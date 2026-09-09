@@ -1,0 +1,1 @@
+{"required":true,"package":"io.github.r3neer.clingingreoriented.testmixin","compatibilityLevel":"JAVA_25","client":["SoundProbeMixin"],"injectors":{"defaultRequire":1}}

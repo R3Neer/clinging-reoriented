@@ -1,0 +1,28 @@
+plugins { id 'net.fabricmc.fabric-loom' version "${loom_version}" }
+version = mod_version
+group = 'io.github.r3neer'
+repositories { mavenCentral(); maven { url = 'https://api.modrinth.com/maven' } }
+dependencies {
+    if (providers.gradleProperty('withFirstPerson').isPresent()) runtimeOnly fileTree(dir: 'test-libs', include: '*.jar')
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
+    implementation file('libs/gravity.jar').exists() ? files('libs/gravity.jar') : 'maven.modrinth:gravity-changer-unofficial-port:vpktEkWn'
+    implementation file('libs/alexsmobs.jar').exists() ? files('libs/alexsmobs.jar') : 'maven.modrinth:alexs-mobs-continued:fL9nXI68'
+    implementation file('libs/codxlib-1.5.1-fabric+26.2.jar').exists() ? files('libs/codxlib-1.5.1-fabric+26.2.jar') : 'maven.modrinth:codxlib:BwANM3tR'
+    implementation file('libs/cloth-config-26.2.155.jar').exists() ? files('libs/cloth-config-26.2.155.jar') : 'maven.modrinth:cloth-config:Nv3xnWXd'
+    implementation fileTree(dir: 'libs', include: '*.jar', exclude: ['gravity.jar', 'alexsmobs.jar', 'codxlib-*.jar', 'cloth-config-*.jar'] + (providers.gradleProperty('withoutScaleBrews').isPresent() ? ['scalebrews*.jar'] : []))
+    if (providers.gradleProperty('withoutScaleBrews').isPresent()) compileOnly fileTree(dir: 'libs', include: 'scalebrews-*.jar')
+    testImplementation platform('org.junit:junit-bom:5.12.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+java { withSourcesJar(); sourceCompatibility = JavaVersion.VERSION_25; targetCompatibility = JavaVersion.VERSION_25 }
+tasks.withType(JavaCompile).configureEach { options.release = 25 }
+test { useJUnitPlatform() }
+processResources { inputs.property 'version', version; filesMatching('fabric.mod.json') { expand version: project.version } }
+fabricApi { configureTests { createSourceSet = true; modId = 'clinging_reoriented_test'; enableGameTests = true; enableClientGameTests = true } }
+dependencies { gametestCompileOnly fileTree(dir: 'test-libs', include: '*.jar') }
+if (!providers.gradleProperty('withFirstPerson').isPresent()) sourceSets.gametest.java.exclude '**/FirstPersonChecks.java'
+if (providers.gradleProperty('withoutScaleBrews').isPresent()) dependencies { gametestCompileOnly fileTree(dir: 'libs', include: 'scalebrews-*.jar') }
+tasks.withType(AbstractArchiveTask).configureEach { preserveFileTimestamps = false; reproducibleFileOrder = true }
