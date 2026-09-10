@@ -68,9 +68,9 @@ versions on every multiplayer participant. See the
 ## Recommended companions
 
 - **[Alchemical Leather](https://github.com/R3Neer/alchemical-leather)** is the
-  recommended companion. Infuse Clinging or Reorientation into leather boots
-  so the effect lasts while they are equipped. Its future animal-armor release
-  can also supply gravity effects to leather horse armor and wolf armor.
+  recommended companion. Infuse Clinging or Reorientation into compatible
+  boots, or use its current dyeable animal-armor support to supply those gravity
+  effects through leather horse armor and wolf armor.
 - **[Scale Brews](https://github.com/R3Neer/scale-brews)** is optional for extra
   chaos: combine changing gravity with growing, shrinking and size-dependent
   entity interactions. The tested integration uses Scale Brews beta.4's existing
