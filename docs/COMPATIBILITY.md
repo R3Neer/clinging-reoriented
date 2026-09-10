@@ -16,13 +16,15 @@ Minecraft 26.2. Both the client and server need the same mod version.
 
 ### Alchemical Leather
 
-Alchemical Leather can infuse Clinging and Reorientation into leather boots. The
-normal/splash infusion clock advances only while equipped; lingering infusions last
-while worn. This optional rule stays inactive when Clinging: Reoriented is absent.
+Alchemical Leather 0.1.0-alpha.2 can infuse Clinging and Reorientation into
+compatible humanoid boots and into compatible BODY / animal armor. Humanoid
+boots keep Alchemical Leather's effect-slot rule. BODY armor stores one potion
+bundle and is not constrained by the humanoid slot table.
 
-Animal-armor gravity and pet-route integration has been tested against the next
-Alchemical Leather development version, but must not be treated as part of its
-current public alpha.1 release.
+Normal/splash infusion clocks advance only while equipped; lingering infusions
+remain stable while worn. The alpha.2 integration fixture uses this Clinging:
+Reoriented alpha.6 release with real leather horse armor and wolf armor and
+verifies equip/unequip effect ownership. Alchemical Leather remains optional.
 
 ### Scale Brews
 
