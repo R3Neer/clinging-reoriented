@@ -6,6 +6,7 @@ import java.util.UUID;
 
 /** Gravity ownership survives contact loss. Transport never does. */
 public final class PlayerData {
+    public record SupportSample(long sequence,long tick,Vec3 position) {}
     public boolean owned;
     public boolean airChangeUsed;
     public boolean ownedAtDeath;
@@ -27,8 +28,13 @@ public final class PlayerData {
     public long lastRequest = -1;
     public long requestTick = -1;
     public int revision;
-    public final java.util.ArrayDeque<Vec3> supportHistory = new java.util.ArrayDeque<>();
+    public long supportSampleSequence;
+    public long lastConsumedSupportSample=-1;
+    public final java.util.ArrayDeque<SupportSample> supportHistory = new java.util.ArrayDeque<>();
     public Payloads.MoveReference pendingMove;
-    public void unbind() { support = null; supportId = -1; supportPosition = null; supportBox = null; lastTransport = Vec3.ZERO; groundedOnSurface = false; supportHistory.clear(); pendingMove=null; }
+    public void unbind() {
+        support = null; supportId = -1; supportPosition = null; supportBox = null; lastTransport = Vec3.ZERO; groundedOnSurface = false;
+        supportHistory.clear();supportSampleSequence=0;lastConsumedSupportSample=-1;pendingMove=null;
+    }
     public interface Holder { PlayerData clinging$data(); }
 }
