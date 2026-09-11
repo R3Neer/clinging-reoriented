@@ -11,10 +11,9 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.minecraft.client.CameraType;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.Pose;
-import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.phys.Vec3;
 
-/** Runs against the installed First Person and Scale Visual Compat binaries. */
+/** Runs against the installed First Person binary without requiring Scale Brews. */
 public final class FirstPersonChecks {
     public static void run(ClientGameTestContext context) {
         context.runOnClient(mc -> mc.options.setCameraType(CameraType.FIRST_PERSON));
@@ -32,40 +31,37 @@ public final class FirstPersonChecks {
                 var player = mc.player;
                 var logic = FirstPersonModelCore.instance.getLogicHandler();
                 var rotation = ((GravityAnimationEntity)player).gravitychanger$getVisualGravityRotation(direction);
-                for (double scale : new double[]{.28, 1, 3.88}) {
-                    player.getAttribute(Attributes.SCALE).setBaseValue(scale);
-                    for (Pose pose : new Pose[]{Pose.STANDING, Pose.CROUCHING}) {
-                        player.setPose(pose);
-                        for (float yaw : new float[]{0, 90, 180, -90}) {
-                            player.yBodyRotO = yaw; player.yBodyRot = yaw;
-                            double distance = pose == Pose.STANDING
-                                ? .25f + FirstPersonModelCore.instance.getConfig().xOffset / 100f + .10
-                                : .27f + FirstPersonModelCore.instance.getConfig().sneakXOffset / 100f;
-                            Vec3 local = new Vec3(distance * Math.sin(Math.toRadians(yaw)), 0, -distance * Math.cos(Math.toRadians(yaw))).scale(scale);
+                for (Pose pose : new Pose[]{Pose.STANDING, Pose.CROUCHING}) {
+                    player.setPose(pose);
+                    for (float yaw : new float[]{0, 90, 180, -90}) {
+                        player.yBodyRotO = yaw; player.yBodyRot = yaw;
+                        double distance = pose == Pose.STANDING
+                            ? .25f + FirstPersonModelCore.instance.getConfig().xOffset / 100f + .10
+                            : .27f + FirstPersonModelCore.instance.getConfig().sneakXOffset / 100f;
+                        Vec3 local = new Vec3(distance * Math.sin(Math.toRadians(yaw)), 0, -distance * Math.cos(Math.toRadians(yaw)));
 
-                            // An unrelated Gravity Changer frame is not ours to patch.
-                            ClingingReoriented.data(player).visualFrameOwned=false;
-                            VisualTransitions.clear();
+                        // An unrelated Gravity Changer frame is not ours to patch.
+                        ClingingReoriented.data(player).visualFrameOwned=false;
+                        VisualTransitions.clear();
+                        logic.updatePositionOffset(player, 1);
+                        if (logic.getOffset().distanceTo(local) > 1e-5)
+                            throw new AssertionError("External gravity offset was modified " + direction + " " + pose + " actual=" + logic.getOffset() + " expected=" + local);
+
+                        // The same settled physical frame becomes eligible once Clinging owns presentation.
+                        ClingingReoriented.data(player).visualFrameOwned=true;
+                        Vec3 expected = RotationUtil.vecPlayerToWorld(local, rotation);
+                        logic.updatePositionOffset(player, 1);
+                        if (logic.getOffset().distanceTo(expected) > 1e-5)
+                            throw new AssertionError("Clinging-owned body offset mismatch " + direction + " " + pose + " actual=" + logic.getOffset() + " expected=" + expected);
+
+                        Vec3 worldOffset = new Vec3(.13, .24, .35);
+                        PlayerOffsetHandler handler = (p, delta, original, current) -> current.add(worldOffset);
+                        FirstPersonAPI.getPlayerOffsetHandlers().add(handler);
+                        try {
                             logic.updatePositionOffset(player, 1);
-                            if (logic.getOffset().distanceTo(local) > 1e-5)
-                                throw new AssertionError("External gravity offset was modified " + direction + " " + pose + " " + scale + " actual=" + logic.getOffset() + " expected=" + local);
-
-                            // The same settled physical frame becomes eligible once Clinging owns presentation.
-                            ClingingReoriented.data(player).visualFrameOwned=true;
-                            Vec3 expected = RotationUtil.vecPlayerToWorld(local, rotation);
-                            logic.updatePositionOffset(player, 1);
-                            if (logic.getOffset().distanceTo(expected) > 1e-5)
-                                throw new AssertionError("Clinging-owned body offset mismatch " + direction + " " + pose + " " + scale + " actual=" + logic.getOffset() + " expected=" + expected);
-
-                            Vec3 worldOffset = new Vec3(.13, .24, .35);
-                            PlayerOffsetHandler handler = (p, delta, original, current) -> current.add(worldOffset);
-                            FirstPersonAPI.getPlayerOffsetHandlers().add(handler);
-                            try {
-                                logic.updatePositionOffset(player, 1);
-                                if (logic.getOffset().distanceTo(expected.add(worldOffset)) > 1e-5)
-                                    throw new AssertionError("External world offset was rotated");
-                            } finally { FirstPersonAPI.getPlayerOffsetHandlers().remove(handler); }
-                        }
+                            if (logic.getOffset().distanceTo(expected.add(worldOffset)) > 1e-5)
+                                throw new AssertionError("External world offset was rotated");
+                        } finally { FirstPersonAPI.getPlayerOffsetHandlers().remove(handler); }
                     }
                 }
                 // The transition epoch is a separate ownership source used while a
@@ -74,7 +70,6 @@ public final class FirstPersonChecks {
                 VisualTransitions.begin(player,direction,++sequence[0]);
                 if(!VisualTransitions.owns(player))throw new AssertionError("Clinging transition epoch was not associated with the player animation");
                 VisualTransitions.clear();
-                player.getAttribute(Attributes.SCALE).setBaseValue(1);
                 player.setPose(Pose.STANDING);
                 player.yBodyRotO = 0; player.yBodyRot = 0;
             });
