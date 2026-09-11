@@ -18,7 +18,6 @@ public abstract class PlayerStateMixin implements PlayerData.Holder {
         output.putInt("clinging_reoriented:direction",clinging$state.selected.get3DDataValue());
         output.putBoolean("clinging_reoriented:anchor_borrowed",clinging$state.anchorBorrowed);
         output.putBoolean("clinging_reoriented:anchor_expired",clinging$state.anchorExpired);
-        if(clinging$state.lastSafeDown!=null){output.putDouble("clinging_reoriented:safe_x",clinging$state.lastSafeDown.x);output.putDouble("clinging_reoriented:safe_y",clinging$state.lastSafeDown.y);output.putDouble("clinging_reoriented:safe_z",clinging$state.lastSafeDown.z);}
     }
     @Inject(method="readAdditionalSaveData",at=@At("TAIL"))
     private void clinging$load(ValueInput input,CallbackInfo ci){
@@ -27,7 +26,6 @@ public abstract class PlayerStateMixin implements PlayerData.Holder {
         clinging$state.selected=Direction.from3DDataValue(Math.clamp(input.getIntOr("clinging_reoriented:direction",0),0,5));
         clinging$state.anchorBorrowed=input.getBooleanOr("clinging_reoriented:anchor_borrowed",false);
         clinging$state.anchorExpired=input.getBooleanOr("clinging_reoriented:anchor_expired",false);
-        double x=input.getDoubleOr("clinging_reoriented:safe_x",Double.NaN),y=input.getDoubleOr("clinging_reoriented:safe_y",Double.NaN),z=input.getDoubleOr("clinging_reoriented:safe_z",Double.NaN);
-        if(Double.isFinite(x+y+z))clinging$state.lastSafeDown=new net.minecraft.world.phys.Vec3(x,y,z);
+        // Legacy safe_x/safe_y/safe_z keys are intentionally ignored. Retirement is local-only.
     }
 }
