@@ -4,5 +4,5 @@
   "version": "1.0.0",
   "environment": "*",
   "mixins": ["clinging_reoriented_test.mixins.json"],
-  "entrypoints": {"fabric-gametest": ["io.github.r3neer.clingingreoriented.ClingingGameTests", "io.github.r3neer.clingingreoriented.ReorientationTests", "io.github.r3neer.clingingreoriented.AnimalGravityTests", "io.github.r3neer.clingingreoriented.ScaleMountGravityTests"], "fabric-client-gametest": ["io.github.r3neer.clingingreoriented.ClingingClientGameTest", "io.github.r3neer.clingingreoriented.GravityControlsClientTest"]}
+  "entrypoints": {"fabric-gametest": ["io.github.r3neer.clingingreoriented.ClingingGameTests", "io.github.r3neer.clingingreoriented.ReorientationTests", "io.github.r3neer.clingingreoriented.AnimalGravityTests", "io.github.r3neer.clingingreoriented.HardeningAdversarialTests"], "fabric-client-gametest": ["io.github.r3neer.clingingreoriented.ClingingClientGameTest", "io.github.r3neer.clingingreoriented.GravityControlsClientTest"]}
 }

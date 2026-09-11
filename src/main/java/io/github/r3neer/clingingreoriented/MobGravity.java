@@ -4,33 +4,44 @@ import com.moigferdsrte.gravitychanger.util.*;
 import com.moigferdsrte.gravitychanger.init.ModAttributes;
 import com.moigferdsrte.gravitychanger.attributes.DirectionalAttribute;
 import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 /** Passive effect lifetime and temporary rider grant; no navigation decisions. */
 public final class MobGravity {
+    private static final double RECOVERY_RADIUS=4.0;
+    public enum Ownership { NONE, OWNED_EFFECT, BORROWED_RIDER, EXTERNAL }
     public static final class State {
-        public boolean effectSeen, borrowed, airUsed;
+        public Ownership ownership=Ownership.NONE;
+        public Direction ownedDirection=Direction.DOWN;
+        public Ownership borrowedPreviousOwnership=Ownership.NONE;
+        public Direction borrowedPreviousDirection=Direction.DOWN;
+        public boolean airUsed;
         public long breadcrumb;
         public java.util.UUID breadcrumbOwner;
         public long retryAt;
+        public void clearBorrow(){borrowedPreviousOwnership=Ownership.NONE;borrowedPreviousDirection=Direction.DOWN;}
     }
     public interface Holder { State clinging$mobGravity(); }
     public static State state(LivingEntity e){return ((Holder)e).clinging$mobGravity();}
     public static boolean supported(LivingEntity e){return e.getAttribute(ModAttributes.GRAVITY_DIRECTION)!=null;}
     public static boolean hasRider(Entity e){return e.getPassengers().stream().anyMatch(p->p instanceof Player && p.isAlive() || hasRider(p));}
     private static boolean hasGrantRider(Entity e){return e.getPassengers().stream().anyMatch(p->p instanceof Player rider && rider.isAlive() && rider.hasEffect(Reorientation.EFFECT) || hasGrantRider(p));}
-    public static boolean active(LivingEntity e){return supported(e) && e.isAlive() && (ClingingReoriented.hasEffect(e)||state(e).borrowed&&hasGrantRider(e));}
-    private static boolean restore(LivingEntity e){
+    public static boolean active(LivingEntity e){return supported(e) && e.isAlive() && (ClingingReoriented.hasEffect(e)||state(e).ownership==Ownership.BORROWED_RIDER&&hasGrantRider(e));}
+
+    private static boolean restore(LivingEntity e,Direction direction){
         var s=state(e);if(e.level().getGameTime()<s.retryAt)return false;
-        if(turn(e,Direction.DOWN,true))return true;
+        if(turn(e,direction,true)){s.retryAt=0;return true;}
         var origin=e.position();
+        double maxDistanceSqr=RECOVERY_RADIUS*RECOVERY_RADIUS+1.0E-9;
         for(int radius=1;radius<=8;radius++)for(int x=-radius;x<=radius;x++)for(int y=-radius;y<=radius;y++)for(int z=-radius;z<=radius;z++){
             if(Math.max(Math.abs(x),Math.max(Math.abs(y),Math.abs(z)))!=radius)continue;
             var target=origin.add(x*.5,y*.5,z*.5);
-            var box=RotationUtil.makeBoxFromDimensions(e.getDimensions(e.getPose()),Direction.DOWN,target);
-            if(fits(e,box)){e.teleportTo(target.x,target.y,target.z);return turn(e,Direction.DOWN,true);}
+            if(target.distanceToSqr(origin)>maxDistanceSqr)continue;
+            if(relocateTree(e,direction,target)){s.retryAt=0;return true;}
         }
         s.retryAt=e.level().getGameTime()+20;return false;
     }
@@ -42,55 +53,121 @@ public final class MobGravity {
         if(AnatomyBridge.active(e) && !AnatomyBridge.spaceClear(e,interior))return false;
         return e.level().noCollision(e,interior);
     }
-    private static boolean passengersFit(Entity vehicle,Direction direction,net.minecraft.world.phys.Vec3 position){
+    private static boolean passengersFit(Entity vehicle,Direction direction,Vec3 position){
         for(var passenger:vehicle.getPassengers()){
-            // Audited vanilla attachment getters, with the same cardinal rotation
-            // used by Gravity Changer's positionRider hook. No gravity mutation.
             var offset=vehicle.getPassengerRidingPosition(passenger).subtract(vehicle.position()).subtract(passenger.getVehicleAttachmentPoint(vehicle));
             var target=position.add(RotationUtil.vecPlayerToWorld(offset,direction));
             var passengerDirection=passenger instanceof Player?direction:GravityDirectionUtil.getGravityDirection(passenger);
-            if(!fits(passenger,RotationUtil.makeBoxFromDimensions(passenger.getDimensions(passenger.getPose()),passengerDirection,target))
-                || !passengersFit(passenger,passengerDirection,target))return false;
+            if(!treeFits(passenger,passengerDirection,target))return false;
         }
         return true;
     }
+    private static boolean treeFits(Entity root,Direction direction,Vec3 position){
+        var box=RotationUtil.makeBoxFromDimensions(root.getDimensions(root.getPose()),direction,position);
+        return fits(root,box)&&passengersFit(root,direction,position);
+    }
     private static void positionPassengers(Entity vehicle){for(var passenger:vehicle.getPassengers()){vehicle.positionRider(passenger);positionPassengers(passenger);}}
+    private static void commitTurn(LivingEntity e,Direction direction,Vec3 position,boolean relocate){
+        if(relocate)e.teleportTo(position.x,position.y,position.z);
+        var attribute=e.getAttribute(ModAttributes.GRAVITY_DIRECTION);
+        attribute.setBaseValue(DirectionalAttribute.valueOf(direction));
+        e.setBoundingBox(RotationUtil.makeBoxFromDimensions(e.getDimensions(e.getPose()),direction,position));
+        positionPassengers(e);
+        e.setOnGround(false);e.verticalCollision=false;e.verticalCollisionBelow=false;e.horizontalCollision=false;
+    }
+    static boolean relocateTree(LivingEntity e,Direction direction,Vec3 position){
+        if(!treeFits(e,direction,position))return false;
+        commitTurn(e,direction,position,!e.position().equals(position));
+        return true;
+    }
     public static boolean turn(LivingEntity e,Direction direction,boolean checkSpace){
         var attribute=e.getAttribute(ModAttributes.GRAVITY_DIRECTION);
         if(attribute==null || !attribute.getModifiers().isEmpty())return false;
-        var box=RotationUtil.makeBoxFromDimensions(e.getDimensions(e.getPose()),direction,e.position());
-        if(checkSpace && (!fits(e,box) || !passengersFit(e,direction,e.position())))return false;
-        // The public setter recentres mobs by teleporting. Use its same audited
-        // syncable base attribute here so the validated pivot and world velocity stay fixed.
-        attribute.setBaseValue(DirectionalAttribute.valueOf(direction));e.setBoundingBox(box);
-        positionPassengers(e);
-        e.setOnGround(false);e.verticalCollision=false;e.verticalCollisionBelow=false;e.horizontalCollision=false;
+        if(checkSpace)return relocateTree(e,direction,e.position());
+        commitTurn(e,direction,e.position(),false);
+        return true;
+    }
+
+    private static void relinquishToExternal(LivingEntity e,Direction direction){
+        var s=state(e);s.ownership=Ownership.EXTERNAL;s.ownedDirection=direction;s.clearBorrow();s.retryAt=0;
+    }
+    public static void externalWrite(LivingEntity e,Direction direction){
+        if(e.level().isClientSide()||!supported(e))return;
+        relinquishToExternal(e,direction);
+    }
+    private static boolean ownershipStillMatches(LivingEntity e,State s){
+        if(s.ownership!=Ownership.OWNED_EFFECT&&s.ownership!=Ownership.BORROWED_RIDER)return true;
+        var attribute=e.getAttribute(ModAttributes.GRAVITY_DIRECTION);
+        Direction actual=GravityDirectionUtil.getOwnGravityDirection(e);
+        if(attribute==null||!attribute.getModifiers().isEmpty()||actual!=s.ownedDirection){relinquishToExternal(e,actual);return false;}
+        return true;
+    }
+    private static void finishBorrow(State s,Ownership ownership,Direction direction){
+        s.ownership=ownership;s.ownedDirection=direction;s.clearBorrow();s.retryAt=0;
+    }
+    public static boolean borrow(LivingEntity e,Direction direction){
+        if(!supported(e)||!e.isAlive())return false;
+        var s=state(e);ownershipStillMatches(e,s);
+        Direction current=GravityDirectionUtil.getOwnGravityDirection(e);
+        if(current==direction&&s.ownership!=Ownership.BORROWED_RIDER)return true;
+        if(s.ownership!=Ownership.BORROWED_RIDER){
+            Ownership previous=s.ownership;
+            if(previous==Ownership.NONE&&current!=Direction.DOWN)previous=Ownership.EXTERNAL;
+            s.borrowedPreviousOwnership=previous;
+            s.borrowedPreviousDirection=current;
+        }
+        if(!turn(e,direction,true))return false;
+        s.ownership=Ownership.BORROWED_RIDER;s.ownedDirection=direction;s.airUsed=true;s.retryAt=0;
         return true;
     }
     public static void tick(LivingEntity e){
         if(e instanceof Player || e.level().isClientSide() || !supported(e))return;
-        var s=state(e);boolean own=ClingingReoriented.hasEffect(e);
+        var s=state(e);boolean ownEffect=ClingingReoriented.hasEffect(e);
         if(s.airUsed && AirChanges.grounded(e))s.airUsed=false;
-        if(own)s.effectSeen=true;
+        if(!ownershipStillMatches(e,s))return;
         boolean ridden=hasGrantRider(e);
-        if(!own && !ridden && (s.effectSeen || s.borrowed)) {
-            if(restore(e)){s.effectSeen=false;s.borrowed=false;}
+        if(s.ownership==Ownership.BORROWED_RIDER){
+            if(ridden)return;
+            Ownership previous=s.borrowedPreviousOwnership;Direction previousDirection=s.borrowedPreviousDirection;
+            if(previous==Ownership.EXTERNAL){
+                if(restore(e,previousDirection))finishBorrow(s,Ownership.EXTERNAL,previousDirection);
+                return;
+            }
+            if(previous==Ownership.OWNED_EFFECT&&ownEffect){
+                if(restore(e,previousDirection))finishBorrow(s,Ownership.OWNED_EFFECT,previousDirection);
+                return;
+            }
+            if(ownEffect){
+                finishBorrow(s,Ownership.OWNED_EFFECT,GravityDirectionUtil.getOwnGravityDirection(e));
+                return;
+            }
+            if(restore(e,Direction.DOWN))finishBorrow(s,Ownership.NONE,Direction.DOWN);
+            return;
         }
-        if(!ridden && own)s.borrowed=false;
+        if(s.ownership==Ownership.OWNED_EFFECT&&!ownEffect){
+            if(restore(e,Direction.DOWN)){s.ownership=Ownership.NONE;s.ownedDirection=Direction.DOWN;s.retryAt=0;}
+        }
     }
     public static boolean transfer(Player player,Entity vehicle,Direction before){
         if(!player.hasEffect(Reorientation.EFFECT) || before==Direction.DOWN || !(vehicle.getRootVehicle() instanceof LivingEntity root) || root instanceof Player)return false;
-        if(!turn(root,before,true))return false;
-        state(root).borrowed=true;state(root).effectSeen|=ClingingReoriented.hasEffect(root);
+        Direction previous=GravityDirectionUtil.getOwnGravityDirection(root);
+        if(!borrow(root,before))return false;
+        if(previous!=before&&player instanceof ServerPlayer serverPlayer){
+            var playerState=ClingingReoriented.data(serverPlayer);playerState.visualFrameOwned=true;
+            Payloads.visual(serverPlayer,before);Payloads.publish(serverPlayer);
+        }
         return true;
     }
     public static boolean replay(LivingEntity pet,Direction direction){
         if(!ClingingReoriented.hasEffect(pet) || !supported(pet) || pet.isPassenger() || pet.isVehicle() || !pet.isAlive())return false;
-        var s=state(pet);if(AirChanges.grounded(pet))s.airUsed=false;
-        if(direction==GravityDirectionUtil.getGravityDirection(pet))return true;
+        var s=state(pet);ownershipStillMatches(pet,s);
+        if(AirChanges.grounded(pet))s.airUsed=false;
+        Direction current=GravityDirectionUtil.getOwnGravityDirection(pet);
+        if(direction==current)return true;
+        if((s.ownership==Ownership.EXTERNAL||s.ownership==Ownership.NONE)&&current!=Direction.DOWN)return false;
         if(s.airUsed && !pet.hasEffect(Reorientation.EFFECT))return false;
         boolean airborne=!AirChanges.grounded(pet);
         if(!turn(pet,direction,true))return false;
-        s.airUsed|=airborne;s.effectSeen=true;return true;
+        s.airUsed|=airborne;s.ownership=Ownership.OWNED_EFFECT;s.ownedDirection=direction;s.clearBorrow();s.retryAt=0;return true;
     }
 }

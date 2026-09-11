@@ -34,7 +34,7 @@ public final class AnimalGravityTests {
         h.assertTrue(ClingingReoriented.attempt(p,new Vec3(1,0,0))==ClingingReoriented.Result.NO_SPACE,"passenger obstruction rejects turn");
         h.assertTrue(GravityDirectionUtil.getGravityDirection(horse)==Direction.DOWN && before.equals(horse.position()) && riderBefore.equals(p.position()) && momentum.equals(horse.getDeltaMovement()),"failed mounted turn is atomic");h.succeed();
     }
-    @GameTest(padding=40,maxTicks=100) public void actualSplashEffectsExpireOnPassiveAnimals(GameTestHelper h){
+    @GameTest(padding=40,maxTicks=100) public void actualSplashEffectsDoNotClaimExternalGravity(GameTestHelper h){
         player(h);var animals=new java.util.ArrayList<LivingEntity>();
         for(var type:new EntityType[]{EntityTypes.HORSE,EntityTypes.WOLF,EntityTypes.PIG})for(var effect:new Holder[]{clinging(),Reorientation.EFFECT}){
             var mob=(Mob)h.spawn(type,new BlockPos(4,10,4));mob.setNoAi(true);mob.setNoGravity(true);
@@ -43,10 +43,11 @@ public final class AnimalGravityTests {
             var splash=new net.minecraft.world.entity.projectile.throwableitemprojectile.ThrownSplashPotion(h.getLevel(),mob.getX(),mob.getY(),mob.getZ(),stack);
             splash.onHitAsPotion(h.getLevel(),stack,new net.minecraft.world.phys.EntityHitResult(mob));
             h.assertTrue(mob.hasEffect(effect),"real splash delivery to "+type);
-            h.assertTrue(MobGravity.turn(mob,Direction.UP,false),"external direction applied");MobGravity.tick(mob);
-            h.assertTrue(GravityDirectionUtil.getGravityDirection(mob)==Direction.UP,"splash retains external direction");animals.add(mob);
+            GravityDirectionUtil.setGravityDirection(mob,Direction.UP);MobGravity.tick(mob);
+            h.assertTrue(GravityDirectionUtil.getGravityDirection(mob)==Direction.UP,"passive effect does not overwrite external direction");
+            h.assertTrue(MobGravity.state(mob).ownership==MobGravity.Ownership.EXTERNAL,"external write is explicitly owned elsewhere");animals.add(mob);
         }
-        h.runAfterDelay(55,()->{for(var mob:animals)h.assertTrue(!ClingingReoriented.hasEffect(mob) && GravityDirectionUtil.getGravityDirection(mob)==Direction.DOWN,"natural expiry restores DOWN");h.succeed();});
+        h.runAfterDelay(55,()->{for(var mob:animals)h.assertTrue(!ClingingReoriented.hasEffect(mob) && GravityDirectionUtil.getGravityDirection(mob)==Direction.UP,"natural expiry preserves external gravity");h.succeed();});
     }
     @GameTest(padding=40) public void breadcrumbQueueBoundExpiryAndDimension(GameTestHelper h) throws Exception {
         var owner=player(h);var wolf=h.spawn(EntityTypes.WOLF,new BlockPos(4,10,4));wolf.tame(owner);wolf.addEffect(new MobEffectInstance(Reorientation.EFFECT,500));
@@ -83,24 +84,33 @@ public final class AnimalGravityTests {
         p.stopRiding();MobGravity.tick(horse);
         h.assertTrue(GravityDirectionUtil.getGravityDirection(horse)==Direction.DOWN,"unpowered mount resets after dismount");
         ClingingReoriented.write(p,Direction.EAST);horse.addEffect(new MobEffectInstance(clinging(),300));p.startRiding(horse,true,true);p.stopRiding();MobGravity.tick(horse);
-        h.assertTrue(GravityDirectionUtil.getGravityDirection(horse)==Direction.EAST,"own Clinging retains mount orientation");
+        h.assertTrue(GravityDirectionUtil.getGravityDirection(horse)==Direction.EAST,"own Clinging adopts retained mount orientation");
         horse.removeAllEffects();MobGravity.tick(horse);
         h.assertTrue(GravityDirectionUtil.getGravityDirection(horse)==Direction.DOWN,"last own effect removed resets mount");h.succeed();
     }
-    @GameTest(padding=32) public void passiveEffectsNeverPickGravity(GameTestHelper h){
+    @GameTest(padding=32) public void passiveEffectsNeverClaimExternalGravity(GameTestHelper h){
         player(h);
         for(var type:new EntityType[]{EntityTypes.HORSE,EntityTypes.WOLF,EntityTypes.PIG}){
             var mob=(Mob)h.spawn(type,new BlockPos(4,10,4));mob.setNoAi(true);
             for(var effect:new Holder[]{clinging(),Reorientation.EFFECT}){
                 mob.addEffect(new MobEffectInstance(effect,200));MobGravity.tick(mob);
-                h.assertTrue(GravityDirectionUtil.getGravityDirection(mob)==Direction.DOWN,"effect alone makes no decision");
-                MobGravity.turn(mob,Direction.UP,true);MobGravity.tick(mob);
+                h.assertTrue(GravityDirectionUtil.getGravityDirection(mob)==Direction.DOWN,"effect alone makes no direction decision");
+                GravityDirectionUtil.setGravityDirection(mob,Direction.UP);MobGravity.tick(mob);
                 h.assertTrue(GravityDirectionUtil.getGravityDirection(mob)==Direction.UP,"passive effect retains external orientation");
+                h.assertTrue(MobGravity.state(mob).ownership==MobGravity.Ownership.EXTERNAL,"external direction is not claimed by effect");
                 mob.removeAllEffects();MobGravity.tick(mob);
-                h.assertTrue(GravityDirectionUtil.getGravityDirection(mob)==Direction.DOWN,"effect removal restores down");
+                h.assertTrue(GravityDirectionUtil.getGravityDirection(mob)==Direction.UP,"effect removal cannot reset external gravity");
+                GravityDirectionUtil.setGravityDirection(mob,Direction.DOWN);MobGravity.tick(mob);
             }
             mob.discard();
         }h.succeed();
+    }
+    @GameTest(padding=32) public void ownedPetGravityRetiresWhenEffectEnds(GameTestHelper h){
+        var owner=player(h);var wolf=h.spawn(EntityTypes.WOLF,new BlockPos(4,10,4));wolf.tame(owner);wolf.setNoAi(true);wolf.addEffect(new MobEffectInstance(Reorientation.EFFECT,200));wolf.setOnGround(false);
+        h.assertTrue(MobGravity.replay(wolf,Direction.EAST),"breadcrumb-style replay acquires gravity ownership");
+        h.assertTrue(MobGravity.state(wolf).ownership==MobGravity.Ownership.OWNED_EFFECT && GravityDirectionUtil.getGravityDirection(wolf)==Direction.EAST,"owned frame recorded");
+        wolf.removeAllEffects();MobGravity.tick(wolf);
+        h.assertTrue(MobGravity.state(wolf).ownership==MobGravity.Ownership.NONE && GravityDirectionUtil.getGravityDirection(wolf)==Direction.DOWN,"owned effect frame retires to DOWN");h.succeed();
     }
     @GameTest(padding=40) public void followerReplaysAtThePlaceAndRespectsItsCharge(GameTestHelper h){
         var owner=player(h);var wolf=h.spawn(EntityTypes.WOLF,new BlockPos(4,10,4));wolf.tame(owner);

@@ -1,6 +1,7 @@
 package io.github.r3neer.clingingreoriented;
 
 import net.fabricmc.fabric.api.networking.v1.*;
+import net.minecraft.core.Direction;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -28,9 +29,15 @@ public final class Payloads {
         public static final StreamCodec<RegistryFriendlyByteBuf,Reply> CODEC=StreamCodec.of((b,v)->{b.writeVarLong(v.sequence);b.writeVarInt(v.result);},b->new Reply(b.readVarLong(),b.readVarInt()));
         @Override public Type<Reply> type(){return TYPE;}
     }
-    public record State(int player,int direction,boolean owned,int support,java.util.UUID supportUuid,int revision) implements CustomPacketPayload {
-        public static final Type<State> TYPE=Payloads.type("state");
-        public static final StreamCodec<RegistryFriendlyByteBuf,State> CODEC=StreamCodec.of((b,v)->{b.writeVarInt(v.player);b.writeVarInt(v.direction);b.writeBoolean(v.owned);b.writeVarInt(v.support);b.writeUUID(v.supportUuid);b.writeVarInt(v.revision);},b->new State(b.readVarInt(),b.readVarInt(),b.readBoolean(),b.readVarInt(),b.readUUID(),b.readVarInt()));
+    /** Sent only to the affected player and only for a transition initiated by Clinging. */
+    public record VisualTransition(int direction,long sequence) implements CustomPacketPayload {
+        public static final Type<VisualTransition> TYPE=Payloads.type("visual_transition_v1");
+        public static final StreamCodec<RegistryFriendlyByteBuf,VisualTransition> CODEC=StreamCodec.of((b,v)->{b.writeVarInt(v.direction);b.writeVarLong(v.sequence);},b->new VisualTransition(b.readVarInt(),b.readVarLong()));
+        @Override public Type<VisualTransition> type(){return TYPE;}
+    }
+    public record State(int player,int direction,boolean owned,boolean visualOwned,int support,java.util.UUID supportUuid,int revision) implements CustomPacketPayload {
+        public static final Type<State> TYPE=Payloads.type("state_v2");
+        public static final StreamCodec<RegistryFriendlyByteBuf,State> CODEC=StreamCodec.of((b,v)->{b.writeVarInt(v.player);b.writeVarInt(v.direction);b.writeBoolean(v.owned);b.writeBoolean(v.visualOwned);b.writeVarInt(v.support);b.writeUUID(v.supportUuid);b.writeVarInt(v.revision);},b->new State(b.readVarInt(),b.readVarInt(),b.readBoolean(),b.readBoolean(),b.readVarInt(),b.readUUID(),b.readVarInt()));
         @Override public Type<State> type(){return TYPE;}
     }
     public static void register() {
@@ -41,6 +48,7 @@ public final class Payloads {
         });
         PayloadTypeRegistry.serverboundPlay().register(Request.TYPE,Request.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(Reply.TYPE,Reply.CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(VisualTransition.TYPE,VisualTransition.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(State.TYPE,State.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(Request.TYPE,(request,context)-> {
             var p=context.player(); var s=ClingingReoriented.data(p);
@@ -55,10 +63,14 @@ public final class Payloads {
             ServerPlayNetworking.send(p,new Reply(request.sequence,result.ordinal()));
         });
     }
+    public static void visual(ServerPlayer p,Direction direction){
+        var s=ClingingReoriented.data(p);long sequence=++s.visualSequence;
+        if(ServerPlayNetworking.canSend(p,VisualTransition.TYPE))ServerPlayNetworking.send(p,new VisualTransition(direction.get3DDataValue(),sequence));
+    }
     public static void sendState(ServerPlayer p,ServerPlayer recipient) {
         if(!ServerPlayNetworking.canSend(recipient,State.TYPE)) return;
         var s=ClingingReoriented.data(p);
-        ServerPlayNetworking.send(recipient,new State(p.getId(),s.selected.get3DDataValue(),s.owned,s.supportId,s.support==null?new java.util.UUID(0,0):s.support,s.revision));
+        ServerPlayNetworking.send(recipient,new State(p.getId(),s.selected.get3DDataValue(),s.owned,s.visualFrameOwned,s.supportId,s.support==null?new java.util.UUID(0,0):s.support,s.revision));
     }
     public static void publish(ServerPlayer p) {
         ClingingReoriented.data(p).revision++;

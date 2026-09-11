@@ -27,8 +27,19 @@ jobs:
             https://github.com/R3Neer/scale-brews/releases/download/v0.1.0-beta.5/scalebrews-0.1.0-beta.5.jar
       - name: Build and run server tests without optional Scale Brews
         run: ./gradlew build runGameTest -PwithoutScaleBrews --no-daemon --console=plain
-      - name: Run client GameTests
+      - name: Run client GameTests without First Person
         run: xvfb-run -a ./gradlew runClientGameTest -PwithoutScaleBrews --no-daemon --console=plain
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+      - name: Fetch optional First Person fixtures
+        run: |
+          mkdir -p test-libs
+          curl --fail --location --output test-libs/firstperson-fabric-2.7.2-mc26.2.jar \
+            https://api.modrinth.com/maven/maven/modrinth/H5XMjpHi/6sgz2HEq/H5XMjpHi-6sgz2HEq.jar
+          curl --fail --location --output test-libs/notenoughanimations-fabric-1.12.4-mc26.2.jar \
+            https://api.modrinth.com/maven/maven/modrinth/MPCX6s5C/67xQnLDS/MPCX6s5C-67xQnLDS.jar
+      - name: Run First Person ownership GameTests
+        run: xvfb-run -a ./gradlew runClientGameTest -PwithoutScaleBrews -PwithFirstPerson --no-daemon --console=plain
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
       - name: Upload artifacts and diagnostics

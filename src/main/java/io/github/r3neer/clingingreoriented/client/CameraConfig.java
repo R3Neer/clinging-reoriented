@@ -27,7 +27,7 @@ public final class CameraConfig {
                 return;
             }
             var json = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
-            if (!json.has("cameraRotationSeconds")) return;
+            if (!json.has("cameraRotationSeconds")) throw new IllegalArgumentException("Missing cameraRotationSeconds");
             var value = json.get("cameraRotationSeconds");
             if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber()) throw new IllegalArgumentException("Expected a number");
             double candidate = value.getAsDouble();

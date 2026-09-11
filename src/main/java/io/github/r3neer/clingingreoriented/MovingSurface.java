@@ -8,6 +8,7 @@ import net.minecraft.world.phys.*;
 import java.util.*;
 
 public final class MovingSurface {
+    private static final long REFERENCE_MAX_AGE_TICKS=20;
     public static LivingEntity resolve(Player p) {
         var s=ClingingReoriented.data(p);
         Entity e=p.level().getEntity(s.supportId);
@@ -26,10 +27,16 @@ public final class MovingSurface {
         if(node instanceof Player other && !acyclic(p,resolve(other),stack,done))return false;
         stack.remove(node.getUUID());done.add(node.getUUID());return true;
     }
+    private static void sample(Player p,Vec3 position){
+        var s=ClingingReoriented.data(p);var latest=s.supportHistory.peekLast();
+        if(latest!=null&&latest.position().equals(position))return;
+        s.supportHistory.add(new PlayerData.SupportSample(++s.supportSampleSequence,p.level().getGameTime(),position));
+        while(s.supportHistory.size()>20)s.supportHistory.removeFirst();
+    }
     public static void bind(Player p, LivingEntity entity) {
         var s=ClingingReoriented.data(p);
         s.support=entity.getUUID(); s.supportId=entity.getId(); s.supportPosition=entity.position(); s.supportBox=entity.getBoundingBox();
-        s.supportHistory.clear();s.supportHistory.add(entity.position());
+        s.supportHistory.clear();s.supportSampleSequence=0;s.lastConsumedSupportSample=-1;sample(p,entity.position());
         ScaleBridge.clear(p);
     }
     public static void clear(Player p) {
@@ -48,22 +55,20 @@ public final class MovingSurface {
         for(Player p:entity.level().players())if(entity.getUUID().equals(ClingingReoriented.data(p).support))clear(p);
     }
     public static void carry(Player p) {
-        if(AnatomyBridge.active(p))return; // The shared core owns carry, even without Clinging selected.
+        if(AnatomyBridge.active(p))return;
         var s=ClingingReoriented.data(p);
         if(s.support==null || s.carrying || (p.level().isClientSide() && !p.isLocalInstanceAuthoritative())) return;
         LivingEntity support=resolve(p);
         if(support==null || !ClingingReoriented.controlsPhysics(p) || !canBind(p,support)) { clear(p); return; }
-        if(s.supportPosition==null || s.supportBox==null) { s.supportPosition=support.position(); s.supportBox=support.getBoundingBox(); return; }
+        if(s.supportPosition==null || s.supportBox==null) { s.supportPosition=support.position(); s.supportBox=support.getBoundingBox();sample(p,support.position()); return; }
         Vec3 delta=support.position().subtract(s.supportPosition);
-        if(!support.position().equals(s.supportHistory.peekLast())) {s.supportHistory.add(support.position());while(s.supportHistory.size()>20)s.supportHistory.removeFirst();}
+        sample(p,support.position());
         boolean touching=FaceGeometry.touching(p.getBoundingBox(),s.supportBox,s.selected);
         s.supportPosition=support.position(); s.supportBox=support.getBoundingBox();
         if(delta.lengthSqr()>16 || !Double.isFinite(delta.lengthSqr())) { clear(p); return; }
         double away=p.getDeltaMovement().dot(FaceGeometry.vector(s.selected.getOpposite()));
         s.groundedOnSurface=touching && away <= 1e-5;
         if(!s.groundedOnSurface) { s.lastTransport=Vec3.ZERO; return; }
-        // Keep the departure velocity for repeated calls within this tick, but never
-        // reuse a previous tick's displacement after a platform has stopped.
         if(delta.lengthSqr()<1e-12) {
             if(s.transportTick!=p.level().getGameTime())s.lastTransport=Vec3.ZERO;
             return;
@@ -77,8 +82,6 @@ public final class MovingSurface {
             s.transportTick=p.level().getGameTime();
             if(p instanceof ServerPlayer sp) ScaleBridge.baseline(sp,actual);
             if(actual.distanceToSqr(delta)>1e-8) { clear(p); return; }
-            // The collider is excluded during carry to avoid self-blocking. Restore the
-            // real support flags so an entity moving every tick doesn't prevent jumping.
             p.setOnGround(true);p.verticalCollisionBelow=true;
         } finally { s.carrying=false; }
     }
@@ -88,7 +91,7 @@ public final class MovingSurface {
             var support=AnatomyBridge.parent(p);
             if(state.groundedOnSurface && support!=null && !support.getUUID().equals(state.support)) {
                 state.support=support.getUUID();state.supportId=support.getId();state.supportPosition=support.position();
-                state.supportHistory.clear();if(p instanceof ServerPlayer sp)Payloads.publish(sp);
+                state.supportHistory.clear();state.supportSampleSequence=0;state.lastConsumedSupportSample=-1;if(p instanceof ServerPlayer sp)Payloads.publish(sp);
             }
             return;
         }
@@ -107,25 +110,31 @@ public final class MovingSurface {
         }
         s.groundedOnSurface=contact && p.getDeltaMovement().dot(FaceGeometry.vector(s.selected.getOpposite()))<=1e-5;
     }
+    static Vec3 consumeLatestCorrection(PlayerData s,Vec3 observed,long now){
+        if(observed==null||!Double.isFinite(observed.lengthSqr()))return null;
+        var latest=s.supportHistory.peekLast();
+        if(latest==null)return null;
+        long age=now-latest.tick();
+        if(age<0||age>REFERENCE_MAX_AGE_TICKS||latest.sequence()<=s.lastConsumedSupportSample)return null;
+        Vec3 correction=latest.position().subtract(observed);
+        if(!Double.isFinite(correction.lengthSqr())||correction.lengthSqr()>16||correction.lengthSqr()<1e-12)return null;
+        var descending=s.supportHistory.descendingIterator();descending.next();
+        var previous=descending.hasNext()?descending.next():null;
+        if(previous==null||previous.sequence()+1!=latest.sequence())return null;
+        Vec3 segment=latest.position().subtract(previous.position());double len=segment.lengthSqr();
+        if(len<1e-12)return null;
+        double t=Math.clamp(observed.subtract(previous.position()).dot(segment)/len,0,1);
+        if(previous.position().add(segment.scale(t)).distanceToSqr(observed)>=1e-6)return null;
+        s.lastConsumedSupportSample=latest.sequence();
+        return correction;
+    }
     public static Vec3 resolveMovement(ServerPlayer p,Vec3 absolute) {
         if(AnatomyBridge.active(p)){ClingingReoriented.data(p).pendingMove=null;return absolute;}
         var s=ClingingReoriented.data(p); var reference=s.pendingMove;s.pendingMove=null;
         var surface=resolve(p);
         if(reference==null || surface==null || !s.groundedOnSurface || reference.support()!=s.supportId || reference.revision()!=s.revision || !reference.absolute().equals(absolute)) return absolute;
-        Vec3 observed=reference.origin();
-        if(!Double.isFinite(observed.lengthSqr()))return absolute;
-        boolean known=false;Vec3 previous=null;
-        for(Vec3 frame:s.supportHistory) {
-            if(frame.distanceToSqr(observed)<1e-6)known=true;
-            if(previous!=null){
-                Vec3 segment=frame.subtract(previous);double len=segment.lengthSqr();
-                double t=len>1e-12?Math.clamp(observed.subtract(previous).dot(segment)/len,0,1):0;
-                if(previous.add(segment.scale(t)).distanceToSqr(observed)<1e-6)known=true;
-            }
-            previous=frame;
-        }
-        Vec3 correction=surface.position().subtract(observed);
-        if(!known || correction.lengthSqr()>16)return absolute;
+        Vec3 correction=consumeLatestCorrection(s,reference.origin(),p.level().getGameTime());
+        if(correction==null)return absolute;
         Vec3 target=absolute.add(correction);
         if(target.distanceToSqr(p.position())>16)return absolute;
         var box=com.moigferdsrte.gravitychanger.util.RotationUtil.makeBoxFromDimensions(p.getDimensions(p.getPose()),s.selected,target);
