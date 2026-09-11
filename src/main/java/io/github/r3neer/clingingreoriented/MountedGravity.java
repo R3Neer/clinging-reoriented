@@ -21,8 +21,8 @@ public final class MountedGravity {
         Direction direction=LookDirection.select(look);
         if(direction==null)return ClingingReoriented.Result.AMBIGUOUS;
         if(direction==GravityDirectionUtil.getGravityDirection(root))return ClingingReoriented.Result.UNCHANGED;
-        if(!MobGravity.turn(root,direction,true))return ClingingReoriented.Result.NO_SPACE;
-        var state=MobGravity.state(root);state.borrowed=true;state.airUsed=true;
+        if(!MobGravity.borrow(root,direction))return ClingingReoriented.Result.NO_SPACE;
+        MobGravity.state(root).airUsed=true;
         s.airChangeUsed=true;root.positionRider(p);p.setOnGround(false);
         GravityBreadcrumbs.record(p,direction);
         return ClingingReoriented.Result.SUCCESS;
