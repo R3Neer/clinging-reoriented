@@ -1,0 +1,76 @@
+name: Publish alpha.7 from validated main artifact
+
+on:
+  push:
+    branches:
+      - chatgpt/clinging-hardening
+    paths:
+      - .github/workflows/release-alpha7.yml
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    env:
+      TARGET_SHA: 62ee1706ba311445d930dd25dc9aa93e8944eb07
+      VALIDATED_RUN_ID: '34590289860'
+      TAG: v0.1.0-alpha.7
+      REGULAR_SHA256: 188d66ea711fe302492c7f02f5e73a0ed3d62325cc4140756cbe0500df552e82
+      SOURCES_SHA256: 961d51f6eafca91426bd163ca9a32732d034daa8f21082c6a7826d3b628c9da3
+    steps:
+      - name: Download exact validated main artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          RUN_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${VALIDATED_RUN_ID}" --jq .head_sha)"
+          test "$RUN_SHA" = "$TARGET_SHA"
+          gh run download "$VALIDATED_RUN_ID" --repo "$GITHUB_REPOSITORY" --name clinging-reoriented-build --dir release-artifact
+      - name: Verify release assets
+        run: |
+          set -euo pipefail
+          REGULAR="release-artifact/libs/clinging-reoriented-0.1.0-alpha.7.jar"
+          SOURCES="release-artifact/libs/clinging-reoriented-0.1.0-alpha.7-sources.jar"
+          test -f "$REGULAR"
+          test -f "$SOURCES"
+          test "$(stat -c%s "$REGULAR")" = "106915"
+          test "$(stat -c%s "$SOURCES")" = "45181"
+          test "$(sha256sum "$REGULAR" | cut -d' ' -f1)" = "$REGULAR_SHA256"
+          test "$(sha256sum "$SOURCES" | cut -d' ' -f1)" = "$SOURCES_SHA256"
+      - name: Publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists" >&2
+            exit 1
+          fi
+          cat > release-notes.md <<EOF
+          Correctness-hardening alpha for Minecraft 26.2 on Fabric.
+
+          - Forced effect retirement is local and bounded: DOWN in place, validated relocation within four blocks, or a pending retry without remote checkpoint teleports.
+          - Mob gravity ownership and mount loans preserve external frames; root/passenger recovery is atomic across the complete hierarchy.
+          - Camera timing and First Person body offsets now apply only to Clinging-owned visual transitions.
+          - The transitional moving-surface path rejects stale, replayed and non-consecutive material references.
+          - Mounted gravity uses one generic living-root contract; Clinging no longer patches Scale Brews bee flight, chicken glide or wolf pounce.
+
+          Validation: 42 required server GameTests, 10 JUnit tests, the real default client suites and a separate real-client First Person 2.7.2 + Not Enough Animations 1.12.4 lane passed on the exact target below. Scale Brews was not loaded at runtime and is not part of alpha.7's support target.
+
+          This is an alpha. Dedicated multiplayer latency, long sessions, long pet routes and broad full-pack visual combinations remain manual acceptance checks.
+
+          Target commit: `$TARGET_SHA`
+          Regular JAR SHA-256: `$REGULAR_SHA256`
+          Sources JAR SHA-256: `$SOURCES_SHA256`
+          EOF
+          gh release create "$TAG" \
+            release-artifact/libs/clinging-reoriented-0.1.0-alpha.7.jar \
+            release-artifact/libs/clinging-reoriented-0.1.0-alpha.7-sources.jar \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$TARGET_SHA" \
+            --title "Clinging: Reoriented 0.1.0-alpha.7" \
+            --notes-file release-notes.md \
+            --prerelease
