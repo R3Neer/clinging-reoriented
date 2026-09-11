@@ -10,6 +10,11 @@ public abstract class PlayerTransferMixin {
     @Inject(method="teleport(Lnet/minecraft/world/level/portal/TeleportTransition;)Lnet/minecraft/server/level/ServerPlayer;",at=@At("HEAD"))
     private void clinging$transfer(TeleportTransition transition,CallbackInfoReturnable<ServerPlayer> cir){
         var p=(ServerPlayer)(Object)this;
-        if(!transition.newLevel().dimension().equals(p.level().dimension())){MovingSurface.teleported(p);ClingingReoriented.data(p).lastSafeDown=null;}
+        if(!transition.newLevel().dimension().equals(p.level().dimension())){
+            MovingSurface.teleported(p);
+            var state=ClingingReoriented.data(p);
+            state.retirementPending=false;
+            state.nextRetirementAttempt=0;
+        }
     }
 }
