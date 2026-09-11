@@ -78,11 +78,11 @@ versions on every multiplayer participant. See the
   remains deliberately excluded from its villager-trade economy.
 - **First Person** is optional. Clinging scopes its body-offset correction to
   Clinging-owned visual frames/transitions instead of becoming a global
-  Gravity Changer patch. Alpha.7 CI exercises First Person 2.7.2 in a separate
+  Gravity Changer patch. Alpha.8 CI exercises First Person 2.7.2 in a separate
   real-client lane.
 
 Scale Brews is under active architectural development and is **not part of the
-alpha.7 runtime/support target**. Clinging's mounted-gravity contract is generic:
+alpha.8 runtime/support target**. Clinging's mounted-gravity contract is generic:
 a Tiny Mount is just a living root vehicle. Scale is responsible for making its
 own flight/glide/pounce mechanics honor that root's gravity when Scale is ready.
 
@@ -104,13 +104,19 @@ See [configuration](docs/CONFIGURATION.md).
 
 ## Project status
 
-The alpha.7 hardening candidate passes **42 dedicated server GameTests**, 10
-JUnit tests, the real default client GameTest suites and a separate real-client
-First Person 2.7.2 lane, all without loading optional Scale Brews at runtime.
-The adversarial coverage includes bounded retirement/retry, external mob-gravity
-ownership, atomic passenger recovery and stale/replayed moving-surface references.
-Full-pack human playtesting, dedicated multiplayer latency and long pet routes
-remain manual checks; automated success is not presented as human gameplay QA.
+**0.1.0-alpha.8** is a documentation-sync prerelease of the alpha.7 hardening
+implementation. It intentionally makes no gameplay or production-code behavior
+changes relative to alpha.7; it republishes that validated implementation with the
+repository documentation written in release-state terms rather than pre-publication
+candidate terms.
+
+The release validation covers **42 dedicated server GameTests**, 10 JUnit tests,
+the real default client GameTest suites and a separate real-client First Person
+2.7.2 lane, all without loading optional Scale Brews at runtime. The adversarial
+coverage includes bounded retirement/retry, external mob-gravity ownership, atomic
+passenger recovery and stale/replayed moving-surface references. Full-pack human
+playtesting, dedicated multiplayer latency and long pet routes remain manual checks;
+automated success is not presented as human gameplay QA.
 
 ## Build and contribute
 
@@ -123,7 +129,7 @@ the audited required versions from Modrinth:
 ```
 
 CI fetches the public Scale Brews beta.5 JAR only as a **compile-time API** for
-the still-transitional anatomical bridge, while all alpha.7 runtime lanes use
+the still-transitional anatomical bridge, while all alpha.8 runtime lanes use
 `-PwithoutScaleBrews`. The optional First Person lane installs its test fixtures
 separately. Scale is not a supported runtime dependency for this prerelease, and
 no dependency or test JAR is included in version control.

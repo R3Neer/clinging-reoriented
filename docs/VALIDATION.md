@@ -1,32 +1,34 @@
 # Validation
 
-## Alpha.7 hardening candidate — 2026-09-11
+## 0.1.0-alpha.8 documentation-sync prerelease — 2026-09-11
 
-The alpha.7 hardening candidate is validated without loading optional Scale Brews at
-runtime. The core CI commands are:
+Alpha.8 intentionally makes no gameplay or production-code behavior changes relative
+to alpha.7. Its purpose is to publish the already-hardened implementation with the
+repository documentation synchronized to the released state. No file under
+`src/main/java` or `src/client/java` is changed by this version bump.
 
-```powershell
-.\gradlew.bat build runGameTest -PwithoutScaleBrews --no-daemon --console=plain
-.\gradlew.bat runClientGameTest -PwithoutScaleBrews --no-daemon --console=plain
-```
+The release is accepted only after the repository's full CI repeats all required
+server/JUnit tests, the default real-client suites and the separate First Person
+compatibility lane on the exact alpha.8 target. Runtime validation continues to omit
+Scale Brews; beta.5 is used only as a compile-time API for the transitional anatomical
+bridge.
 
-Implementation checkpoint run `34586087290` completed successfully with **42 required
-server GameTests**, all **10 JUnit tests** and the real default client GameTest suites.
-Scale Brews beta.5 was fetched only as a compile-time API for the transitional
-anatomical bridge and was absent from the runtime fixture.
+Alpha.7 supplied the functional hardening evidence that alpha.8 carries forward. The
+validated alpha.7 `main` run `34590289860` at commit
+`62ee1706ba311445d930dd25dc9aa93e8944eb07` passed **42 required server GameTests**,
+all **10 JUnit tests**, the real default client GameTest suites and the real-client
+First Person fixture. Alpha.8 repeats those same lanes before publication so the
+version/documentation-only change does not bypass release validation.
 
-Fresh optional-client run `34588259494` at commit
-`0c8871b0d0ac44b0b662c9af041a042e3c4d11a3` repeated the server and default-client
-lanes and then passed a separate real-client fixture with **First Person 2.7.2** and
-**Not Enough Animations 1.12.4**, again with Scale Brews absent at runtime. That
-fixture proves that unrelated Gravity Changer frames retain First Person's native
-body offset, Clinging-owned frames rotate that native baseline exactly once and
-external world-space offset handlers remain world-space. The first version of this
-fixture exposed a stale hard-coded First Person offset assumption; the test was
-corrected to derive its baseline from the installed First Person binary, with no
-production-code change required.
+The First Person fixture uses **First Person 2.7.2** with **Not Enough Animations
+1.12.4**, without Scale Brews at runtime. It proves that unrelated Gravity Changer
+frames retain First Person's native body offset, Clinging-owned frames rotate that
+native baseline exactly once and external world-space offset handlers remain
+world-space. The first version of this fixture exposed a stale hard-coded First
+Person offset assumption; the test was corrected to derive its baseline from the
+installed First Person binary, with no production-code change required.
 
-The alpha.7-specific adversarial holdouts cover:
+The hardening-specific adversarial holdouts cover:
 
 - forced retirement with every local DOWN candidate obstructed, followed by a safe
   retry; the entity remains in its current frame while pending and never relocates
@@ -44,34 +46,15 @@ The normal runtime suite also covers the generic mount contract without Scale:
 compatible non-player `LivingEntity` roots use the same mounted-gravity path and the
 removed Tiny-Mount-specific Clinging mixins are not required for core behavior.
 
-## Public-tree revalidation (2026-09-09, alpha.6)
+## Historical alpha.6 evidence
 
 The repository prepared for alpha.6 publication was rebuilt from a clean output
-directory with Java 25 and dependencies resolved from their public sources. These
-commands completed successfully:
-
-```powershell
-.\gradlew.bat build runGameTest -PwithoutScaleBrews --no-daemon --console=plain
-.\gradlew.bat runClientGameTest -PwithoutScaleBrews --no-daemon --console=plain
-```
-
-The first run passed all 39 required server GameTests and all 10 JUnit tests. The
-second launched the real client GameTest environment and passed both client suites.
-Scale Brews was available only as a compile-time API and was not loaded for either
-runtime check.
-
-## Historical alpha.6 optional evidence
-
-The final alpha.6 optional run executed:
-
-```powershell
-.\gradlew.bat build runClientGameTest -PwithFirstPerson --offline --no-daemon
-```
-
-It completed successfully with the then-current 39 server tests, 10 JUnit tests,
-main real-client suite, First Person/Scale Visual Compat fixture and one/two-second
-camera-animation checks. Alpha.7 supersedes that optional presentation evidence with
-the narrower First Person-only ownership fixture described above.
+directory with Java 25 and dependencies resolved from their public sources. The
+server run passed all 39 required server GameTests and all 10 JUnit tests; the real
+client GameTest environment passed both client suites. A separate optional run also
+covered the then-current First Person/Scale Visual Compat fixture. Alpha.7/alpha.8
+supersede that presentation evidence with the narrower First Person-only ownership
+fixture described above.
 
 ## Covered behavior
 
@@ -85,10 +68,12 @@ presentation in real client environments.
 
 ## Packaging
 
-The final release candidate must be rebuilt after temporary work files are removed.
-The production artifact must contain only production classes/resources and no
-GameTest classes, dependency JARs, work-plan documents or raw validation logs. The
-release tag/assets must point at the exact candidate that passed the cleaned CI run.
+Prereleases are published from the exact artifact produced by the successful final
+`main` CI run; the release process does not rebuild a merely equivalent JAR after
+validation. The production artifact contains production classes/resources only: no
+GameTest classes, dependency JARs, temporary work-plan documents or raw validation
+logs. The release tag, regular JAR and sources JAR are checked against the exact
+validated target and recorded digests before publication.
 
 ## Manual QA still required
 
