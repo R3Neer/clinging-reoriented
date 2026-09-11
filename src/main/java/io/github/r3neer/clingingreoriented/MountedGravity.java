@@ -23,7 +23,9 @@ public final class MountedGravity {
         if(direction==GravityDirectionUtil.getGravityDirection(root))return ClingingReoriented.Result.UNCHANGED;
         if(!MobGravity.borrow(root,direction))return ClingingReoriented.Result.NO_SPACE;
         MobGravity.state(root).airUsed=true;
+        Payloads.visual(p,direction);s.visualFrameOwned=true;
         s.airChangeUsed=true;root.positionRider(p);p.setOnGround(false);
+        Payloads.publish(p);
         GravityBreadcrumbs.record(p,direction);
         return ClingingReoriented.Result.SUCCESS;
     }
