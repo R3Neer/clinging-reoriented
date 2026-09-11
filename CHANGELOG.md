@@ -6,8 +6,9 @@
 
 - Remove the transitional production compile-time dependency on Scale Brews.
 - Resolve legacy Scale platform hooks reflectively and target `PlatformPhysics`
-  through a gated `@Pseudo` mixin so absent or incompatible Scale versions leave
-  Clinging's base behavior available.
+  through a `@Pseudo` mixin whose optional injections use `require = 0`, so absent
+  or incompatible Scale versions leave Clinging's base behavior available without
+  probing Scale classes during Mixin bootstrap.
 - Add a build guard that rejects Scale Brews on production `compileClasspath`.
 - Keep Scale beta.5 coverage in CI as an isolated runtime-only fixture instead of a
   compile API, while the required build/server/client lanes run with no Scale JAR.
