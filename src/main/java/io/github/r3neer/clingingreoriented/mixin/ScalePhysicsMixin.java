@@ -19,7 +19,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class ScalePhysicsMixin {
     @Unique
     private static boolean clinging$legacy(Entity entity) {
-        return ClingingReoriented.controlsPhysics(entity) && !AnatomyBridge.active(entity);
+        return ScaleBridge.legacyApiAvailable()
+            && ClingingReoriented.controlsPhysics(entity)
+            && !AnatomyBridge.active(entity);
     }
 
     @Inject(method = {"carry", "afterMove"}, at = @At("HEAD"), cancellable = true, require = 0, remap = false)
