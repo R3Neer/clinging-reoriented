@@ -38,8 +38,13 @@ owner of acceleration, movement, jumping, collisions and camera rotation.
 - Brew Reorientation and cross a room without agreeing on which way is down.
 - Give a tamed animal its own gravity effect and let it replay turns along the
   route where it follows you.
-- Use Reorientation while riding to turn an airborne mount and its passengers
-  together.
+- Use Reorientation while riding to turn any compatible airborne living mount
+  and its complete passenger hierarchy through the same generic mount path.
+
+When an owned gravity effect expires, the mod first restores DOWN in place. If
+that is obstructed it may relocate locally by at most four blocks; if no safe
+local placement exists, the previous frame remains temporarily while retirement
+is retried. It never falls back to an old remote checkpoint.
 
 The full behavior of mounts, pets, beacons, recovery and effect expiry is in the
 **[player guide](docs/GUIDE.md)**.
@@ -68,18 +73,17 @@ versions on every multiplayer participant. See the
 ## Recommended companions
 
 - **[Alchemical Leather](https://github.com/R3Neer/alchemical-leather)** is the
-  recommended companion. Infuse Clinging or Reorientation into compatible
-  boots, or use its current dyeable animal-armor support to supply those gravity
-  effects through leather horse armor and wolf armor.
-- **[Scale Brews](https://github.com/R3Neer/scale-brews)** is optional for extra
-  chaos: combine changing gravity with growing, shrinking and size-dependent
-  entity interactions. The tested integration uses Scale Brews beta.4's existing
-  entity surfaces; the newer shared anatomical system is not released gameplay.
-- **First Person** is optional. Its audited compatibility keeps the rendered
-  body aligned with the rotated camera when used with Scale Visual Compat.
+  recommended companion. Its current alpha.3 can infuse Clinging or
+  Reorientation into compatible boots and dyeable animal armor. Reorientation
+  remains deliberately excluded from its villager-trade economy.
+- **First Person** is optional. Clinging scopes its body-offset correction to
+  Clinging-owned visual frames/transitions instead of becoming a global
+  Gravity Changer patch.
 
-None of these companions is required for the core Clinging and Reorientation
-experience.
+Scale Brews is under active architectural development and is **not part of the
+alpha.7 runtime/support target**. Clinging's mounted-gravity contract is generic:
+a Tiny Mount is just a living root vehicle. Scale is responsible for making its
+own flight/glide/pounce mechanics honor that root's gravity when Scale is ready.
 
 ## Camera timing
 
@@ -92,18 +96,20 @@ The first client launch creates `config/clinging-reoriented-client.json`:
 ```
 
 Choose a decimal value from `0.05` to `10` seconds and restart the client. The
-physical gravity change remains immediate; this setting changes only the visual
-transition. See [configuration](docs/CONFIGURATION.md).
+physical gravity change remains immediate. The configured duration applies only
+to visual transitions initiated by Clinging/Reorientation, including their own
+return to DOWN; unrelated Gravity Changer transitions retain upstream timing.
+See [configuration](docs/CONFIGURATION.md).
 
 ## Project status
 
-Alpha.6 passes 39 dedicated server GameTests, 10 JUnit tests and real client
-GameTest suites. The public tree was revalidated on 2026-09-09 both with a clean
-server build and in a real client GameTest environment without loading optional
-Scale Brews. Earlier alpha.6 evidence also covers configurable camera timing and
-First Person integration. Full-pack human playtesting, dedicated multiplayer
-latency and long pet routes remain manual checks. Automated success is not
-presented as human gameplay QA.
+The alpha.7 hardening candidate passes **42 dedicated server GameTests**, 10
+JUnit tests and the real default client GameTest suites without loading optional
+Scale Brews. The new adversarial coverage includes bounded retirement/retry,
+external mob-gravity ownership, atomic passenger recovery and stale/replayed
+moving-surface references. Full-pack human playtesting, dedicated multiplayer
+latency, long pet routes and the optional First Person runtime fixture remain
+separate evidence; automated success is not presented as human gameplay QA.
 
 ## Build and contribute
 
@@ -115,9 +121,10 @@ the audited required versions from Modrinth:
 .\gradlew.bat runClientGameTest -PwithoutScaleBrews
 ```
 
-For offline development against the exact installed binaries, use
-`scripts/prepare-dependencies.ps1`; Scale Brews is copied only when its tested
-beta.4 JAR is present. No dependency or test JAR is included in version control.
+CI fetches the public Scale Brews beta.5 JAR only as a **compile-time API** for
+the still-transitional anatomical bridge, while normal alpha.7 runtime tests use
+`-PwithoutScaleBrews`. Scale is not a supported runtime dependency for this
+prerelease, and no dependency or test JAR is included in version control.
 
 - [Player guide](docs/GUIDE.md)
 - [Compatibility](docs/COMPATIBILITY.md)
