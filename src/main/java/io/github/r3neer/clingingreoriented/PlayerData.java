@@ -22,6 +22,8 @@ public final class PlayerData {
     public boolean groundedOnSurface;
     public boolean anchorBorrowed;
     public boolean anchorExpired;
+    public boolean visualFrameOwned;
+    public long visualSequence;
     public long lastRequest = -1;
     public long requestTick = -1;
     public int revision;
