@@ -34,7 +34,10 @@ if (!withFirstPerson) sourceSets.gametest.java.exclude '**/FirstPersonChecks.jav
 
 tasks.register('verifyScaleCompileIsolation') {
     doLast {
-        def leaked = configurations.compileClasspath.files.findAll { it.name.toLowerCase(java.util.Locale.ROOT).contains('scalebrews') }
+        def leaked = configurations.compileClasspath.files.findAll {
+            def normalized = it.name.toLowerCase(java.util.Locale.ROOT).replace('-', '').replace('_', '')
+            normalized.contains('scalebrews')
+        }
         if (!leaked.empty) throw new GradleException("Scale Brews leaked into production compileClasspath: ${leaked*.name.join(', ')}")
     }
 }
