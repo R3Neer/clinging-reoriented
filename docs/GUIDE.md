@@ -1,7 +1,7 @@
 # Player guide
 
 This guide contains the exact controls and less-obvious interactions for
-Clinging: Reoriented 0.1.0-alpha.7.
+Clinging: Reoriented 0.1.0-alpha.8.
 
 ## Controls
 

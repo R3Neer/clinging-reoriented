@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.0-alpha.8] - 2026-09-11
+
+Documentation-sync prerelease. There are no gameplay or production-code behavior
+changes relative to alpha.7.
+
+### Documentation and packaging
+
+- Replace pre-publication "candidate" wording with the actual released state.
+- Update the current-version references in the README, guide and compatibility
+  documentation from alpha.7 to alpha.8 while preserving alpha.7 as historical
+  hardening evidence.
+- Rewrite validation/packaging text so it describes the exact validated-main-artifact
+  release process rather than a future rebuild step that has already happened.
+- Repeat the full server, default-client and First Person CI lanes before publication.
+
 ## [0.1.0-alpha.7] - 2026-09-11
 
 Correctness and ownership hardening without adding a new gameplay feature set.
