@@ -1,7 +1,7 @@
 # Player guide
 
 This guide contains the exact controls and less-obvious interactions for
-Clinging: Reoriented 0.1.0-alpha.6.
+Clinging: Reoriented 0.1.0-alpha.7.
 
 ## Controls
 
@@ -15,8 +15,8 @@ previous jump is required; being airborne is the criterion. The same held press
 cannot produce repeated turns.
 
 Grounded Space keeps normal jump or mount behavior. Creative flight, spectator
-mode, sleeping, gliding, held Gravity Anchors and foreign gravity ownership block
-voluntary selection.
+mode, sleeping, gliding, held Gravity Anchors, pending forced retirement and
+foreign gravity ownership block voluntary selection.
 
 ## Effects and brewing
 
@@ -35,14 +35,21 @@ beacon option.
 ## Momentum, collision and recovery
 
 A voluntary turn keeps world position and momentum, then validates the complete
-rotated root/passenger collision box before changing gravity. Obstruction produces
-a failure sound and leaves gravity unchanged.
+rotated root/passenger hierarchy before changing gravity. Obstruction produces a
+failure sound and leaves position, gravity and momentum unchanged.
 
-Gravity persists across jumps and temporary contact loss. When the last owned
-Clinging or Reorientation source disappears, the entity returns to DOWN. If the
-DOWN box cannot fit during forced retirement, the mod searches a small validated
-nearby area rather than embedding the entity. It keeps retrying when no safe
-position exists. Voluntary turns never relocate the player.
+Gravity persists across jumps and temporary contact loss. When the last gravity
+source **owned by Clinging: Reoriented** disappears, the mod first tries to return
+to DOWN at the current position. If that does not fit, it searches only validated
+loaded positions whose true displacement is at most **four blocks** from the
+retirement origin. It never teleports to an old checkpoint and never scans an
+unbounded vertical column.
+
+If no safe local DOWN placement exists, the current frame remains temporarily and
+retirement becomes pending. The mod retries periodically; ordinary movement can
+help the entity leave the obstruction, but new voluntary gravity turns are blocked
+until retirement succeeds or a lifecycle discontinuity invalidates the pending
+state. Voluntary turns themselves never relocate the player.
 
 ## Elytra
 
@@ -54,12 +61,20 @@ gliding retains the gravity frame that existed at deployment.
 
 Clinging cannot turn a mount. With Reorientation, ordinary grounded Space remains
 the mount's normal action; any fresh Space while the root mount is airborne turns
-the complete passenger group if every destination box is clear.
+the complete passenger hierarchy only if every destination box is clear. A failed
+candidate is atomic: neither root nor passengers are moved first and checked later.
 
-Mounting with Reorientation transfers the rider's non-DOWN gravity to the mount.
-Clinging instead adopts the mount's frame. On dismount, an unpowered mount returns
-to DOWN. A mount with its own gravity effect retains its orientation until its last
-effect source disappears.
+Mounted gravity uses the same generic contract for every compatible non-player
+`LivingEntity` root vehicle. Tiny Mounts are not a separate Clinging concept.
+
+Mounting with Reorientation can temporarily lend the rider's non-DOWN frame to the
+root mount. Clinging instead adopts the mount's frame. When that loan ends, the
+mount returns to the frame it had before the loan. That may be DOWN, an orientation
+owned by its own effect, or a non-DOWN frame supplied by another source.
+
+A passive gravity effect does not make Clinging the owner of a gravity direction it
+did not create. If another source changes a managed mob's gravity later, Clinging
+relinquishes ownership and effect expiry will not reset that external frame.
 
 ## Pets and passive mobs
 
@@ -67,6 +82,10 @@ Mobs never choose directions autonomously. A tamed animal using vanilla's
 follow-owner goal can replay the owner's turns when it reaches the recorded place
 where each turn occurred. The pet needs its own Clinging or Reorientation effect,
 and Clinging still permits only one turn per airborne stretch.
+
+A successful replay is one of the operations that gives Clinging ownership of that
+mob's new frame. Simply applying the potion to a mob that was already under an
+external gravity does not.
 
 Sitting pets do not replay routes. Trails retain at most 64 turns for one minute
 and are cleared when the owner teleports, changes dimension, dies or logs out.
@@ -76,5 +95,5 @@ This is positional replay, not new three-dimensional pathfinding.
 
 A successful turn and a rejected attempt use different sounds. When nothing
 happens, check that the entity is airborne, the jump key was released, the desired
-direction differs from the current one, the effect still exists and the destination
-has enough room.
+direction differs from the current one, the effect still exists, retirement is not
+pending and the complete destination hierarchy has enough room.
