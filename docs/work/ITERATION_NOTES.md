@@ -2,4 +2,4 @@
 
 Status: TEMPORARY — DELETE ON SUCCESS.
 
-The requirements/analysis/workflow/plan set reached convergence after six full planning passes. Material changes were: reduce MovingSurface work to temporary anti-replay hardening; keep Tiny Mount gravity outside collision; preserve released Scale beta.5 via conditional shims; require one future transversal Scale gravity-frame authority; and scope camera/First Person changes to Clinging-owned visual transitions.
+The requirements/analysis/workflow/plan set has now converged after owner review and a seventh architecture pass. Material changes were: reduce MovingSurface work to temporary anti-replay hardening; scope camera/First Person changes to Clinging-owned visual transitions; preserve one future transversal Scale gravity-frame authority; and, critically, reject the earlier beta.5 shim/capability-overlap design. Tiny Mounts are ordinary mounts at the Clinging contract boundary, so Clinging must not add Scale-version gates, Tiny capability markers or a second mounted-gravity path. Scale-specific generated-impulse fixes belong inside Scale.
