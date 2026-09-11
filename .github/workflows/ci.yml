@@ -20,15 +20,10 @@ jobs:
           java-version: '25'
       - name: Make Gradle executable
         run: chmod +x ./gradlew
-      - name: Fetch the public Scale Brews compile API
-        run: |
-          mkdir -p libs
-          curl --fail --location --output libs/scalebrews-0.1.0-beta.5.jar \
-            https://github.com/R3Neer/scale-brews/releases/download/v0.1.0-beta.5/scalebrews-0.1.0-beta.5.jar
       - name: Build and run server tests without optional Scale Brews
-        run: ./gradlew build runGameTest -PwithoutScaleBrews --no-daemon --console=plain
-      - name: Run client GameTests without First Person
-        run: xvfb-run -a ./gradlew runClientGameTest -PwithoutScaleBrews --no-daemon --console=plain
+        run: ./gradlew build runGameTest --no-daemon --console=plain
+      - name: Run client GameTests without optional mods
+        run: xvfb-run -a ./gradlew runClientGameTest --no-daemon --console=plain
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
       - name: Fetch optional First Person fixtures
@@ -39,7 +34,17 @@ jobs:
           curl --fail --location --output test-libs/notenoughanimations-fabric-1.12.4-mc26.2.jar \
             https://api.modrinth.com/maven/maven/modrinth/MPCX6s5C/67xQnLDS/MPCX6s5C-67xQnLDS.jar
       - name: Run First Person ownership GameTests
-        run: xvfb-run -a ./gradlew runClientGameTest -PwithoutScaleBrews -PwithFirstPerson --no-daemon --console=plain
+        run: xvfb-run -a ./gradlew runClientGameTest -PwithFirstPerson --no-daemon --console=plain
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+      - name: Fetch optional Scale Brews runtime fixture
+        run: |
+          curl --fail --location --output test-libs/scalebrews-0.1.0-beta.5.jar \
+            https://github.com/R3Neer/scale-brews/releases/download/v0.1.0-beta.5/scalebrews-0.1.0-beta.5.jar
+      - name: Run optional Scale Brews compatibility GameTests
+        run: ./gradlew runGameTest -PwithScaleBrews --no-daemon --console=plain
+      - name: Run optional Scale Brews client load lane
+        run: xvfb-run -a ./gradlew runClientGameTest -PwithScaleBrews --no-daemon --console=plain
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
       - name: Upload artifacts and diagnostics

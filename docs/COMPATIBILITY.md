@@ -29,15 +29,24 @@ change direct infusion compatibility.
 ### Scale Brews
 
 Scale Brews is **not part of the alpha.8 runtime/support target** while its larger
-shared entity-collision architecture is still under active development. Alpha.8
-CI intentionally validates Clinging without loading Scale Brews at runtime.
+shared entity-collision architecture is still under active development. Clinging's
+production sources and compile classpath do not depend on Scale Brews.
 
-The repository still compiles its transitional anatomical bridge against the
-public beta.5 API so the future G7 migration remains buildable, but this is not a
-claim of current released gameplay support. Tiny Mounts no longer have special
-Clinging mixins: externally they are ordinary compatible living root vehicles.
-Scale owns the gravity-awareness of the flight/glide/pounce vectors that Scale
-itself generates.
+The remaining transitional legacy platform integration is isolated behind a
+reflective bridge and a pseudo mixin. Clinging detects the specific legacy API it
+knows how to use; if Scale Brews is absent or that API is incompatible, the
+integration disables itself while base Clinging gameplay remains available. No
+Scale class is linked directly from production bytecode solely to make that
+compatibility compile.
+
+CI first builds and runs the required server/client suites with no Scale Brews JAR
+present. A separate optional lane downloads the public beta.5 JAR into `test-libs`
+and loads it only as a runtime fixture with `-PwithScaleBrews`, preserving
+compatibility coverage without turning Scale into a build dependency.
+
+Tiny Mounts no longer have special Clinging mixins: externally they are ordinary
+compatible living root vehicles. Scale owns the gravity-awareness of the
+flight/glide/pounce vectors that Scale itself generates.
 
 When Scale's shared collision/reconciliation API reaches its G7 prerequisites,
 Clinging should migrate anatomical contact/carry/reference ownership there and
@@ -67,6 +76,7 @@ longer required by this Clinging compatibility contract.
   pet turn trails and the presentation epochs of its own transitions.
 - Alchemical Leather owns equipment-supplied effects.
 - Scale Brews owns Scale-generated size/mount/anatomical mechanics when that
-  project is used; it is not an alpha.8 runtime dependency.
+  project is used; it is neither a required runtime dependency nor a production
+  compile dependency.
 
 No dependency JAR or third-party class is bundled in the production artifact.

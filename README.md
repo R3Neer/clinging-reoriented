@@ -85,6 +85,8 @@ Scale Brews is under active architectural development and is **not part of the
 alpha.8 runtime/support target**. Clinging's mounted-gravity contract is generic:
 a Tiny Mount is just a living root vehicle. Scale is responsible for making its
 own flight/glide/pounce mechanics honor that root's gravity when Scale is ready.
+Optional legacy Scale integration is discovered reflectively and disables itself
+when the installed Scale API is absent or incompatible.
 
 ## Camera timing
 
@@ -105,10 +107,9 @@ See [configuration](docs/CONFIGURATION.md).
 ## Project status
 
 **0.1.0-alpha.8** is a documentation-sync prerelease of the alpha.7 hardening
-implementation. It intentionally makes no gameplay or production-code behavior
-changes relative to alpha.7; it republishes that validated implementation with the
-repository documentation written in release-state terms rather than pre-publication
-candidate terms.
+implementation. It intentionally makes no gameplay behavior changes relative to
+alpha.7; current main additionally removes the transitional compile-time dependency
+on optional Scale Brews without changing Clinging's base gameplay contract.
 
 The release validation covers **42 dedicated server GameTests**, 10 JUnit tests,
 the real default client GameTest suites and a separate real-client First Person
@@ -121,18 +122,19 @@ automated success is not presented as human gameplay QA.
 ## Build and contribute
 
 Use Java 25 and the included Gradle wrapper. A connected clean checkout resolves
-the audited required versions from Modrinth:
+the audited required versions from Modrinth and builds without any Scale Brews JAR:
 
 ```powershell
-.\gradlew.bat build runGameTest -PwithoutScaleBrews
-.\gradlew.bat runClientGameTest -PwithoutScaleBrews
+.\gradlew.bat build runGameTest
+.\gradlew.bat runClientGameTest
 ```
 
-CI fetches the public Scale Brews beta.5 JAR only as a **compile-time API** for
-the still-transitional anatomical bridge, while all alpha.8 runtime lanes use
-`-PwithoutScaleBrews`. The optional First Person lane installs its test fixtures
-separately. Scale is not a supported runtime dependency for this prerelease, and
-no dependency or test JAR is included in version control.
+Production `compileClasspath` deliberately excludes Scale Brews, and the build has
+a guard that fails if a Scale JAR leaks into it. CI proves the clean base build
+first. A separate optional compatibility lane downloads the public Scale Brews
+beta.5 JAR into `test-libs` and loads it only at runtime with `-PwithScaleBrews`;
+the production artifact never requires or bundles that fixture. First Person uses
+its own isolated test fixtures in the same way.
 
 - [Player guide](docs/GUIDE.md)
 - [Compatibility](docs/COMPATIBILITY.md)
