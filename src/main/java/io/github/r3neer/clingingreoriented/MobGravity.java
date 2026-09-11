@@ -47,7 +47,7 @@ public final class MobGravity {
     }
     public static boolean fits(Entity e,AABB box){
         if(!Double.isFinite(box.getSize()) || box.minY<e.level().getMinY() || box.maxY>e.level().getMaxY()+1 || !e.level().getWorldBorder().isWithinBounds(box))return false;
-        for(int x=((int)Math.floor(box.minX))>>4;x<=((int)Math.floor(box.maxX))>>4;x++)for(int z=((int)Math.floor(box.maxZ))>>4;z<=((int)Math.floor(box.maxZ))>>4;z++)
+        for(int x=((int)Math.floor(box.minX))>>4;x<=((int)Math.floor(box.maxX))>>4;x++)for(int z=((int)Math.floor(box.minZ))>>4;z<=((int)Math.floor(box.maxZ))>>4;z++)
             if(!e.level().hasChunkAt(new net.minecraft.core.BlockPos(x<<4,(int)box.minY,z<<4)))return false;
         var interior=box.deflate(1e-7);
         if(AnatomyBridge.active(e) && !AnatomyBridge.spaceClear(e,interior))return false;
