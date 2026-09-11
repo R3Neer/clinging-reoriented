@@ -1,6 +1,5 @@
 package io.github.r3neer.clingingreoriented.mixin;
 
-import io.github.r3neer.clingingreoriented.ScaleBridge;
 import java.util.List;
 import java.util.Set;
 import net.fabricmc.loader.api.FabricLoader;
@@ -16,7 +15,7 @@ public final class CompatPlugin implements IMixinConfigPlugin {
         if (mixinClassName.endsWith("FirstPersonOffsetMixin"))
             return FabricLoader.getInstance().isModLoaded("firstperson");
         if (mixinClassName.endsWith("ScalePhysicsMixin"))
-            return ScaleBridge.legacyApiAvailable();
+            return FabricLoader.getInstance().isModLoaded("scalebrews");
         return true;
     }
 
