@@ -62,26 +62,26 @@ Branch target for implementation: dedicated Clinging work branch, never direct d
 - [ ] Explicitly avoid a new permanent receipt/epoch architecture.
 - [ ] Add stale-authentic-sample, duplicate and reorder adversarial cases.
 
-## C6 — Scale Brews handoff compatibility
+## C6 — one generic mounted-gravity contract
 
-**Requirements:** CR-014..016, CNFR-007.
+**Requirements:** CR-015..016, CNFR-007.
 
-Dependency: native Tiny Mount gravity support lands and validates on Scale Brews `main`.
-
-- [ ] Add/detect a native Scale capability marker agreed with the Scale workstream.
-- [ ] Keep released beta.5 shim behavior when native capability is absent.
-- [ ] Disable Clinging Tiny Mount shims when native capability is present to prevent double handling.
-- [ ] Do not migrate shared anatomical physics to provisional Scale collision API; wait for Scale G7 prerequisites.
-- [ ] Validate both old-Scale and native-Scale paths.
+- [ ] Treat all eligible non-player `LivingEntity` root vehicles through the same `MountedGravity`/`MobGravity` path.
+- [ ] Audit the mounted path for hidden Scale/Tiny assumptions; none may be introduced to replace the current generic contract.
+- [ ] Remove `ScaleFlightGravityMixin`, `ScaleWolfGravityMixin` and `ScaleChickenGravityMixin` from Clinging once the final diff is prepared; their semantics belong to Scale-generated mechanics, not Clinging mount policy.
+- [ ] Do not add Scale version checks, Tiny capability markers or old/new Scale shim negotiation.
+- [ ] Keep future Scale G7 anatomical-contact migration separate from mounted gravity.
+- [ ] Add/retain generic mount fixtures proving the contract without Scale classes.
 
 ## C7 — aggregate validation and permanent docs
 
 - [ ] Run base server tests/build without Scale.
 - [ ] Run real client GameTests.
-- [ ] Run released Scale beta.5 compatibility path.
-- [ ] Run native-Scale-main fixture for the capability path.
-- [ ] Run First Person/Scale Visual Compat lane where applicable.
+- [ ] Run generic mounted-gravity regressions using non-Scale living mounts.
+- [ ] Run First Person compatibility lane where applicable.
+- [ ] Do not make unfinished Scale Brews a prerelease validation dependency.
 - [ ] Review README, GUIDE, ARCHITECTURE, CONFIGURATION, COMPATIBILITY, VALIDATION and CHANGELOG against actual final behavior.
+- [ ] Remove/update any permanent claim that this prerelease certifies unfinished Scale/Tiny Mount integration.
 - [ ] Record only executed evidence in VALIDATION.
 
 ## C8 — cleanup, merge and prerelease
@@ -102,11 +102,10 @@ C0
 ├── C1
 ├── C2 → C3
 ├── C4
-└── C5
-
-Scale T-workstream ──→ C6
+├── C5
+└── C6
 
 C1+C3+C4+C5+C6 ──→ C7 ──→ C8
 ```
 
-C1/C2/C4/C5 may be developed as separate small commits/sprints. C3 depends on the final ownership model from C2. C6 waits for the Scale workstream but does not wait for Scale entity-collision G7.
+C1/C2/C4/C5/C6 may be developed as separate small commits/sprints. C3 depends on the final ownership model from C2. Scale's own Tiny Mount gravity work proceeds independently and is not a Clinging prerelease dependency.
