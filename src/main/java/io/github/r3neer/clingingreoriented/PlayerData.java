@@ -14,7 +14,6 @@ public final class PlayerData {
     public int supportId = -1;
     public Vec3 supportPosition;
     public net.minecraft.world.phys.AABB supportBox;
-    public Vec3 lastSafeDown;
     public boolean retirementPending;
     public long nextRetirementAttempt;
     public Vec3 lastTransport = Vec3.ZERO;
