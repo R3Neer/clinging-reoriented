@@ -1,4 +1,4 @@
-name: Publish alpha.7 from validated main artifact
+name: Repair alpha.7 release notes
 
 on:
   push:
@@ -9,46 +9,22 @@ on:
 
 permissions:
   contents: write
-  actions: read
 
 jobs:
-  release:
+  repair-notes:
     runs-on: ubuntu-24.04
     env:
       TARGET_SHA: 62ee1706ba311445d930dd25dc9aa93e8944eb07
-      VALIDATED_RUN_ID: '34590289860'
       TAG: v0.1.0-alpha.7
       REGULAR_SHA256: 188d66ea711fe302492c7f02f5e73a0ed3d62325cc4140756cbe0500df552e82
       SOURCES_SHA256: 961d51f6eafca91426bd163ca9a32732d034daa8f21082c6a7826d3b628c9da3
     steps:
-      - name: Download exact validated main artifact
+      - name: Verify and repair release notes
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          RUN_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${VALIDATED_RUN_ID}" --jq .head_sha)"
-          test "$RUN_SHA" = "$TARGET_SHA"
-          gh run download "$VALIDATED_RUN_ID" --repo "$GITHUB_REPOSITORY" --name clinging-reoriented-build --dir release-artifact
-      - name: Verify release assets
-        run: |
-          set -euo pipefail
-          REGULAR="release-artifact/libs/clinging-reoriented-0.1.0-alpha.7.jar"
-          SOURCES="release-artifact/libs/clinging-reoriented-0.1.0-alpha.7-sources.jar"
-          test -f "$REGULAR"
-          test -f "$SOURCES"
-          test "$(stat -c%s "$REGULAR")" = "106915"
-          test "$(stat -c%s "$SOURCES")" = "45181"
-          test "$(sha256sum "$REGULAR" | cut -d' ' -f1)" = "$REGULAR_SHA256"
-          test "$(sha256sum "$SOURCES" | cut -d' ' -f1)" = "$SOURCES_SHA256"
-      - name: Publish prerelease
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $TAG already exists" >&2
-            exit 1
-          fi
+          test "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json targetCommitish --jq .targetCommitish)" = "$TARGET_SHA"
           cat > release-notes.md <<EOF
           Correctness-hardening alpha for Minecraft 26.2 on Fabric.
 
@@ -62,15 +38,8 @@ jobs:
 
           This is an alpha. Dedicated multiplayer latency, long sessions, long pet routes and broad full-pack visual combinations remain manual acceptance checks.
 
-          Target commit: `$TARGET_SHA`
-          Regular JAR SHA-256: `$REGULAR_SHA256`
-          Sources JAR SHA-256: `$SOURCES_SHA256`
+          Target commit: $TARGET_SHA
+          Regular JAR SHA-256: $REGULAR_SHA256
+          Sources JAR SHA-256: $SOURCES_SHA256
           EOF
-          gh release create "$TAG" \
-            release-artifact/libs/clinging-reoriented-0.1.0-alpha.7.jar \
-            release-artifact/libs/clinging-reoriented-0.1.0-alpha.7-sources.jar \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$TARGET_SHA" \
-            --title "Clinging: Reoriented 0.1.0-alpha.7" \
-            --notes-file release-notes.md \
-            --prerelease
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file release-notes.md
