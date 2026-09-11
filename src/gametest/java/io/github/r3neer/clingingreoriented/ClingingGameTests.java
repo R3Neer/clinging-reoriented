@@ -18,6 +18,19 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.*;
 
 public final class ClingingGameTests {
+    private static Object scaleStatic(String owner,String method,Class<?>[] parameters,Object... arguments){
+        try{return Class.forName(owner).getMethod(method,parameters).invoke(null,arguments);}
+        catch(ReflectiveOperationException failure){throw new RuntimeException("Optional Scale test API invocation failed: "+owner+"#"+method,failure);}
+    }
+    private static Vec3 scaleCollide(Entity entity,Vec3 requested,Vec3 vanilla){
+        return (Vec3)scaleStatic("io.github.r3neer.scalebrews.platform.PlatformPhysics","collide",new Class<?>[]{Entity.class,Vec3.class,Vec3.class},entity,requested,vanilla);
+    }
+    private static void scaleAfterMove(Entity entity){
+        scaleStatic("io.github.r3neer.scalebrews.platform.PlatformPhysics","afterMove",new Class<?>[]{Entity.class},entity);
+    }
+    private static boolean upstreamScaleEligible(Entity entity,LivingEntity support){
+        return (boolean)scaleStatic("io.github.r3neer.scalebrews.platform.Platforms","eligible",new Class<?>[]{Entity.class,LivingEntity.class},entity,support);
+    }
     /** Runs only with the new coordinated Scale artifact; old optional dependency stays loadable. */
     @GameTest(padding=24) public void sharedAnatomyBridgeUsesPiecesAndUpstreamGravity(GameTestHelper h) throws Exception {
         Class<?> core;
@@ -68,10 +81,10 @@ public final class ClingingGameTests {
                 var targetCenter=center.subtract(down.scale(1.5+extent));
                 p.setPos(p.position().add(targetCenter.subtract(p.getBoundingBox().getCenter())));
                 var requested=down.scale(3);
-                var clipped=io.github.r3neer.scalebrews.platform.PlatformPhysics.collide(p,requested,requested);
+                var clipped=scaleCollide(p,requested,requested);
                 h.assertTrue(clipped.dot(down)<2,"Clinging no longer cancels anatomical collision "+direction);
                 p.setPos(p.position().add(clipped));
-                io.github.r3neer.scalebrews.platform.PlatformPhysics.afterMove(p);
+                scaleAfterMove(p);
                 h.assertTrue(AnatomyBridge.supported(p),"real piece contact is shared "+direction);
                 h.assertTrue(AnatomyBridge.parent(p)==cow,"shared contact identifies support "+direction);
                 MovingSurface.afterMove(p);
@@ -152,17 +165,17 @@ public final class ClingingGameTests {
         check(GravityDirectionUtil.getOwnGravityDirection(p)==Direction.NORTH,"doesn't reset foreign source");h.succeed();
     }
     @GameTest(padding=24) public void scaleEligibilityAndEntityVolume(GameTestHelper h){
-        if(!ScaleBridge.PRESENT){h.succeed();return;}
+        if(!ScaleBridge.legacyApiAvailable()){h.succeed();return;}
         var p=player(h);var cow=h.spawn(EntityTypes.COW,new BlockPos(5,3,5));cow.setNoAi(true);
         p.getAttribute(Attributes.SCALE).setBaseValue(.28);p.refreshDimensions();
-        check(ScaleBridge.eligible(p,cow)==io.github.r3neer.scalebrews.platform.Platforms.eligible(p,cow),"upstream eligibility exact");
+        check(ScaleBridge.eligible(p,cow)==upstreamScaleEligible(p,cow),"upstream eligibility exact");
         check(ScaleBridge.eligible(p,cow),"tiny player eligible");
         check(!ClingingReoriented.fits(p,cow.getBoundingBox(),cow),"surface interior never fits");
         p.getAttribute(Attributes.SCALE).setBaseValue(10);p.refreshDimensions();
         check(!ScaleBridge.eligible(p,cow),"giant player not eligible on cow");h.succeed();
     }
     @GameTest(padding=24) public void selectedEntityAddsPhysicalCollision(GameTestHelper h){
-        if(!ScaleBridge.PRESENT){h.succeed();return;}
+        if(!ScaleBridge.legacyApiAvailable()){h.succeed();return;}
         var p=player(h);var cow=h.spawn(EntityTypes.COW,new BlockPos(5,3,5));cow.setNoAi(true);
         p.getAttribute(Attributes.SCALE).setBaseValue(.28);p.refreshDimensions();
         MovingSurface.bind(p,cow);ClingingReoriented.data(p).owned=true;
@@ -170,7 +183,7 @@ public final class ClingingGameTests {
         check(shapes.stream().anyMatch(s->s.bounds().equals(cow.getBoundingBox())),"entity contributes real collider");h.succeed();
     }
     @GameTest(padding=24) public void surfaceTranslationAndAirborneSeparation(GameTestHelper h){
-        if(!ScaleBridge.PRESENT){h.succeed();return;}
+        if(!ScaleBridge.legacyApiAvailable()){h.succeed();return;}
         var p=player(h);var cow=h.spawn(EntityTypes.COW,new BlockPos(5,3,5));cow.setNoAi(true);
         p.getAttribute(Attributes.SCALE).setBaseValue(.28);p.refreshDimensions();
         p.setPos(cow.getX(),cow.getBoundingBox().maxY,cow.getZ());p.setDeltaMovement(Vec3.ZERO);
@@ -182,7 +195,7 @@ public final class ClingingGameTests {
         check(p.position().equals(before),"airborne not dragged");check(ClingingReoriented.data(p).support!=null,"reference survives air");h.succeed();
     }
     @GameTest(padding=24) public void sixEntityFacesCollideAndTranslate(GameTestHelper h){
-        if(!ScaleBridge.PRESENT){h.succeed();return;}
+        if(!ScaleBridge.legacyApiAvailable()){h.succeed();return;}
         var p=player(h);var cow=h.spawn(EntityTypes.COW,new BlockPos(5,5,5));cow.setNoAi(true);
         p.getAttribute(Attributes.SCALE).setBaseValue(.28);p.refreshDimensions();
         for(Direction gravity:Direction.values()){
@@ -227,7 +240,7 @@ public final class ClingingGameTests {
         check(GravityDirectionUtil.getOwnGravityDirection(p)==Direction.DOWN && h.getLevel().noCollision(p,p.getBoundingBox().deflate(1e-7)),"retirement relocated to validated box");h.succeed();
     }
     @GameTest(padding=24) public void forgedMovingReferenceCannotReposition(GameTestHelper h){
-        if(!ScaleBridge.PRESENT){h.succeed();return;}
+        if(!ScaleBridge.legacyApiAvailable()){h.succeed();return;}
         var p=player(h);var cow=h.spawn(EntityTypes.COW,new BlockPos(5,3,5));cow.setNoAi(true);
         p.getAttribute(Attributes.SCALE).setBaseValue(.28);p.refreshDimensions();p.setPos(cow.getX(),cow.getBoundingBox().maxY,cow.getZ());
         MovingSurface.bind(p,cow);var s=ClingingReoriented.data(p);s.owned=true;s.groundedOnSurface=true;
@@ -252,7 +265,7 @@ public final class ClingingGameTests {
         check(GravityDirectionUtil.getOwnGravityDirection(replacement)==Direction.DOWN,"copied ownership retires");h.succeed();
     }
     @GameTest(padding=24) public void movingEntityTeleportDropsBindingNotGravity(GameTestHelper h){
-        if(!ScaleBridge.PRESENT){h.succeed();return;}
+        if(!ScaleBridge.legacyApiAvailable()){h.succeed();return;}
         var p=player(h);var cow=h.spawn(EntityTypes.COW,new BlockPos(5,3,5));cow.setNoAi(true);
         p.getAttribute(Attributes.SCALE).setBaseValue(.28);p.refreshDimensions();MovingSurface.bind(p,cow);
         ClingingReoriented.write(p,Direction.EAST);var s=ClingingReoriented.data(p);s.owned=true;s.selected=Direction.EAST;
@@ -260,7 +273,7 @@ public final class ClingingGameTests {
         check(s.support==null && p.position().equals(before) && GravityDirectionUtil.getOwnGravityDirection(p)==Direction.EAST,"small teleport doesn't carry or reset");h.succeed();
     }
     @GameTest(padding=24) public void playerTeleportInvalidatesBindingAndInputEpoch(GameTestHelper h){
-        if(!ScaleBridge.PRESENT){h.succeed();return;}
+        if(!ScaleBridge.legacyApiAvailable()){h.succeed();return;}
         var p=player(h);var cow=h.spawn(EntityTypes.COW,new BlockPos(5,3,5));cow.setNoAi(true);
         p.getAttribute(Attributes.SCALE).setBaseValue(.28);p.refreshDimensions();MovingSurface.bind(p,cow);
         var s=ClingingReoriented.data(p);int before=s.revision;
@@ -291,7 +304,7 @@ public final class ClingingGameTests {
         p.jumpFromGround();check(p.getDeltaMovement().x<0,"jump leaves wall against EAST gravity");h.succeed();
     }
     @GameTest(padding=24) public void allEntityFacesCatchUnboundArrivals(GameTestHelper h){
-        if(!ScaleBridge.PRESENT){h.succeed();return;}
+        if(!ScaleBridge.legacyApiAvailable()){h.succeed();return;}
         var p=player(h);var cow=h.spawn(EntityTypes.COW,new BlockPos(5,5,5));cow.setNoAi(true);
         p.getAttribute(Attributes.SCALE).setBaseValue(.28);p.refreshDimensions();
         for(Direction gravity:Direction.values()){
@@ -329,7 +342,7 @@ public final class ClingingGameTests {
         check(p.getHealth()<health,"foreign gravity retains upstream timeout damage: health="+p.getHealth()+" noGravity="+p.isNoGravity()+" ground="+p.onGround()+" velocity="+p.getDeltaMovement()+" creative="+p.isCreative());h.succeed();
     }
     @GameTest(padding=24) public void stoppedPlatformDoesNotLaunchPlayer(GameTestHelper h){
-        if(!ScaleBridge.PRESENT){h.succeed();return;}
+        if(!ScaleBridge.legacyApiAvailable()){h.succeed();return;}
         var p=player(h);var cow=h.spawn(EntityTypes.COW,new BlockPos(5,3,5));cow.setNoAi(true);
         p.getAttribute(Attributes.SCALE).setBaseValue(.28);p.refreshDimensions();p.setPos(cow.getX(),cow.getBoundingBox().maxY,cow.getZ());p.setDeltaMovement(Vec3.ZERO);
         var s=ClingingReoriented.data(p);s.owned=true;MovingSurface.bind(p,cow);s.lastTransport=new Vec3(.2,0,0);s.transportTick=p.level().getGameTime()-1;
