@@ -36,10 +36,10 @@ Each sprint must state:
 - one primary technical thesis;
 - affected production classes and external contracts;
 - explicit exclusions;
-- dependency on Scale Brews or released compatibility versions;
+- dependencies on optional integrations that are actually in scope;
 - observable acceptance conditions.
 
-Do not combine unrelated ownership, networking and presentation refactors merely because they touch the same class.
+Do not combine unrelated ownership, networking and presentation refactors merely because they touch the same class. Do not invent a mod-specific mount branch where the generic `LivingEntity` root-vehicle contract is sufficient.
 
 ## 3. Adversarial model
 
@@ -51,10 +51,10 @@ Before coding, consider at minimum when applicable:
 - partial failure after one mutation;
 - nested passenger hierarchies;
 - save/load, death, teleport and dimension discontinuities;
-- optional mod absent/present/old/new;
+- optional integration absent/present when that integration is part of the sprint;
 - non-DOWN frames and DOWN equivalence;
 - NaN/invalid network vectors and bounded-work limits;
-- double application when two compatibility layers are installed.
+- accidental double application caused by duplicate ownership paths.
 
 Reserve at least one concrete adversarial scenario per sprint until after implementation, so the implementation is not written solely to its visible tests.
 
@@ -77,17 +77,18 @@ Use the smallest useful level first, then the integration level required by the 
 - unit/helper tests for pure selection/state logic;
 - server GameTests for ownership, recovery, passengers and effect lifecycle;
 - real client GameTests for input/camera/First Person behavior;
-- real optional-mod fixture for Scale Brews integration;
+- generic mount fixtures for mounted-gravity behavior without Scale classes;
+- optional-mod fixtures only for integrations explicitly in scope;
 - CI clean build on the exact candidate commit.
 
-Adversarial coverage is mandatory for the new failure mode, but exhaustive mutation/fuzz infrastructure is optional unless a sprint exposes a sufficiently risky input surface.
+Unfinished Scale Brews is not a validation dependency of the upcoming Clinging prerelease. Adversarial coverage is mandatory for each new failure mode, but exhaustive mutation/fuzz infrastructure is optional unless a sprint exposes a sufficiently risky input surface.
 
 ## 6. Finalization
 
 After all sprints:
 
 1. review final code and tests against every CR/CNFR;
-2. run complete applicable CI/compatibility suites;
+2. run complete applicable CI and in-scope compatibility suites;
 3. update permanent docs according to their existing scope;
 4. perform a final full no-change review;
 5. delete all `docs/work/*` temporary artifacts;
