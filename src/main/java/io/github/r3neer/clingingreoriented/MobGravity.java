@@ -41,13 +41,13 @@ public final class MobGravity {
             if(Math.max(Math.abs(x),Math.max(Math.abs(y),Math.abs(z)))!=radius)continue;
             var target=origin.add(x*.5,y*.5,z*.5);
             if(target.distanceToSqr(origin)>maxDistanceSqr)continue;
-            if(treeFits(e,direction,target)){commitTurn(e,direction,target,true);s.retryAt=0;return true;}
+            if(relocateTree(e,direction,target)){s.retryAt=0;return true;}
         }
         s.retryAt=e.level().getGameTime()+20;return false;
     }
     public static boolean fits(Entity e,AABB box){
         if(!Double.isFinite(box.getSize()) || box.minY<e.level().getMinY() || box.maxY>e.level().getMaxY()+1 || !e.level().getWorldBorder().isWithinBounds(box))return false;
-        for(int x=((int)Math.floor(box.minX))>>4;x<=((int)Math.floor(box.maxX))>>4;x++)for(int z=((int)Math.floor(box.minZ))>>4;z<=((int)Math.floor(box.maxZ))>>4;z++)
+        for(int x=((int)Math.floor(box.minX))>>4;x<=((int)Math.floor(box.maxX))>>4;x++)for(int z=((int)Math.floor(box.maxZ))>>4;z<=((int)Math.floor(box.maxZ))>>4;z++)
             if(!e.level().hasChunkAt(new net.minecraft.core.BlockPos(x<<4,(int)box.minY,z<<4)))return false;
         var interior=box.deflate(1e-7);
         if(AnatomyBridge.active(e) && !AnatomyBridge.spaceClear(e,interior))return false;
@@ -75,10 +75,15 @@ public final class MobGravity {
         positionPassengers(e);
         e.setOnGround(false);e.verticalCollision=false;e.verticalCollisionBelow=false;e.horizontalCollision=false;
     }
+    static boolean relocateTree(LivingEntity e,Direction direction,Vec3 position){
+        if(!treeFits(e,direction,position))return false;
+        commitTurn(e,direction,position,!e.position().equals(position));
+        return true;
+    }
     public static boolean turn(LivingEntity e,Direction direction,boolean checkSpace){
         var attribute=e.getAttribute(ModAttributes.GRAVITY_DIRECTION);
         if(attribute==null || !attribute.getModifiers().isEmpty())return false;
-        if(checkSpace && !treeFits(e,direction,e.position()))return false;
+        if(checkSpace)return relocateTree(e,direction,e.position());
         commitTurn(e,direction,e.position(),false);
         return true;
     }
