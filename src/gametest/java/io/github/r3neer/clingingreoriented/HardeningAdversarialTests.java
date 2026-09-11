@@ -37,14 +37,19 @@ public final class HardeningAdversarialTests {
         var s=ClingingReoriented.data(p);s.owned=true;s.visualFrameOwned=true;s.selected=Direction.EAST;
         Vec3 origin=p.position();
 
-        // Make every DOWN candidate physically impossible without changing blocks.
-        p.getAttribute(Attributes.SCALE).setBaseValue(1000);p.refreshDimensions();
+        // Fill a region larger than the complete <=4-block retirement sphere so no
+        // DOWN candidate can pass collision preflight. The fixture deliberately
+        // traps the current EAST box too; failed retirement must still not mutate it.
+        BlockPos center=p.blockPosition();
+        for(var pos:BlockPos.betweenClosed(center.offset(-5,-5,-5),center.offset(5,7,5)))
+            h.getLevel().setBlockAndUpdate(pos,Blocks.STONE.defaultBlockState());
         p.removeAllEffects();ClingingReoriented.reconcile(p);
         h.assertTrue(s.retirementPending,"impossible local recovery enters pending state");
         h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(p)==Direction.EAST,"pending retirement preserves the current frame");
         h.assertTrue(p.position().equals(origin),"failed recovery does not teleport");
 
-        p.getAttribute(Attributes.SCALE).setBaseValue(1);p.refreshDimensions();
+        for(var pos:BlockPos.betweenClosed(center.offset(-5,-5,-5),center.offset(5,7,5)))
+            h.getLevel().setBlockAndUpdate(pos,Blocks.AIR.defaultBlockState());
         s.nextRetirementAttempt=0;ClingingReoriented.reconcile(p);
         h.assertFalse(s.retirementPending,"retry clears pending once local geometry is valid");
         h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(p)==Direction.DOWN,"retry restores DOWN");
