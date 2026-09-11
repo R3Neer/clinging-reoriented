@@ -16,7 +16,10 @@ public abstract class MovementMixin {
     @Inject(method="teleportTo(DDD)V",at=@At("HEAD"))
     private void clinging$teleport(double x,double y,double z,CallbackInfo ci){MovingSurface.teleported((Entity)(Object)this);}
     @Inject(method="teleport",at=@At("HEAD"))
-    private void clinging$dimension(TeleportTransition transition,CallbackInfoReturnable<Entity> cir){MovingSurface.teleported((Entity)(Object)this);if((Object)this instanceof Player p)ClingingReoriented.data(p).lastSafeDown=null;}
+    private void clinging$dimension(TeleportTransition transition,CallbackInfoReturnable<Entity> cir){
+        MovingSurface.teleported((Entity)(Object)this);
+        if((Object)this instanceof Player p){var s=ClingingReoriented.data(p);s.retirementPending=false;s.nextRetirementAttempt=0;}
+    }
     @Inject(method="canCollideWith",at=@At("HEAD"),cancellable=true)
     private void clinging$pair(Entity other,CallbackInfoReturnable<Boolean> cir){
         if((Object)this instanceof Player p && ClingingReoriented.managed(p) && other.getUUID().equals(ClingingReoriented.data(p).support)) cir.setReturnValue(false);
