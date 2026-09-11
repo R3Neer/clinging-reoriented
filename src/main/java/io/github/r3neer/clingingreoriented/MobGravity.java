@@ -4,6 +4,7 @@ import com.moigferdsrte.gravitychanger.util.*;
 import com.moigferdsrte.gravitychanger.init.ModAttributes;
 import com.moigferdsrte.gravitychanger.attributes.DirectionalAttribute;
 import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
@@ -46,7 +47,7 @@ public final class MobGravity {
     }
     public static boolean fits(Entity e,AABB box){
         if(!Double.isFinite(box.getSize()) || box.minY<e.level().getMinY() || box.maxY>e.level().getMaxY()+1 || !e.level().getWorldBorder().isWithinBounds(box))return false;
-        for(int x=((int)Math.floor(box.minX))>>4;x<=((int)Math.floor(box.maxX))>>4;x++)for(int z=((int)Math.floor(box.maxZ))>>4;z>=((int)Math.floor(box.minZ))>>4;z--)
+        for(int x=((int)Math.floor(box.minX))>>4;x<=((int)Math.floor(box.maxX))>>4;x++)for(int z=((int)Math.floor(box.minZ))>>4;z<=((int)Math.floor(box.maxZ))>>4;z++)
             if(!e.level().hasChunkAt(new net.minecraft.core.BlockPos(x<<4,(int)box.minY,z<<4)))return false;
         var interior=box.deflate(1e-7);
         if(AnatomyBridge.active(e) && !AnatomyBridge.spaceClear(e,interior))return false;
@@ -54,8 +55,6 @@ public final class MobGravity {
     }
     private static boolean passengersFit(Entity vehicle,Direction direction,Vec3 position){
         for(var passenger:vehicle.getPassengers()){
-            // Audited vanilla attachment getters, with the same cardinal rotation
-            // used by Gravity Changer's positionRider hook. No gravity mutation.
             var offset=vehicle.getPassengerRidingPosition(passenger).subtract(vehicle.position()).subtract(passenger.getVehicleAttachmentPoint(vehicle));
             var target=position.add(RotationUtil.vecPlayerToWorld(offset,direction));
             var passengerDirection=passenger instanceof Player?direction:GravityDirectionUtil.getGravityDirection(passenger);
@@ -134,8 +133,6 @@ public final class MobGravity {
                 return;
             }
             if(ownEffect){
-                // The loan ended but the mount independently has Clinging; the current
-                // safe orientation is now backed by its own effect rather than a rider.
                 finishBorrow(s,Ownership.OWNED_EFFECT,GravityDirectionUtil.getOwnGravityDirection(e));
                 return;
             }
@@ -148,7 +145,13 @@ public final class MobGravity {
     }
     public static boolean transfer(Player player,Entity vehicle,Direction before){
         if(!player.hasEffect(Reorientation.EFFECT) || before==Direction.DOWN || !(vehicle.getRootVehicle() instanceof LivingEntity root) || root instanceof Player)return false;
-        return borrow(root,before);
+        Direction previous=GravityDirectionUtil.getOwnGravityDirection(root);
+        if(!borrow(root,before))return false;
+        if(previous!=before&&player instanceof ServerPlayer serverPlayer){
+            var playerState=ClingingReoriented.data(serverPlayer);playerState.visualFrameOwned=true;
+            Payloads.visual(serverPlayer,before);Payloads.publish(serverPlayer);
+        }
+        return true;
     }
     public static boolean replay(LivingEntity pet,Direction direction){
         if(!ClingingReoriented.hasEffect(pet) || !supported(pet) || pet.isPassenger() || pet.isVehicle() || !pet.isAlive())return false;
