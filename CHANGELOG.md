@@ -41,8 +41,9 @@ Correctness and ownership hardening without adding a new gameplay feature set.
   real default client GameTests without runtime Scale Brews.
 - Add adversarial holdouts for blocked retirement/retry, external mob ownership,
   passenger-only recovery obstruction and stale/replayed support references.
-- Keep the optional First Person runtime fixture separate from default release
-  evidence after narrowing it to First Person alone.
+- Pass a fresh real-client compatibility lane with First Person 2.7.2 and Not Enough
+  Animations 1.12.4, proving that external gravity retains First Person's native
+  offset while Clinging-owned frames rotate that baseline exactly once.
 
 ## [0.1.0-alpha.6] - 2026-09-09
 
