@@ -69,9 +69,14 @@ movement-reference and reconciliation responsibilities.
 
 ## Optional integrations
 
-Optional integrations are isolated by the mixin configuration plugin and reflective
-bridges. The production JAR can load without Alchemical Leather, Scale Brews or
-First Person. It cannot load without the dependencies declared in
+Optional integrations are isolated from the required production classpath. First
+Person is gated by the mixin configuration plugin. Scale Brews uses reflective
+bridges plus a `@Pseudo` mixin targeted by class name, so neither its classes nor a
+Scale JAR are required to compile or load Clinging. The Scale mixin is enabled only
+when the specific legacy API Clinging understands is present; an absent or
+incompatible Scale version leaves the integration disabled instead of making Scale
+a dependency. The production JAR can therefore load without Alchemical Leather,
+Scale Brews or First Person. It cannot load without the dependencies declared in
 `fabric.mod.json`.
 
 Tiny Mount gravity-specific mixins no longer live in Clinging. A Tiny Mount is an
