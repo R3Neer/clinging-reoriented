@@ -78,7 +78,8 @@ versions on every multiplayer participant. See the
   remains deliberately excluded from its villager-trade economy.
 - **First Person** is optional. Clinging scopes its body-offset correction to
   Clinging-owned visual frames/transitions instead of becoming a global
-  Gravity Changer patch.
+  Gravity Changer patch. Alpha.7 CI exercises First Person 2.7.2 in a separate
+  real-client lane.
 
 Scale Brews is under active architectural development and is **not part of the
 alpha.7 runtime/support target**. Clinging's mounted-gravity contract is generic:
@@ -104,12 +105,12 @@ See [configuration](docs/CONFIGURATION.md).
 ## Project status
 
 The alpha.7 hardening candidate passes **42 dedicated server GameTests**, 10
-JUnit tests and the real default client GameTest suites without loading optional
-Scale Brews. The new adversarial coverage includes bounded retirement/retry,
-external mob-gravity ownership, atomic passenger recovery and stale/replayed
-moving-surface references. Full-pack human playtesting, dedicated multiplayer
-latency, long pet routes and the optional First Person runtime fixture remain
-separate evidence; automated success is not presented as human gameplay QA.
+JUnit tests, the real default client GameTest suites and a separate real-client
+First Person 2.7.2 lane, all without loading optional Scale Brews at runtime.
+The adversarial coverage includes bounded retirement/retry, external mob-gravity
+ownership, atomic passenger recovery and stale/replayed moving-surface references.
+Full-pack human playtesting, dedicated multiplayer latency and long pet routes
+remain manual checks; automated success is not presented as human gameplay QA.
 
 ## Build and contribute
 
@@ -122,9 +123,10 @@ the audited required versions from Modrinth:
 ```
 
 CI fetches the public Scale Brews beta.5 JAR only as a **compile-time API** for
-the still-transitional anatomical bridge, while normal alpha.7 runtime tests use
-`-PwithoutScaleBrews`. Scale is not a supported runtime dependency for this
-prerelease, and no dependency or test JAR is included in version control.
+the still-transitional anatomical bridge, while all alpha.7 runtime lanes use
+`-PwithoutScaleBrews`. The optional First Person lane installs its test fixtures
+separately. Scale is not a supported runtime dependency for this prerelease, and
+no dependency or test JAR is included in version control.
 
 - [Player guide](docs/GUIDE.md)
 - [Compatibility](docs/COMPATIBILITY.md)
