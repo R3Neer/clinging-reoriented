@@ -49,11 +49,13 @@ from generic mounted gravity.
 The optional client mixin targets First Person 2.7.2. Its contract in alpha.7 is
 narrow: it transforms First Person's existing body offset only for visual frames
 or transitions owned by Clinging: Reoriented. Unrelated Gravity Changer gravity
-must retain First Person's ordinary behavior. First Person is not required.
+retains First Person's ordinary behavior. First Person is not required.
 
-The alpha.7 default CI does not install First Person; therefore its current runtime
-fixture is tracked separately from the core release evidence rather than being
-implied by a green default build.
+The alpha.7 compatibility lane installs First Person 2.7.2 together with Not Enough
+Animations 1.12.4 and runs the real client GameTest without Scale Brews. The fixture
+checks an external/unowned gravity baseline, the same frame under Clinging ownership,
+and an additional third-party world-space offset handler. Scale Visual Compat is no
+longer required by this Clinging compatibility contract.
 
 ## Ownership boundaries
 
