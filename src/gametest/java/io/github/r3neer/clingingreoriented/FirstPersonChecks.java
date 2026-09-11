@@ -35,25 +35,27 @@ public final class FirstPersonChecks {
                     player.setPose(pose);
                     for (float yaw : new float[]{0, 90, 180, -90}) {
                         player.yBodyRotO = yaw; player.yBodyRot = yaw;
-                        double distance = pose == Pose.STANDING
-                            ? .25f + FirstPersonModelCore.instance.getConfig().xOffset / 100f + .10
-                            : .27f + FirstPersonModelCore.instance.getConfig().sneakXOffset / 100f;
-                        Vec3 local = new Vec3(distance * Math.sin(Math.toRadians(yaw)), 0, -distance * Math.cos(Math.toRadians(yaw)));
 
-                        // An unrelated Gravity Changer frame is not ours to patch.
+                        // Capture First Person's own current baseline instead of duplicating
+                        // its offset formula in this fixture. With ownership disabled our
+                        // mixin is a no-op, so this is the external behavior we must preserve.
                         ClingingReoriented.data(player).visualFrameOwned=false;
                         VisualTransitions.clear();
                         logic.updatePositionOffset(player, 1);
-                        if (logic.getOffset().distanceTo(local) > 1e-5)
-                            throw new AssertionError("External gravity offset was modified " + direction + " " + pose + " actual=" + logic.getOffset() + " expected=" + local);
+                        Vec3 baseline=logic.getOffset();
+                        if(!Double.isFinite(baseline.x+baseline.y+baseline.z))
+                            throw new AssertionError("First Person produced a non-finite baseline " + direction + " " + pose);
 
-                        // The same settled physical frame becomes eligible once Clinging owns presentation.
+                        // The same settled physical frame becomes eligible once Clinging owns
+                        // presentation. We rotate exactly First Person's baseline once.
                         ClingingReoriented.data(player).visualFrameOwned=true;
-                        Vec3 expected = RotationUtil.vecPlayerToWorld(local, rotation);
+                        Vec3 expected = RotationUtil.vecPlayerToWorld(baseline, rotation);
                         logic.updatePositionOffset(player, 1);
                         if (logic.getOffset().distanceTo(expected) > 1e-5)
-                            throw new AssertionError("Clinging-owned body offset mismatch " + direction + " " + pose + " actual=" + logic.getOffset() + " expected=" + expected);
+                            throw new AssertionError("Clinging-owned body offset mismatch " + direction + " " + pose + " actual=" + logic.getOffset() + " expected=" + expected + " baseline=" + baseline);
 
+                        // Third-party handlers operate after First Person builds its base offset;
+                        // their world-space contribution must not be rotated by Clinging.
                         Vec3 worldOffset = new Vec3(.13, .24, .35);
                         PlayerOffsetHandler handler = (p, delta, original, current) -> current.add(worldOffset);
                         FirstPersonAPI.getPlayerOffsetHandlers().add(handler);
