@@ -16,6 +16,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.*;
 import net.minecraft.network.protocol.game.ClientboundUpdateAttributesPacket;
@@ -26,7 +27,7 @@ public final class ClingingReoriented implements ModInitializer {
     private static final double RETIREMENT_RADIUS = 4.0;
     private static final ThreadLocal<Boolean> WRITING = ThreadLocal.withInitial(() -> false);
     public static PlayerData data(Player p) { return ((PlayerData.Holder)p).clinging$data(); }
-    public static boolean hasEffect(net.minecraft.world.entity.LivingEntity p) { return p.hasEffect(Reorientation.EFFECT) || BuiltInRegistries.MOB_EFFECT.get(Identifier.fromNamespaceAndPath("alexsmobs", "clinging")).map(p::hasEffect).orElse(false); }
+    public static boolean hasEffect(LivingEntity p) { return p.hasEffect(Reorientation.EFFECT) || BuiltInRegistries.MOB_EFFECT.get(Identifier.fromNamespaceAndPath("alexsmobs", "clinging")).map(p::hasEffect).orElse(false); }
     public static boolean anchor(Player p) { return p.getMainHandItem().getItem() instanceof GravityAnchorItem || p.getOffhandItem().getItem() instanceof GravityAnchorItem; }
     public static boolean managed(Entity e) { return e instanceof Player p && data(p).support != null && controlsPhysics(p); }
     public static boolean controlsPhysics(Entity e) {
@@ -35,6 +36,16 @@ public final class ClingingReoriented implements ModInitializer {
         return s.owned && hasEffect(p) && p.isAlive() && !p.isPassenger() && !s.anchorBorrowed
             && !anchor(p) && attr!=null && attr.getModifiers().isEmpty()
             && GravityDirectionUtil.getGravityDirection(p)==s.selected;
+    }
+    private static boolean mountedVisualOwned(ServerPlayer p){
+        if(!(p.getRootVehicle() instanceof LivingEntity root)||root==p)return false;
+        var state=MobGravity.state(root);
+        return state.ownership==MobGravity.Ownership.BORROWED_RIDER
+            && GravityDirectionUtil.getOwnGravityDirection(root)==state.ownedDirection;
+    }
+    private static void reconcileVisualOwnership(ServerPlayer p){
+        var s=data(p);boolean next=s.owned||mountedVisualOwned(p);
+        if(s.visualFrameOwned!=next){s.visualFrameOwned=next;Payloads.publish(p);}
     }
     @Override public void onInitialize() {
         AnatomyBridge.initialize();
@@ -58,6 +69,7 @@ public final class ClingingReoriented implements ModInitializer {
                 next.owned = old.owned; next.selected = old.selected;
                 next.airChangeUsed = old.airChangeUsed;
                 next.anchorBorrowed = old.anchorBorrowed; next.anchorExpired = old.anchorExpired;
+                next.visualFrameOwned=old.visualFrameOwned;
             } else if(data(oldPlayer).owned || data(oldPlayer).ownedAtDeath || data(oldPlayer).anchorBorrowed) {
                 // Vanilla restoreFrom copies base attributes even on death.
                 write(newPlayer,Direction.DOWN);
@@ -67,9 +79,7 @@ public final class ClingingReoriented implements ModInitializer {
         EntityTrackingEvents.START_TRACKING.register((entity, observer) -> { if (entity instanceof ServerPlayer p) Payloads.sendState(p, observer); });
     }
     public enum Result { SUCCESS, NO_SURFACE, AMBIGUOUS, NO_SPACE, BLOCKED, FOREIGN_GRAVITY, UNCHANGED, AIR_CHANGE_USED, MOUNT_ACTION }
-    public static Result attempt(ServerPlayer p) {
-        return attempt(p, p.getLookAngle());
-    }
+    public static Result attempt(ServerPlayer p) { return attempt(p, p.getLookAngle()); }
     public static Result attempt(ServerPlayer p, Vec3 worldLook) {
         reconcile(p);
         var s = data(p);
@@ -85,12 +95,11 @@ public final class ClingingReoriented implements ModInitializer {
         AABB box = RotationUtil.makeBoxFromDimensions(p.getDimensions(p.getPose()), direction, p.position());
         if (!fits(p, box, null)) return Result.NO_SPACE;
         boolean airborne=!AirChanges.grounded(p);
+        Payloads.visual(p,direction);
         write(p, direction);
         if(airborne)s.airChangeUsed=true;
-        s.owned = true; s.selected = direction; s.unbind();
+        s.owned = true; s.visualFrameOwned=true; s.selected = direction; s.unbind();
         ScaleBridge.clear(p);
-        // Ground flags describe the previous frame. Preserve world momentum and fall
-        // distance, but do not allow a phantom jump from the old floor after turning.
         p.setOnGround(false); p.verticalCollision=false; p.verticalCollisionBelow=false; p.horizontalCollision=false;
         Payloads.publish(p);
         GravityBreadcrumbs.record(p,direction);
@@ -99,15 +108,13 @@ public final class ClingingReoriented implements ModInitializer {
     public static boolean fits(Player p, AABB box, Entity selected) {
         if (!Double.isFinite(box.minX+box.minY+box.minZ+box.maxX+box.maxY+box.maxZ) || box.getXsize() <= 0 || box.getYsize() <= 0 || box.getZsize() <= 0) return false;
         if (box.minY < p.level().getMinY() || box.maxY > p.level().getMaxY()+1 || !p.level().getWorldBorder().isWithinBounds(box)) return false;
-        for (int x=((int)Math.floor(box.minX))>>4; x<=((int)Math.floor(box.maxX))>>4; x++) for(int z=((int)Math.floor(box.minZ))>>4; z<=((int)Math.floor(box.maxZ))>>4; z++) {
-            if (!p.level().hasChunkAt(new BlockPos(x<<4, (int)box.minY, z<<4))) return false;
-        }
+        for (int x=((int)Math.floor(box.minX))>>4; x<=((int)Math.floor(box.maxX))>>4; x++) for(int z=((int)Math.floor(box.minZ))>>4; z<=((int)Math.floor(box.maxZ))>>4; z++) if (!p.level().hasChunkAt(new BlockPos(x<<4, (int)box.minY, z<<4))) return false;
         AABB interior = box.deflate(1e-7);
         if(AnatomyBridge.active(p)) {
             if(!AnatomyBridge.spaceClear(p,interior))return false;
         }else {
             if (selected != null && interior.intersects(selected.getBoundingBox())) return false;
-            if(ScaleBridge.PRESENT)for(var entity:p.level().getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,interior,e->ScaleBridge.eligible(p,e)))if(interior.intersects(entity.getBoundingBox()))return false;
+            if(ScaleBridge.PRESENT)for(var entity:p.level().getEntitiesOfClass(LivingEntity.class,interior,e->ScaleBridge.eligible(p,e)))if(interior.intersects(entity.getBoundingBox()))return false;
         }
         return p.level().noCollision(p, interior);
     }
@@ -123,20 +130,21 @@ public final class ClingingReoriented implements ModInitializer {
         if (WRITING.get() || p.level().isClientSide()) return;
         var s = data(p);
         if (s.anchorBorrowed && anchor(p)) return;
-        if (s.owned) { s.owned=false; s.retirementPending=false; s.unbind(); if (p instanceof ServerPlayer sp) Payloads.publish(sp); }
+        if (s.owned) { s.owned=false; s.visualFrameOwned=false; s.retirementPending=false; s.unbind(); if (p instanceof ServerPlayer sp) Payloads.publish(sp); }
     }
     public static void reconcile(ServerPlayer p) {
         var s=data(p);
         MountedGravity.refresh(p);
         AirChanges.refresh(p);
-        if (!p.isAlive()) { s.ownedAtDeath |= s.owned || s.anchorBorrowed; s.owned=false; s.unbind(); return; }
+        reconcileVisualOwnership(p);
+        if (!p.isAlive()) { s.ownedAtDeath |= s.owned || s.anchorBorrowed; s.owned=false; s.visualFrameOwned=false; s.unbind(); return; }
         if (s.anchorBorrowed) {
             if (!hasEffect(p)) s.anchorExpired=true;
             return;
         }
         if (!s.owned) return;
         var attr=p.getAttribute(ModAttributes.GRAVITY_DIRECTION);
-        if (attr == null || !attr.getModifiers().isEmpty() || GravityDirectionUtil.getOwnGravityDirection(p) != s.selected) { s.owned=false; s.unbind(); Payloads.publish(p); return; }
+        if (attr == null || !attr.getModifiers().isEmpty() || GravityDirectionUtil.getOwnGravityDirection(p) != s.selected) { s.owned=false; s.visualFrameOwned=false; s.unbind(); Payloads.publish(p); return; }
         if (!hasEffect(p)) {
             s.unbind();
             if(s.retirementPending && p.level().getGameTime()<s.nextRetirementAttempt)return;
@@ -144,20 +152,20 @@ public final class ClingingReoriented implements ModInitializer {
                 if(!s.retirementPending) org.slf4j.LoggerFactory.getLogger(ID).warn("Cannot retire Clinging for {} yet: no collision-free DOWN placement within {} blocks",p.getUUID(),RETIREMENT_RADIUS);
                 s.retirementPending=true;s.nextRetirementAttempt=p.level().getGameTime()+20;return;
             }
-            s.owned=false; s.retirementPending=false; Payloads.publish(p);
+            s.owned=false; s.visualFrameOwned=false; s.retirementPending=false; Payloads.publish(p);
         }
     }
     /** Forced cleanup is local and bounded; voluntary selection never calls this search. */
     public static boolean retire(ServerPlayer p) {
         Vec3 origin=p.position();
         var dimensions=p.getDimensions(p.getPose());
-        if (fits(p, RotationUtil.makeBoxFromDimensions(dimensions, Direction.DOWN, origin), null)) { write(p,Direction.DOWN); return true; }
+        if (fits(p, RotationUtil.makeBoxFromDimensions(dimensions, Direction.DOWN, origin), null)) { Payloads.visual(p,Direction.DOWN);write(p,Direction.DOWN); return true; }
         double maxDistanceSqr=RETIREMENT_RADIUS*RETIREMENT_RADIUS+1.0E-9;
         for (int radius=1; radius<=8; radius++) for (int y=-radius; y<=radius; y++) for(int x=-radius;x<=radius;x++) for(int z=-radius;z<=radius;z++) {
             if (Math.max(Math.abs(x),Math.max(Math.abs(y),Math.abs(z))) != radius) continue;
             Vec3 target=origin.add(x*.5,y*.5,z*.5);
             if(target.distanceToSqr(origin)>maxDistanceSqr)continue;
-            if (fits(p,RotationUtil.makeBoxFromDimensions(dimensions,Direction.DOWN,target),null)) { write(p,Direction.DOWN); p.teleportTo(target.x,target.y,target.z); return true; }
+            if (fits(p,RotationUtil.makeBoxFromDimensions(dimensions,Direction.DOWN,target),null)) { Payloads.visual(p,Direction.DOWN);write(p,Direction.DOWN); p.teleportTo(target.x,target.y,target.z); return true; }
         }
         return false;
     }
