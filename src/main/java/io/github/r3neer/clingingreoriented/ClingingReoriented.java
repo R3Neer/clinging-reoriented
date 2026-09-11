@@ -23,6 +23,7 @@ import java.util.List;
 
 public final class ClingingReoriented implements ModInitializer {
     public static final String ID = "clinging_reoriented";
+    private static final double RETIREMENT_RADIUS = 4.0;
     private static final ThreadLocal<Boolean> WRITING = ThreadLocal.withInitial(() -> false);
     public static PlayerData data(Player p) { return ((PlayerData.Holder)p).clinging$data(); }
     public static boolean hasEffect(net.minecraft.world.entity.LivingEntity p) { return p.hasEffect(Reorientation.EFFECT) || BuiltInRegistries.MOB_EFFECT.get(Identifier.fromNamespaceAndPath("alexsmobs", "clinging")).map(p::hasEffect).orElse(false); }
@@ -83,7 +84,6 @@ public final class ClingingReoriented implements ModInitializer {
         if (s.airChangeUsed && !p.hasEffect(Reorientation.EFFECT)) return Result.AIR_CHANGE_USED;
         AABB box = RotationUtil.makeBoxFromDimensions(p.getDimensions(p.getPose()), direction, p.position());
         if (!fits(p, box, null)) return Result.NO_SPACE;
-        if (fits(p, RotationUtil.makeBoxFromDimensions(p.getDimensions(p.getPose()), Direction.DOWN, p.position()), null)) s.lastSafeDown = p.position();
         boolean airborne=!AirChanges.grounded(p);
         write(p, direction);
         if(airborne)s.airChangeUsed=true;
@@ -141,32 +141,23 @@ public final class ClingingReoriented implements ModInitializer {
             s.unbind();
             if(s.retirementPending && p.level().getGameTime()<s.nextRetirementAttempt)return;
             if (!retire(p)) {
-                if(!s.retirementPending) org.slf4j.LoggerFactory.getLogger(ID).error("Cannot retire Clinging for {}: no collision-free DOWN space in loaded recovery search",p.getUUID());
+                if(!s.retirementPending) org.slf4j.LoggerFactory.getLogger(ID).warn("Cannot retire Clinging for {} yet: no collision-free DOWN placement within {} blocks",p.getUUID(),RETIREMENT_RADIUS);
                 s.retirementPending=true;s.nextRetirementAttempt=p.level().getGameTime()+20;return;
             }
             s.owned=false; s.retirementPending=false; Payloads.publish(p);
         }
     }
-    /** Forced cleanup may relocate; voluntary selection never calls this search. */
+    /** Forced cleanup is local and bounded; voluntary selection never calls this search. */
     public static boolean retire(ServerPlayer p) {
         Vec3 origin=p.position();
         var dimensions=p.getDimensions(p.getPose());
         if (fits(p, RotationUtil.makeBoxFromDimensions(dimensions, Direction.DOWN, origin), null)) { write(p,Direction.DOWN); return true; }
+        double maxDistanceSqr=RETIREMENT_RADIUS*RETIREMENT_RADIUS+1.0E-9;
         for (int radius=1; radius<=8; radius++) for (int y=-radius; y<=radius; y++) for(int x=-radius;x<=radius;x++) for(int z=-radius;z<=radius;z++) {
             if (Math.max(Math.abs(x),Math.max(Math.abs(y),Math.abs(z))) != radius) continue;
             Vec3 target=origin.add(x*.5,y*.5,z*.5);
+            if(target.distanceToSqr(origin)>maxDistanceSqr)continue;
             if (fits(p,RotationUtil.makeBoxFromDimensions(dimensions,Direction.DOWN,target),null)) { write(p,Direction.DOWN); p.teleportTo(target.x,target.y,target.z); return true; }
-        }
-        Vec3 safe=data(p).lastSafeDown;
-        if(safe != null && fits(p,RotationUtil.makeBoxFromDimensions(dimensions,Direction.DOWN,safe),null)) { write(p,Direction.DOWN); p.teleportTo(safe.x,safe.y,safe.z); return true; }
-        // Emergency recovery stays in the same loaded column and never changes blocks.
-        for(int y=(int)Math.ceil(origin.y);y+dimensions.height()<=p.level().getMaxY()+1;y++) {
-            Vec3 target=new Vec3(origin.x,y,origin.z);
-            if(fits(p,RotationUtil.makeBoxFromDimensions(dimensions,Direction.DOWN,target),null)){write(p,Direction.DOWN);p.teleportTo(target.x,target.y,target.z);return true;}
-        }
-        for(int y=(int)Math.floor(origin.y)-1;y>=p.level().getMinY();y--) {
-            Vec3 target=new Vec3(origin.x,y,origin.z);
-            if(fits(p,RotationUtil.makeBoxFromDimensions(dimensions,Direction.DOWN,target),null)){write(p,Direction.DOWN);p.teleportTo(target.x,target.y,target.z);return true;}
         }
         return false;
     }
