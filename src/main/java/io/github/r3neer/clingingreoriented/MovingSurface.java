@@ -110,30 +110,31 @@ public final class MovingSurface {
         }
         s.groundedOnSurface=contact && p.getDeltaMovement().dot(FaceGeometry.vector(s.selected.getOpposite()))<=1e-5;
     }
+    static Vec3 consumeLatestCorrection(PlayerData s,Vec3 observed,long now){
+        if(observed==null||!Double.isFinite(observed.lengthSqr()))return null;
+        var latest=s.supportHistory.peekLast();
+        if(latest==null)return null;
+        long age=now-latest.tick();
+        if(age<0||age>REFERENCE_MAX_AGE_TICKS||latest.sequence()<=s.lastConsumedSupportSample)return null;
+        Vec3 correction=latest.position().subtract(observed);
+        if(!Double.isFinite(correction.lengthSqr())||correction.lengthSqr()>16||correction.lengthSqr()<1e-12)return null;
+        var descending=s.supportHistory.descendingIterator();descending.next();
+        var previous=descending.hasNext()?descending.next():null;
+        if(previous==null||previous.sequence()+1!=latest.sequence())return null;
+        Vec3 segment=latest.position().subtract(previous.position());double len=segment.lengthSqr();
+        if(len<1e-12)return null;
+        double t=Math.clamp(observed.subtract(previous.position()).dot(segment)/len,0,1);
+        if(previous.position().add(segment.scale(t)).distanceToSqr(observed)>=1e-6)return null;
+        s.lastConsumedSupportSample=latest.sequence();
+        return correction;
+    }
     public static Vec3 resolveMovement(ServerPlayer p,Vec3 absolute) {
         if(AnatomyBridge.active(p)){ClingingReoriented.data(p).pendingMove=null;return absolute;}
         var s=ClingingReoriented.data(p); var reference=s.pendingMove;s.pendingMove=null;
         var surface=resolve(p);
         if(reference==null || surface==null || !s.groundedOnSurface || reference.support()!=s.supportId || reference.revision()!=s.revision || !reference.absolute().equals(absolute)) return absolute;
-        Vec3 observed=reference.origin();
-        if(!Double.isFinite(observed.lengthSqr()))return absolute;
-        var latest=s.supportHistory.peekLast();
-        if(latest==null)return absolute;
-        long age=p.level().getGameTime()-latest.tick();
-        if(age<0||age>REFERENCE_MAX_AGE_TICKS||latest.sequence()<=s.lastConsumedSupportSample)return absolute;
-        Vec3 correction=latest.position().subtract(observed);
-        if(!Double.isFinite(correction.lengthSqr())||correction.lengthSqr()>16)return absolute;
-        if(correction.lengthSqr()<1e-12)return absolute;
-        var descending=s.supportHistory.descendingIterator();descending.next();
-        var previous=descending.hasNext()?descending.next():null;
-        if(previous==null||previous.sequence()+1!=latest.sequence())return absolute;
-        Vec3 segment=latest.position().subtract(previous.position());double len=segment.lengthSqr();
-        if(len<1e-12)return absolute;
-        double t=Math.clamp(observed.subtract(previous.position()).dot(segment)/len,0,1);
-        if(previous.position().add(segment.scale(t)).distanceToSqr(observed)>=1e-6)return absolute;
-        // The latest material interval can justify at most one correction. Consume it
-        // before spatial acceptance so replay/probing cannot retry alternative origins.
-        s.lastConsumedSupportSample=latest.sequence();
+        Vec3 correction=consumeLatestCorrection(s,reference.origin(),p.level().getGameTime());
+        if(correction==null)return absolute;
         Vec3 target=absolute.add(correction);
         if(target.distanceToSqr(p.position())>16)return absolute;
         var box=com.moigferdsrte.gravitychanger.util.RotationUtil.makeBoxFromDimensions(p.getDimensions(p.getPose()),s.selected,target);
