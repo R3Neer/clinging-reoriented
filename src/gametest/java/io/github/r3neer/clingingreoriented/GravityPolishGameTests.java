@@ -64,9 +64,12 @@ public final class GravityPolishGameTests {
         h.assertTrue(wolf.fallDistance==6.0F,"same mob gravity does not reset fall distance");
 
         var horse=h.spawn(EntityTypes.HORSE,new BlockPos(10,10,5));horse.setNoAi(true);clear(h,horse.blockPosition(),5);
-        horse.fallDistance=15.0F;horse.setOnGround(false);
+        var rider=h.makeMockServerPlayerInLevel();rider.snapTo(horse.position());
+        h.assertTrue(rider.startRiding(horse,true,true),"rider attaches to mounted-root fixture");
+        horse.fallDistance=15.0F;rider.fallDistance=9.0F;horse.setOnGround(false);
         h.assertTrue(MobGravity.borrow(horse,Direction.NORTH),"mounted-root borrow succeeds");
-        h.assertTrue(horse.fallDistance==0.0F,"mounted/root gravity change resets fall distance");
+        h.assertTrue(horse.fallDistance==0.0F,"mounted/root gravity change resets root fall distance");
+        h.assertTrue(rider.fallDistance==0.0F,"mounted/root gravity change resets affected player passenger fall distance");
         h.succeed();
     }
 
