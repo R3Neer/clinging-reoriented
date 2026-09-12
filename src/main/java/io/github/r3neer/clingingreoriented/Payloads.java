@@ -18,9 +18,15 @@ public final class Payloads {
         @Override public Type<MoveReference> type(){return TYPE;}
     }
     private static <T extends CustomPacketPayload> CustomPacketPayload.Type<T> type(String path) { return new CustomPacketPayload.Type<>(Identifier.fromNamespaceAndPath(ClingingReoriented.ID,path)); }
-    public record Request(long sequence,int revision,net.minecraft.world.phys.Vec3 look) implements CustomPacketPayload {
-        public static final Type<Request> TYPE=Payloads.type("select_look_v2");
-        public static final StreamCodec<RegistryFriendlyByteBuf,Request> CODEC=StreamCodec.of((b,v)->{b.writeVarLong(v.sequence);b.writeVarInt(v.revision);b.writeDouble(v.look.x);b.writeDouble(v.look.y);b.writeDouble(v.look.z);},b->new Request(b.readVarLong(),b.readVarInt(),new net.minecraft.world.phys.Vec3(b.readDouble(),b.readDouble(),b.readDouble())));
+    public record Request(long sequence,int revision,net.minecraft.world.phys.Vec3 selectionLook,net.minecraft.world.phys.Vec3 navigationHeading) implements CustomPacketPayload {
+        public static final Type<Request> TYPE=Payloads.type("select_intent_v3");
+        public static final StreamCodec<RegistryFriendlyByteBuf,Request> CODEC=StreamCodec.of((b,v)->{
+            b.writeVarLong(v.sequence);b.writeVarInt(v.revision);
+            b.writeDouble(v.selectionLook.x);b.writeDouble(v.selectionLook.y);b.writeDouble(v.selectionLook.z);
+            b.writeDouble(v.navigationHeading.x);b.writeDouble(v.navigationHeading.y);b.writeDouble(v.navigationHeading.z);
+        },b->new Request(b.readVarLong(),b.readVarInt(),
+            new net.minecraft.world.phys.Vec3(b.readDouble(),b.readDouble(),b.readDouble()),
+            new net.minecraft.world.phys.Vec3(b.readDouble(),b.readDouble(),b.readDouble())));
         @Override public Type<Request> type(){return TYPE;}
     }
     public record Reply(long sequence, int result) implements CustomPacketPayload {
@@ -57,10 +63,9 @@ public final class Payloads {
             if(request.sequence<0 || request.sequence<=s.lastRequest) return;
             s.lastRequest=request.sequence;
             if(request.revision!=s.revision){ServerPlayNetworking.send(p,new Reply(request.sequence,ClingingReoriented.Result.BLOCKED.ordinal()));return;}
-            // One computation per simulation step bounds malicious work, not held-key input.
             if(s.requestTick==tick) { ServerPlayNetworking.send(p,new Reply(request.sequence,ClingingReoriented.Result.BLOCKED.ordinal())); return; }
             s.requestTick=tick;
-            var result=ClingingReoriented.attempt(p,request.look);
+            var result=ClingingReoriented.attempt(p,request.selectionLook,request.navigationHeading);
             ServerPlayNetworking.send(p,new Reply(request.sequence,result.ordinal()));
         });
     }
@@ -73,7 +78,7 @@ public final class Payloads {
     public static void visual(ServerPlayer p,net.minecraft.core.Direction direction){
         var previous=com.moigferdsrte.gravitychanger.util.GravityDirectionUtil.getGravityDirection(p);
         if(previous==direction)return;
-        visual(p,GravityTransition.plan(previous,direction,p.getYRot(),p.getXRot()));
+        visual(p,GravityTransition.plan(previous,direction,GravityTransition.headingFromYaw(previous,p.getYRot())));
     }
     public static void sendState(ServerPlayer p,ServerPlayer recipient) {
         if(!ServerPlayNetworking.canSend(recipient,State.TYPE)) return;
