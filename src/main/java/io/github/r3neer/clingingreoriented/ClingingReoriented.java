@@ -69,23 +69,25 @@ public final class ClingingReoriented implements ModInitializer {
         });
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> { reconcile(handler.player); Payloads.publish(handler.player); });
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {data(handler.player).unbind();GravityBreadcrumbs.clear(handler.player.getUUID());});
-        ServerPlayerEvents.COPY_FROM.register((oldPlayer, newPlayer, alive) -> {
-            var old=data(oldPlayer);var next=data(newPlayer);
-            next.revision=old.revision+1;
-            // Visual epochs are connection-scoped. The player entity is replaced on
-            // respawn, but the client must never see the sequence move backwards.
-            next.visualSequence=old.visualSequence;
-            if (alive) {
-                next.owned = old.owned; next.selected = old.selected;
-                next.airChangeUsed = old.airChangeUsed;
-                next.anchorBorrowed = old.anchorBorrowed; next.anchorExpired = old.anchorExpired;
-                next.visualFrameOwned=old.visualFrameOwned;
-            } else if(old.owned || old.ownedAtDeath || old.anchorBorrowed) {
-                write(newPlayer,Direction.DOWN);
-            }
-        });
+        ServerPlayerEvents.COPY_FROM.register(ClingingReoriented::copyPlayerState);
         ServerPlayerEvents.AFTER_RESPAWN.register((oldPlayer,newPlayer,alive)->Payloads.publish(newPlayer));
         EntityTrackingEvents.START_TRACKING.register((entity, observer) -> { if (entity instanceof ServerPlayer p) Payloads.sendState(p, observer); });
+    }
+
+    static void copyPlayerState(ServerPlayer oldPlayer,ServerPlayer newPlayer,boolean alive){
+        var old=data(oldPlayer);var next=data(newPlayer);
+        next.revision=old.revision+1;
+        // Visual epochs are connection-scoped. The player entity is replaced on
+        // respawn, but the client must never see the sequence move backwards.
+        next.visualSequence=old.visualSequence;
+        if(alive){
+            next.owned=old.owned;next.selected=old.selected;
+            next.airChangeUsed=old.airChangeUsed;
+            next.anchorBorrowed=old.anchorBorrowed;next.anchorExpired=old.anchorExpired;
+            next.visualFrameOwned=old.visualFrameOwned;
+        }else if(old.owned||old.ownedAtDeath||old.anchorBorrowed){
+            write(newPlayer,Direction.DOWN);
+        }
     }
 
     public enum Result { SUCCESS, NO_SURFACE, AMBIGUOUS, NO_SPACE, BLOCKED, FOREIGN_GRAVITY, UNCHANGED, AIR_CHANGE_USED, MOUNT_ACTION }
