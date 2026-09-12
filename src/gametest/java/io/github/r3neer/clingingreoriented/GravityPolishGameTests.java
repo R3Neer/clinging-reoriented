@@ -15,6 +15,25 @@ public final class GravityPolishGameTests {
         for(var pos:BlockPos.betweenClosed(center.offset(-radius,-radius,-radius),center.offset(radius,radius,radius)))
             h.getLevel().setBlockAndUpdate(pos,Blocks.AIR.defaultBlockState());
     }
+    private static void assertVec(GameTestHelper h,Vec3 expected,Vec3 actual,double epsilon,String message){
+        h.assertTrue(expected.distanceTo(actual)<=epsilon,message+" expected="+expected+" actual="+actual);
+    }
+
+    @GameTest(padding=24)
+    public void verticalUpSelectionKeepsNavigationHeadingAndPitch(GameTestHelper h){
+        var p=h.makeMockServerPlayerInLevel();p.snapTo(h.absoluteVec(new Vec3(5,10,5)));clear(h,p.blockPosition(),6);
+        p.addEffect(new MobEffectInstance(Reorientation.EFFECT,400));p.setOnGround(false);p.setNoGravity(true);p.setDeltaMovement(Vec3.ZERO);
+        p.setYRot(37.0F);p.yRotO=37.0F;p.setXRot(-90.0F);
+        Vec3 beforeHeading=GravityTransition.headingFromYaw(Direction.DOWN,p.getYRot());
+        float beforePitch=p.getXRot();
+        var result=ClingingReoriented.attempt(p,new Vec3(0,1,0),beforeHeading);
+        h.assertTrue(result==ClingingReoriented.Result.SUCCESS,"vertical UP selection succeeds: "+result);
+        h.assertTrue(GravityDirectionUtil.getGravityDirection(p)==Direction.UP,"UP was selected by rendered look");
+        Vec3 afterHeading=GravityTransition.headingFromYaw(Direction.UP,p.getYRot());
+        assertVec(h,beforeHeading,afterHeading,2.0E-4,"world navigation heading survives DOWN -> UP");
+        h.assertTrue(Math.abs(p.getXRot()-beforePitch)<1.0E-5F,"vertical selection preserves local pitch");
+        h.succeed();
+    }
 
     @GameTest(padding=24)
     public void successfulPlayerTurnStartsNewFallSegmentButUnchangedDoesNot(GameTestHelper h){
