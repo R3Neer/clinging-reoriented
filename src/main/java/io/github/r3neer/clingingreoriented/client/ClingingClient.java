@@ -24,7 +24,6 @@ public final class ClingingClient implements ClientModInitializer {
         long id=++sequence; PENDING.add(id); ClientPlayNetworking.send(new Payloads.Request(id,ClingingReoriented.data(mc.player).revision,look));
     }
     @Override public void onInitializeClient() {
-        CameraConfig.load(CameraConfig.path());
         net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STARTED.register(client->BeaconPowers.install());
         ClientPlayNetworking.registerGlobalReceiver(Payloads.Reply.TYPE,(reply,context)->{
             if(!PENDING.remove(reply.sequence()) || context.client().player==null) return;
@@ -33,8 +32,8 @@ public final class ClingingClient implements ClientModInitializer {
             context.client().player.playSound(sound,.35f,reply.result()==0?1.25f:.8f);
         });
         ClientPlayNetworking.registerGlobalReceiver(Payloads.VisualTransition.TYPE,(transition,context)->{
-            if(transition.direction()<0||transition.direction()>5||context.client().player==null)return;
-            VisualTransitions.begin(context.client().player,Direction.from3DDataValue(transition.direction()),transition.sequence());
+            if(transition.direction()<0||transition.direction()>5||context.client().player==null||!Float.isFinite(transition.yawDelta()))return;
+            VisualTransitions.begin(context.client().player,Direction.from3DDataValue(transition.direction()),transition.yawDelta(),transition.kind(),transition.sequence());
         });
         ClientPlayNetworking.registerGlobalReceiver(Payloads.State.TYPE,(state,context)->{
             if(state.direction()<0 || state.direction()>5) return;
