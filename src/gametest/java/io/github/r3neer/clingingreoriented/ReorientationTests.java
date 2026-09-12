@@ -88,7 +88,8 @@ public final class ReorientationTests {
         var clinging=BuiltInRegistries.MOB_EFFECT.get(Identifier.parse("alexsmobs:clinging")).orElseThrow();
         p.addEffect(new MobEffectInstance(clinging,200));
         h.getLevel().setBlockAndUpdate(p.blockPosition().below(),Blocks.STONE.defaultBlockState());
-        p.setOnGround(true);p.setDeltaMovement(Vec3.ZERO);
+        // The old floor is still physically adjacent, but the input is already airborne.
+        p.setOnGround(false);p.setDeltaMovement(Vec3.ZERO);
         var dimensions=p.getDimensions(p.getPose());var before=p.getBoundingBox();var beforeCenter=before.getCenter();
         var direct=com.moigferdsrte.gravitychanger.util.RotationUtil.makeBoxFromDimensions(dimensions,Direction.EAST,p.position());
         h.assertFalse(h.getLevel().noCollision(p,direct.deflate(1e-7)),"fixture proves old-feet pivot clips the old floor");
