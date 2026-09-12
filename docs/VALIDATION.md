@@ -1,24 +1,39 @@
 # Validation
 
+## 0.1.0-alpha.9 development validation — 2026-09-12
+
+Alpha.9 changes player-facing turn behavior and therefore must pass the repository's
+complete CI matrix rather than inheriting alpha.8's documentation-only evidence.
+The required lanes build and run server/JUnit tests without optional Scale Brews,
+run the default real-client suites, exercise First Person 2.7.2 separately, then
+load Scale Brews beta.5 only in isolated optional compatibility server/client lanes.
+Production compileClasspath remains free of Scale Brews.
+
+The alpha.9-specific regressions cover:
+
+- a Clinging player whose arbitrary airborne turn is already spent can still select
+  `DOWN` as a safety return, while the charge remains spent until a real landing;
+- another non-DOWN turn after that safety return remains rejected with
+  `AIR_CHANGE_USED`;
+- a sideways turn whose old-feet pivot alone intersects the floor succeeds when
+  Gravity Changer's center-aligned rotated box is clear, preserving the physical
+  body's world-space center;
+- the pre-existing blocked-turn fixture still proves that a genuine obstruction
+  returns `NO_SPACE` without spending charge or mutating gravity/position;
+- the client configuration writes and falls back to the new 0.25-second camera
+  duration while preserving valid custom values and invalid user files.
+
 ## 0.1.0-alpha.8 documentation-sync prerelease — 2026-09-11
 
-Alpha.8 intentionally makes no gameplay or production-code behavior changes relative
-to alpha.7. Its purpose is to publish the already-hardened implementation with the
-repository documentation synchronized to the released state. No file under
-`src/main/java` or `src/client/java` is changed by this version bump.
+Alpha.8 intentionally made no gameplay or production-code behavior changes relative
+to alpha.7. Its purpose was to publish the already-hardened implementation with the
+repository documentation synchronized to the released state.
 
-The release is accepted only after the repository's full CI repeats all required
-server/JUnit tests, the default real-client suites and the separate First Person
-compatibility lane on the exact alpha.8 target. Runtime validation continues to omit
-Scale Brews; beta.5 is used only as a compile-time API for the transitional anatomical
-bridge.
-
-Alpha.7 supplied the functional hardening evidence that alpha.8 carries forward. The
+Alpha.7 supplied the functional hardening evidence that alpha.8 carried forward. The
 validated alpha.7 `main` run `34590289860` at commit
 `62ee1706ba311445d930dd25dc9aa93e8944eb07` passed **42 required server GameTests**,
 all **10 JUnit tests**, the real default client GameTest suites and the real-client
-First Person fixture. Alpha.8 repeats those same lanes before publication so the
-version/documentation-only change does not bypass release validation.
+First Person fixture. Alpha.8 repeated those same lanes before publication.
 
 The First Person fixture uses **First Person 2.7.2** with **Not Enough Animations
 1.12.4**, without Scale Brews at runtime. It proves that unrelated Gravity Changer
@@ -52,9 +67,9 @@ The repository prepared for alpha.6 publication was rebuilt from a clean output
 directory with Java 25 and dependencies resolved from their public sources. The
 server run passed all 39 required server GameTests and all 10 JUnit tests; the real
 client GameTest environment passed both client suites. A separate optional run also
-covered the then-current First Person/Scale Visual Compat fixture. Alpha.7/alpha.8
-supersede that presentation evidence with the narrower First Person-only ownership
-fixture described above.
+covered the then-current First Person/Scale Visual Compat fixture. Alpha.7 and later
+validation supersede that presentation evidence with the narrower First Person-only
+ownership fixture described above.
 
 ## Covered behavior
 
@@ -63,22 +78,24 @@ success/failure sounds, obstruction rejection, effect expiry, beacon selection,
 Elytra priority, mounted hierarchy validation, explicit mob ownership, prior-frame
 mount loans, passive mob sources, pet route bounds/lifecycle clearing, bounded
 retirement and moving-surface causal replay rejection. Tests also cover a real jump
-toward a wall, repeated airborne Reorientation and scoped camera/First Person
-presentation in real client environments.
+toward a wall, repeated airborne Reorientation, spent-Clinging DOWN recovery,
+center-aligned voluntary turn clearance and scoped camera/First Person presentation
+in real client environments.
 
 ## Packaging
 
-Prereleases are published from the exact artifact produced by the successful final
-`main` CI run; the release process does not rebuild a merely equivalent JAR after
-validation. The production artifact contains production classes/resources only: no
+Prereleases are published from an artifact validated for the intended release
+target. The production artifact contains production classes/resources only: no
 GameTest classes, dependency JARs, temporary work-plan documents or raw validation
-logs. The release tag, regular JAR and sources JAR are checked against the exact
-validated target and recorded digests before publication.
+logs. Release tags, regular JARs and sources JARs must correspond to the validated
+target rather than a later merely equivalent rebuild.
 
 ## Manual QA still required
 
 - Dedicated multiplayer with realistic latency and rapid presses around landing,
   support and teleport boundaries.
+- Human acceptance of center-aligned sideways turns in irregular caves, slabs,
+  stairs and tight two-block spaces across all six directions.
 - Long gameplay sessions with repeated effect refresh and expiry.
 - Extreme external scale changes and unusual modded passenger attachment overrides.
 - Long pet routes through loaded and unloaded terrain.
