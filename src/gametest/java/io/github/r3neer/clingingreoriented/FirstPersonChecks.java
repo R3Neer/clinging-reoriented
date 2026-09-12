@@ -66,12 +66,18 @@ public final class FirstPersonChecks {
                         } finally { FirstPersonAPI.getPlayerOffsetHandlers().remove(handler); }
                     }
                 }
+
                 // The transition epoch is a separate ownership source used while a
-                // Clinging return/turn animation is still active after physical ownership changes.
+                // Clinging animation is active. Exercise the real v2 metadata shape without
+                // committing the fixture's physical gravity to the synthetic target.
                 ClingingReoriented.data(player).visualFrameOwned=false;
-                VisualTransitions.begin(player,direction,++sequence[0]);
+                float oldYaw=player.getYRot(), oldYawO=player.yRotO, oldPitch=player.getXRot();
+                Direction syntheticTarget=direction.getOpposite();
+                var plan=GravityTransition.plan(direction,syntheticTarget,oldYaw,oldPitch);
+                VisualTransitions.begin(player,syntheticTarget,plan.yawDelta(),plan.kind().ordinal(),++sequence[0]);
                 if(!VisualTransitions.owns(player))throw new AssertionError("Clinging transition epoch was not associated with the player animation");
                 VisualTransitions.clear();
+                player.setYRot(oldYaw);player.yRotO=oldYawO;player.setXRot(oldPitch);
                 player.setPose(Pose.STANDING);
                 player.yBodyRotO = 0; player.yBodyRot = 0;
             });
