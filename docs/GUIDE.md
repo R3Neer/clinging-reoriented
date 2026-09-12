@@ -1,7 +1,7 @@
 # Player guide
 
 This guide contains the exact controls and less-obvious interactions for
-Clinging: Reoriented 0.1.0-alpha.8.
+Clinging: Reoriented 0.1.0-alpha.9 development builds.
 
 ## Controls
 
@@ -20,9 +20,11 @@ foreign gravity ownership block voluntary selection.
 
 ## Effects and brewing
 
-Clinging comes from Alex's Mobs. It permits one successful turn until the entity
-lands on its gravity-relative floor. Failed or unchanged attempts do not consume
-the charge.
+Clinging comes from Alex's Mobs. It permits one arbitrary successful turn until the
+entity lands on its gravity-relative floor. After that airborne charge is spent,
+the player may still choose **DOWN** as a safety return; doing so does not refund
+the charge, so another non-DOWN turn still requires a real landing first. Failed
+or unchanged attempts do not consume the charge.
 
 Add a shulker shell to an ordinary or extended Clinging potion to brew
 Reorientation. Reorientation has no airborne charge limit. Redstone extends its
@@ -34,9 +36,12 @@ beacon option.
 
 ## Momentum, collision and recovery
 
-A voluntary turn keeps world position and momentum, then validates the complete
-rotated root/passenger hierarchy before changing gravity. Obstruction produces a
-failure sound and leaves position, gravity and momentum unchanged.
+A voluntary turn preserves world momentum and validates the complete rotated
+root/passenger hierarchy before changing gravity. It first tests the rotated box at
+the current entity pivot. If that pivot alone would make the rotated body clip the
+old floor or wall, Clinging may retry with a center-aligned pivot that preserves the
+physical body's world-space center. A real obstruction still produces a failure
+sound and leaves position, gravity and momentum unchanged.
 
 Gravity persists across jumps and temporary contact loss. When the last gravity
 source **owned by Clinging: Reoriented** disappears, the mod first tries to return
@@ -49,7 +54,8 @@ If no safe local DOWN placement exists, the current frame remains temporarily an
 retirement becomes pending. The mod retries periodically; ordinary movement can
 help the entity leave the obstruction, but new voluntary gravity turns are blocked
 until retirement succeeds or a lifecycle discontinuity invalidates the pending
-state. Voluntary turns themselves never relocate the player.
+state. Voluntary turns do not search for arbitrary nearby free space: the only
+fallback is the deterministic center-aligned placement of the same rotated body.
 
 ## Elytra
 
@@ -81,7 +87,7 @@ relinquishes ownership and effect expiry will not reset that external frame.
 Mobs never choose directions autonomously. A tamed animal using vanilla's
 follow-owner goal can replay the owner's turns when it reaches the recorded place
 where each turn occurred. The pet needs its own Clinging or Reorientation effect,
-and Clinging still permits only one turn per airborne stretch.
+and Clinging still permits only one arbitrary turn per airborne stretch.
 
 A successful replay is one of the operations that gives Clinging ownership of that
 mob's new frame. Simply applying the potion to a mob that was already under an

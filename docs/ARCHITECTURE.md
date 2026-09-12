@@ -7,7 +7,9 @@ before applying a change through Gravity Changer.
 
 `GravityInput` and the input mixins handle edge-triggered controls. `AirChanges`
 owns Clinging's per-airborne-stretch budget. `ClingingReoriented` validates and
-applies player turns. `MountedGravity` uses the same generic non-player
+applies player turns. A spent Clinging budget still permits a one-way safety choice
+to `DOWN`; that operation leaves the budget spent until real gravity-relative
+support is regained. `MountedGravity` uses the same generic non-player
 `LivingEntity` root-vehicle contract for every compatible mount. `MobGravity` and
 `GravityBreadcrumbs` handle mob ownership, loans and bounded pet route replay.
 
@@ -29,9 +31,20 @@ existing external direction.
 
 ## Collision and retirement
 
-Voluntary turns are atomic and never reposition an entity. Root and complete
-passenger hierarchies are preflighted before a turn or recovery candidate commits;
-a rejected candidate has zero positional, gravity or momentum mutation.
+Voluntary player turns are preflighted before gravity changes. The first candidate
+uses Gravity Changer's directional box at the current entity pivot, preserving the
+historic behavior in open space. If that candidate is blocked, Clinging computes
+Gravity Changer's center-aligned position for the same dimensions and target frame
+and accepts it only when the resulting rotated box is collision-free. This fallback
+preserves the body's world-space center rather than searching arbitrary nearby
+space; its purpose is to avoid false `NO_SPACE` results caused solely by rotating a
+standing player's tall box around the old feet beside the floor or wall being left.
+
+A rejected candidate still has zero positional, gravity or momentum mutation. The
+accepted center-aligned fallback can change the entity pivot coordinate while
+preserving the physical body center and world momentum. Mounted root/passenger
+hierarchies retain their existing all-or-nothing preflight and do not use this
+player-only fallback.
 
 Forced player retirement first tests DOWN in place, then a deterministic loaded
 search limited to a true Euclidean displacement of four blocks. No saved remote
@@ -48,10 +61,10 @@ Changer's own `GravityRotationAnimation`; upstream interpolation and interruptio
 handling remain authoritative.
 
 `cameraRotationSeconds` replaces Gravity Changer's duration only for an animation
-owned by that visual epoch. External Gravity Changer transitions keep upstream
-timing. The First Person offset fix follows the same ownership boundary, including
-Clinging's own animated return to DOWN, rather than acting as a global First
-Person/Gravity Changer compatibility patch.
+owned by that visual epoch. The default is 0.25 seconds. External Gravity Changer
+transitions keep upstream timing. The First Person offset fix follows the same
+ownership boundary, including Clinging's own animated return to DOWN, rather than
+acting as a global First Person/Gravity Changer compatibility patch.
 
 ## Moving surfaces
 

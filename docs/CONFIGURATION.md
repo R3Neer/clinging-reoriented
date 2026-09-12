@@ -7,7 +7,7 @@ first client launch creates:
 
 ```json
 {
-  "cameraRotationSeconds": 1.0
+  "cameraRotationSeconds": 0.25
 }
 ```
 
@@ -24,6 +24,6 @@ An unrelated Gravity Changer change, Gravity Anchor/Core transition, command or
 other mod does **not** inherit this configured duration. Gravity Changer keeps its
 own timing and remains the animation/physics authority for those changes.
 
-Invalid content, including a missing `cameraRotationSeconds` key, falls back to one
-second and produces a log warning. The invalid file is left untouched so that it
-can be corrected manually.
+Invalid content, including a missing `cameraRotationSeconds` key, falls back to
+0.25 seconds and produces a log warning. The invalid file is left untouched so
+that it can be corrected manually.

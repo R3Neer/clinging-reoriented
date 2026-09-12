@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Gameplay and collision clearance
+
+- Let spent Clinging always return to vanilla `DOWN` as a safety exit without
+  refunding its one arbitrary airborne turn; another non-DOWN turn still requires
+  a real landing.
+- When the current entity pivot makes a rotated player box clip only the floor or
+  wall being left behind, retry the same rotation with Gravity Changer's
+  center-aligned placement before returning `NO_SPACE`.
+- Preserve the physical body's world-space center for that fallback and keep real
+  obstruction rejection atomic.
+
+### Presentation
+
+- Change the default Clinging/Reorientation camera transition from 1.0 seconds to
+  0.25 seconds. Existing user configuration files remain authoritative.
+
 ### Compatibility and build isolation
 
 - Remove the transitional production compile-time dependency on Scale Brews.
@@ -12,6 +28,14 @@
 - Add a build guard that rejects Scale Brews on production `compileClasspath`.
 - Keep Scale beta.5 coverage in CI as an isolated runtime-only fixture instead of a
   compile API, while the required build/server/client lanes run with no Scale JAR.
+
+### Validation
+
+- Add server regressions for a spent-Clinging DOWN safety return, retained spent
+  charge, center-aligned clearance beside an old floor and the existing genuine
+  obstruction rejection.
+- Update the client configuration unit test for the 0.25-second default and invalid
+  configuration fallback.
 
 ## [0.1.0-alpha.8] - 2026-09-11
 
