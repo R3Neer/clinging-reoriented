@@ -77,8 +77,6 @@ public final class ClingingReoriented implements ModInitializer {
     static void copyPlayerState(ServerPlayer oldPlayer,ServerPlayer newPlayer,boolean alive){
         var old=data(oldPlayer);var next=data(newPlayer);
         next.revision=old.revision+1;
-        // Visual epochs are connection-scoped. The player entity is replaced on
-        // respawn, but the client must never see the sequence move backwards.
         next.visualSequence=old.visualSequence;
         if(alive){
             next.owned=old.owned;next.selected=old.selected;
@@ -159,9 +157,8 @@ public final class ClingingReoriented implements ModInitializer {
     public static void write(Player p, Direction direction,Vec3 position) {
         boolean oldWriting = WRITING.get(); WRITING.set(true);
         try {
-            Direction previous=GravityDirectionUtil.getOwnGravityDirection(p);
-            GravityDirectionUtil.setGravityDirection(p, direction);
-            if(previous!=direction)p.resetFallDistance();
+            boolean changed=GravityDirectionUtil.setGravityDirection(p,direction);
+            if(changed)p.resetFallDistance();
             var attribute=p.getAttribute(ModAttributes.GRAVITY_DIRECTION);
             if (p instanceof ServerPlayer sp && attribute!=null) {
                 sp.connection.send(new ClientboundUpdateAttributesPacket(p.getId(), List.of(attribute)));
@@ -179,9 +176,8 @@ public final class ClingingReoriented implements ModInitializer {
     private static void writeTransition(ServerPlayer p,Direction direction,Vec3 position,GravityTransition.Plan transition){
         boolean oldWriting=WRITING.get();WRITING.set(true);
         try{
-            Direction previous=GravityDirectionUtil.getOwnGravityDirection(p);
-            GravityDirectionUtil.setGravityDirection(p,direction);
-            if(previous!=direction)p.resetFallDistance();
+            boolean changed=GravityDirectionUtil.setGravityDirection(p,direction);
+            if(changed)p.resetFallDistance();
             applyYaw(p,transition);
             var attribute=p.getAttribute(ModAttributes.GRAVITY_DIRECTION);
             if(attribute!=null){
