@@ -35,11 +35,7 @@ public final class VisualTransitions {
         Direction actual=GravityDirectionUtil.getGravityDirection(entity);
         Quaternionf currentVisual=animation.getRotation(actual,now);
         Quaternionf start=GravityTransition.compensatedVisualStart(currentVisual,yawDelta);
-
-        // This is a coordinate-gauge change, not a new head/body turn. Move every
-        // local yaw accumulator together so vanilla interpolation cannot add a twist.
         GravityTransition.applyYawGauge(entity,yawDelta);
-
         latestSequence=sequence;
         synchronized(ACTIVE){ACTIVE.put(animation,new Active(entity,target,kind,sequence,start,now,0L,false));}
     }
@@ -61,7 +57,7 @@ public final class VisualTransitions {
         long elapsed=Math.max(0L,now-active.startedNanos());
         float progress=(float)Math.min(1.0D,elapsed/(double)active.kind().durationNanos());
         Quaternionf target=RotationUtil.getEntityRotationQuaternion(active.target());
-        Quaternionf result=new Quaternionf(active.startVisual()).slerp(target,GravityTransition.easeOutCubic(progress));
+        Quaternionf result=new Quaternionf(active.startVisual()).slerp(target,GravityTransition.easeOutQuadratic(progress));
         if(progress>=1.0F){clear(animation);return target;}
         return result;
     }
