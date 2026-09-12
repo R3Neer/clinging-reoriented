@@ -16,6 +16,7 @@ import net.minecraft.world.inventory.BeaconMenu;
 import net.minecraft.client.gui.screens.inventory.BeaconScreen;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 
 /** Physical jump edges, owned snap presentation, vanilla Elytra deployment and the real beacon screen. */
 public final class GravityControlsClientTest implements FabricClientGameTest {
@@ -62,15 +63,33 @@ public final class GravityControlsClientTest implements FabricClientGameTest {
 
                 var owned=animation(mc.player);
                 owned.forceSet(Direction.DOWN,0);
-                float originalYaw=mc.player.getYRot();float originalPitch=mc.player.getXRot();float originalYawOld=mc.player.yRotO;
+                float originalYaw=mc.player.getYRot(), originalPitch=mc.player.getXRot(), originalYawOld=mc.player.yRotO;
+                float originalBody=mc.player.yBodyRot, originalBodyOld=mc.player.yBodyRotO;
+                float originalHead=mc.player.yHeadRot, originalHeadOld=mc.player.yHeadRotO;
+                mc.player.yBodyRot=Mth.wrapDegrees(originalYaw-23.0F);mc.player.yBodyRotO=Mth.wrapDegrees(originalYawOld-19.0F);
+                mc.player.yHeadRot=Mth.wrapDegrees(originalYaw+17.0F);mc.player.yHeadRotO=Mth.wrapDegrees(originalYawOld+11.0F);
+                float bodyDelta=Mth.wrapDegrees(mc.player.yBodyRot-originalYaw);
+                float bodyOldDelta=Mth.wrapDegrees(mc.player.yBodyRotO-originalYawOld);
+                float headDelta=Mth.wrapDegrees(mc.player.yHeadRot-originalYaw);
+                float headOldDelta=Mth.wrapDegrees(mc.player.yHeadRotO-originalYawOld);
+
                 var plan=GravityTransition.plan(Direction.DOWN,Direction.EAST,originalYaw,originalPitch);
                 VisualTransitions.begin(mc.player,Direction.EAST,plan.yawDelta(),plan.kind().ordinal(),1);
+                if(Math.abs(Mth.wrapDegrees(mc.player.yBodyRot-mc.player.getYRot())-bodyDelta)>1e-4f
+                    ||Math.abs(Mth.wrapDegrees(mc.player.yBodyRotO-mc.player.yRotO)-bodyOldDelta)>1e-4f
+                    ||Math.abs(Mth.wrapDegrees(mc.player.yHeadRot-mc.player.getYRot())-headDelta)>1e-4f
+                    ||Math.abs(Mth.wrapDegrees(mc.player.yHeadRotO-mc.player.yRotO)-headOldDelta)>1e-4f)
+                    throw new AssertionError("Yaw gauge change altered relative body/head pose");
+
                 var start=owned.getRotation(Direction.EAST,0);
                 if(Math.abs(start.dot(target))>.999f)throw new AssertionError("Clinging snap began at its target instead of a compensated start frame");
                 if(Math.abs(owned.getRotation(Direction.EAST,GravityTransition.QUARTER_TURN_NANOS).dot(target))<.99999f)
                     throw new AssertionError("Clinging quarter-turn did not finish at fixed 120 ms duration");
                 if(VisualTransitions.owns(owned))throw new AssertionError("Completed snap still owns Gravity Changer animation");
+
                 mc.player.setYRot(originalYaw);mc.player.setXRot(originalPitch);mc.player.yRotO=originalYawOld;
+                mc.player.yBodyRot=originalBody;mc.player.yBodyRotO=originalBodyOld;
+                mc.player.yHeadRot=originalHead;mc.player.yHeadRotO=originalHeadOld;
                 VisualTransitions.clear();
             } catch(ReflectiveOperationException failure){throw new AssertionError(failure);}
         });
