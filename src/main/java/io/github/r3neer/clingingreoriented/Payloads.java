@@ -69,6 +69,12 @@ public final class Payloads {
         if(ServerPlayNetworking.canSend(p,VisualTransition.TYPE))ServerPlayNetworking.send(p,new VisualTransition(
             plan.target().get3DDataValue(),plan.yawDelta(),plan.kind().ordinal(),sequence));
     }
+    /** Mount-transfer compatibility: if the effective rider frame did not change, no animation is required. */
+    public static void visual(ServerPlayer p,net.minecraft.core.Direction direction){
+        var previous=com.moigferdsrte.gravitychanger.util.GravityDirectionUtil.getGravityDirection(p);
+        if(previous==direction)return;
+        visual(p,GravityTransition.plan(previous,direction,p.getYRot(),p.getXRot()));
+    }
     public static void sendState(ServerPlayer p,ServerPlayer recipient) {
         if(!ServerPlayNetworking.canSend(recipient,State.TYPE)) return;
         var s=ClingingReoriented.data(p);
