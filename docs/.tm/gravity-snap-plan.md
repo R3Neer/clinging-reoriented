@@ -13,7 +13,7 @@ Temporary working document. Delete before merge.
 - Clinging presentation overrides only transitions explicitly initiated by Clinging/Reorientation; unrelated Gravity Changer animations remain untouched.
 - A failed voluntary turn changes neither gravity, look, charge, nor presentation.
 
-## Implementation checklist v2
+## Implementation checklist v3
 
 ### A. Pure transition geometry
 
@@ -21,7 +21,7 @@ Temporary working document. Delete before merge.
 - [ ] Compute the authoritative old world look from server logical yaw/pitch + previous gravity, not from the client-supplied selection vector.
 - [ ] Perpendicular directions: axis = `normalize(g0 × g1)`, angle = 90°.
 - [ ] Opposite directions: axis = old world look projected onto the plane perpendicular to g0; if degenerate, use old local +X transformed to world (current right axis); angle = 180°.
-- [ ] Rotate the old world look with Rodrigues/JOML axis-angle and convert it to target-local yaw with Gravity Changer `RotationUtil`.
+- [ ] Rotate the old world look with axis-angle math and convert it to target-local yaw with Gravity Changer `RotationUtil`.
 - [ ] Preserve logical pitch exactly; assert the geometrically reconstructed target pitch agrees within epsilon.
 - [ ] Normalize `yawDelta` with wrapped degrees; same-direction transition returns zero/no animation.
 - [ ] Fixed timings: 120 ms quarter turn, 180 ms half turn. Easing = `1 - (1-t)^3`.
@@ -38,14 +38,14 @@ Temporary working document. Delete before merge.
 - [ ] For non-relocating turns, do not require a positional teleport merely to make the client presentation work; the custom visual payload carries the yaw delta. Server state still updates immediately.
 - [ ] For relocating turns, any existing teleport packet carries the updated yaw and unchanged pitch.
 - [ ] Apply the same transport policy to forced retirement to DOWN using server logical yaw/pitch. Retirement remains independent of the airborne charge.
-- [ ] Do not alter foreign/unowned gravity writes.
+- [ ] Do not alter foreign/unowned gravity writes or direct test/setup writes that intentionally bypass presentation policy.
 
 ### C. Visual transition protocol
 
 - [ ] Replace `visual_transition_v1` with v2 carrying target direction, wrapped `yawDelta`, turn kind (quarter/half) and sequence.
 - [ ] Client validates finite yaw delta, legal direction/kind and monotonic sequence.
 - [ ] On receipt, capture the currently displayed gravity quaternion *before* replacing the active transition.
-- [ ] Capture current local yaw, then apply `yaw += yawDelta` immediately; preserve pitch; also synchronize previous-yaw interpolation fields so vanilla camera interpolation does not add a second unwanted yaw animation.
+- [ ] Capture current local yaw, then apply `yaw += yawDelta` immediately; preserve pitch; synchronize the previous-yaw interpolation field so vanilla camera interpolation does not add a second unwanted yaw animation.
 - [ ] Compute the compensated visual start frame as `QcurrentVisual * Ry(yawDelta)` (sign verified by unit tests against `RotationUtil.rotToVec`). This keeps the composite world view continuous after the immediate local-yaw gauge change.
 - [ ] Mounted Reorientation uses the same rider yaw-delta policy from rider logical yaw/pitch and old/target effective gravity; root physical gravity remains on the mount.
 
@@ -74,10 +74,10 @@ Temporary working document. Delete before merge.
 - [ ] Add shared `GravityInput.sprintLandingJumpReserved(Player)` and call it from `available()` so client precheck and server authority agree.
 - [ ] Guard only when sprinting and not already grounded.
 - [ ] Let `toward = deltaMovement · gravityUnit`; require `toward > 1e-4` so ascent/neutral motion is never reserved.
-- [ ] Predict the next-tick gravity travel as `toward + 0.08` blocks (vanilla gravity acceleration magnitude), bounded to `[0.10, 0.60]` blocks to keep this a near-floor grace rather than a general falling lockout.
+- [ ] Predict next-tick travel as `toward + GravityDirectionUtil.scaleGravity(player, 0.08)`, then bound it to `[0.10, 0.60]` blocks. This respects Gravity Changer's gravity-strength attribute while keeping the behavior a near-floor grace rather than a general falling lockout.
 - [ ] Move a slightly deflated current AABB only along the current gravity vector by that predicted distance. Reserve the jump iff the current box is collision-free but the predicted box is not.
 - [ ] This rule is gravity-direction agnostic: DOWN/UP/NORTH/SOUTH/EAST/WEST all use the same vector math.
-- [ ] Tests: descending sprint near support reserved; ascending sprint not reserved; distant/clear predicted box not reserved; non-sprint not reserved; at least one sideways-gravity support case.
+- [ ] Tests: descending sprint near support reserved; ascending sprint not reserved; distant/clear predicted box not reserved; non-sprint not reserved; at least one sideways-gravity support case; altered gravity strength changes prediction consistently.
 
 ### G. Restore one voluntary Clinging turn
 
