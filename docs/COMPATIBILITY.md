@@ -22,7 +22,7 @@ deliberately absent from the villager-trade economy. Alchemical Leather is optio
 
 ### Scale Brews
 
-Scale Brews is **not part of the current alpha.10 runtime/support target** while its
+Scale Brews is **not part of the current alpha.11 runtime/support target** while its
 larger shared entity-collision architecture remains under active development.
 Clinging's production sources and compile classpath do not depend on Scale Brews.
 
@@ -47,16 +47,18 @@ Gravity Changer visual quaternion.
 The compatibility lane installs First Person 2.7.2 with Not Enough Animations
 1.12.4 and runs the real client GameTest without Scale Brews. It checks unowned
 Gravity Changer behavior, Clinging ownership, third-party world-space offsets and
-the v2 snap transition ownership boundary.
+the v2 snap transition ownership boundary. Alpha.11 changes the request-side intent
+protocol to `select_intent_v3`; the clientbound visual transition schema remains v2.
 
 ## Ownership boundaries
 
 - Gravity Changer owns gravity attributes, coordinate conversion, movement and
   collision physics, plus presentation for changes not initiated by Clinging.
 - Alex's Mobs owns Clinging and its original acquisition routes.
-- Clinging: Reoriented owns voluntary turn policy, Reorientation, heading transport,
-  its fixed snap presentation epochs, gravity-retirement responsibility, multiplayer
-  requests, bounded mount loans and pet turn trails.
+- Clinging: Reoriented owns voluntary turn policy, Reorientation, selection/heading
+  intent separation, heading transport, its fixed snap presentation epochs, fall-
+  segment resets for gravity changes it commits, gravity-retirement responsibility,
+  multiplayer requests, bounded mount loans and pet turn trails.
 - First Person owns its model/body-offset baseline; Clinging rotates that baseline
   only inside a Clinging-owned visual frame.
 - Alchemical Leather owns equipment-supplied effects.

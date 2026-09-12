@@ -12,17 +12,22 @@ public final class MountedGravity {
     public static void refresh(Player p){
         if(p.isPassenger() && p.getRootVehicle() instanceof LivingEntity living && AirChanges.grounded(living))ClingingReoriented.data(p).airChangeUsed=false;
     }
-    public static ClingingReoriented.Result attempt(ServerPlayer p,Vec3 look){
+    public static ClingingReoriented.Result attempt(ServerPlayer p,Vec3 selectionLook){
+        Direction gravity=GravityDirectionUtil.getGravityDirection(p);
+        return attempt(p,selectionLook,GravityTransition.headingFromYaw(gravity,p.getYRot()));
+    }
+    public static ClingingReoriented.Result attempt(ServerPlayer p,Vec3 selectionLook,Vec3 requestedHeading){
         if(!p.hasEffect(Reorientation.EFFECT))return ClingingReoriented.Result.BLOCKED;
         var s=ClingingReoriented.data(p);refresh(p);
         if(!(p.getRootVehicle() instanceof LivingEntity root) || root instanceof Player || !MobGravity.supported(root))return ClingingReoriented.Result.BLOCKED;
         if(root.onGround() || AirChanges.grounded(root))return ClingingReoriented.Result.MOUNT_ACTION;
         if(root.isFallFlying() || root.isInWater())return ClingingReoriented.Result.BLOCKED;
         Direction previous=GravityDirectionUtil.getGravityDirection(root);
-        Direction direction=LookDirection.select(look);
+        Direction direction=LookDirection.select(selectionLook);
         if(direction==null)return ClingingReoriented.Result.AMBIGUOUS;
         if(direction==previous)return ClingingReoriented.Result.UNCHANGED;
-        GravityTransition.Plan transition=GravityTransition.plan(previous,direction,p.getYRot(),p.getXRot());
+        Vec3 heading=GravityTransition.sanitizeHeading(previous,requestedHeading,p.getYRot());
+        GravityTransition.Plan transition=GravityTransition.plan(previous,direction,heading);
         if(!MobGravity.borrow(root,direction))return ClingingReoriented.Result.NO_SPACE;
         MobGravity.state(root).airUsed=true;
         Payloads.visual(p,transition);ClingingReoriented.applyYaw(p,transition);s.visualFrameOwned=true;

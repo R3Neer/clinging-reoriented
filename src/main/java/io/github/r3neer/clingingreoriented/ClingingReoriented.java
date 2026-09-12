@@ -69,42 +69,53 @@ public final class ClingingReoriented implements ModInitializer {
         });
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> { reconcile(handler.player); Payloads.publish(handler.player); });
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {data(handler.player).unbind();GravityBreadcrumbs.clear(handler.player.getUUID());});
-        ServerPlayerEvents.COPY_FROM.register((oldPlayer, newPlayer, alive) -> {
-            data(newPlayer).revision=data(oldPlayer).revision+1;
-            if (alive) {
-                var old = data(oldPlayer); var next = data(newPlayer);
-                next.owned = old.owned; next.selected = old.selected;
-                next.airChangeUsed = old.airChangeUsed;
-                next.anchorBorrowed = old.anchorBorrowed; next.anchorExpired = old.anchorExpired;
-                next.visualFrameOwned=old.visualFrameOwned;
-            } else if(data(oldPlayer).owned || data(oldPlayer).ownedAtDeath || data(oldPlayer).anchorBorrowed) {
-                write(newPlayer,Direction.DOWN);
-            }
-        });
+        ServerPlayerEvents.COPY_FROM.register(ClingingReoriented::copyPlayerState);
         ServerPlayerEvents.AFTER_RESPAWN.register((oldPlayer,newPlayer,alive)->Payloads.publish(newPlayer));
         EntityTrackingEvents.START_TRACKING.register((entity, observer) -> { if (entity instanceof ServerPlayer p) Payloads.sendState(p, observer); });
     }
 
+    static void copyPlayerState(ServerPlayer oldPlayer,ServerPlayer newPlayer,boolean alive){
+        var old=data(oldPlayer);var next=data(newPlayer);
+        next.revision=old.revision+1;
+        next.visualSequence=old.visualSequence;
+        if(alive){
+            next.owned=old.owned;next.selected=old.selected;
+            next.airChangeUsed=old.airChangeUsed;
+            next.anchorBorrowed=old.anchorBorrowed;next.anchorExpired=old.anchorExpired;
+            next.visualFrameOwned=old.visualFrameOwned;
+        }else if(old.owned||old.ownedAtDeath||old.anchorBorrowed){
+            write(newPlayer,Direction.DOWN);
+        }
+    }
+
     public enum Result { SUCCESS, NO_SURFACE, AMBIGUOUS, NO_SPACE, BLOCKED, FOREIGN_GRAVITY, UNCHANGED, AIR_CHANGE_USED, MOUNT_ACTION }
-    public static Result attempt(ServerPlayer p) { return attempt(p, p.getLookAngle()); }
-    public static Result attempt(ServerPlayer p, Vec3 worldLook) {
+    public static Result attempt(ServerPlayer p) {
+        Direction gravity=GravityDirectionUtil.getGravityDirection(p);
+        return attempt(p,p.getLookAngle(),GravityTransition.headingFromYaw(gravity,p.getYRot()));
+    }
+    public static Result attempt(ServerPlayer p,Vec3 selectionLook) {
+        Direction gravity=GravityDirectionUtil.getGravityDirection(p);
+        return attempt(p,selectionLook,GravityTransition.headingFromYaw(gravity,p.getYRot()));
+    }
+    public static Result attempt(ServerPlayer p, Vec3 selectionLook, Vec3 requestedHeading) {
         reconcile(p);
         var s = data(p);
         if (!hasEffect(p) || !p.isAlive() || p.isSpectator() || p.isSleeping() || p.isFallFlying() || p.getAbilities().flying || anchor(p) || s.retirementPending) return Result.BLOCKED;
-        if(worldLook==null || !Double.isFinite(worldLook.x+worldLook.y+worldLook.z) || worldLook.lengthSqr()<1.0E-10D)return Result.AMBIGUOUS;
-        worldLook=worldLook.normalize();
-        if(p.isPassenger())return MountedGravity.attempt(p,worldLook);
+        if(selectionLook==null || !Double.isFinite(selectionLook.x+selectionLook.y+selectionLook.z) || selectionLook.lengthSqr()<1.0E-10D)return Result.AMBIGUOUS;
+        selectionLook=selectionLook.normalize();
+        if(p.isPassenger())return MountedGravity.attempt(p,selectionLook,requestedHeading);
         if(!GravityInput.available(p))return Result.BLOCKED;
         var attr = p.getAttribute(ModAttributes.GRAVITY_DIRECTION);
         if (attr == null || !attr.getModifiers().isEmpty() || (!s.owned && GravityDirectionUtil.getOwnGravityDirection(p) != Direction.DOWN)) return Result.FOREIGN_GRAVITY;
         Direction previous=GravityDirectionUtil.getGravityDirection(p);
-        Direction direction=LookDirection.select(worldLook);
+        Direction direction=LookDirection.select(selectionLook);
         if (direction==null) return Result.AMBIGUOUS;
         if (direction==previous) return Result.UNCHANGED;
         if (s.airChangeUsed && !p.hasEffect(Reorientation.EFFECT)) return Result.AIR_CHANGE_USED;
         TurnPlacement placement=findTurnPlacement(p,direction);
         if (placement==null) return Result.NO_SPACE;
-        GravityTransition.Plan transition=GravityTransition.plan(previous,direction,p.getYRot(),p.getXRot());
+        Vec3 heading=GravityTransition.sanitizeHeading(previous,requestedHeading,p.getYRot());
+        GravityTransition.Plan transition=GravityTransition.plan(previous,direction,heading);
         boolean airborne=!AirChanges.grounded(p);
         Payloads.visual(p,transition);
         writeTransition(p,direction,placement.position(),transition);
@@ -144,9 +155,10 @@ public final class ClingingReoriented implements ModInitializer {
 
     public static void write(Player p, Direction direction) { write(p,direction,p.position()); }
     public static void write(Player p, Direction direction,Vec3 position) {
-        boolean old = WRITING.get(); WRITING.set(true);
+        boolean oldWriting = WRITING.get(); WRITING.set(true);
         try {
-            GravityDirectionUtil.setGravityDirection(p, direction);
+            boolean changed=GravityDirectionUtil.setGravityDirection(p,direction);
+            if(changed)p.resetFallDistance();
             var attribute=p.getAttribute(ModAttributes.GRAVITY_DIRECTION);
             if (p instanceof ServerPlayer sp && attribute!=null) {
                 sp.connection.send(new ClientboundUpdateAttributesPacket(p.getId(), List.of(attribute)));
@@ -154,7 +166,7 @@ public final class ClingingReoriented implements ModInitializer {
                     sp.connection.teleport(new PositionMoveRotation(position,p.getDeltaMovement(),p.getYRot(),p.getXRot()),Set.of());
             } else if(position.distanceToSqr(p.position())>1.0E-12) p.setPos(position);
             p.setBoundingBox(RotationUtil.makeBoxFromDimensions(p.getDimensions(p.getPose()), direction, position));
-        } finally { WRITING.set(old); }
+        } finally { WRITING.set(oldWriting); }
     }
 
     static void applyYaw(ServerPlayer p,GravityTransition.Plan transition){
@@ -162,9 +174,10 @@ public final class ClingingReoriented implements ModInitializer {
     }
 
     private static void writeTransition(ServerPlayer p,Direction direction,Vec3 position,GravityTransition.Plan transition){
-        boolean old=WRITING.get();WRITING.set(true);
+        boolean oldWriting=WRITING.get();WRITING.set(true);
         try{
-            GravityDirectionUtil.setGravityDirection(p,direction);
+            boolean changed=GravityDirectionUtil.setGravityDirection(p,direction);
+            if(changed)p.resetFallDistance();
             applyYaw(p,transition);
             var attribute=p.getAttribute(ModAttributes.GRAVITY_DIRECTION);
             if(attribute!=null){
@@ -173,7 +186,7 @@ public final class ClingingReoriented implements ModInitializer {
                     p.connection.teleport(new PositionMoveRotation(position,p.getDeltaMovement(),0.0F,0.0F),Set.of(Relative.Y_ROT,Relative.X_ROT));
             }
             p.setBoundingBox(RotationUtil.makeBoxFromDimensions(p.getDimensions(p.getPose()),direction,position));
-        }finally{WRITING.set(old);}
+        }finally{WRITING.set(oldWriting);}
     }
 
     public static void externalWrite(Player p, Direction direction) {
@@ -210,7 +223,8 @@ public final class ClingingReoriented implements ModInitializer {
     public static boolean retire(ServerPlayer p) {
         Direction previous=GravityDirectionUtil.getGravityDirection(p);
         if(previous==Direction.DOWN)return true;
-        GravityTransition.Plan transition=GravityTransition.plan(previous,Direction.DOWN,p.getYRot(),p.getXRot());
+        Vec3 heading=GravityTransition.headingFromYaw(previous,p.getYRot());
+        GravityTransition.Plan transition=GravityTransition.plan(previous,Direction.DOWN,heading);
         Vec3 origin=p.position();
         var dimensions=p.getDimensions(p.getPose());
         if (fits(p, RotationUtil.makeBoxFromDimensions(dimensions, Direction.DOWN, origin), null)) {

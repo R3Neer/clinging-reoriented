@@ -38,16 +38,23 @@ being mistaken for Clinging/Reorientation.
 ## Gravity snap presentation
 
 Clinging/Reorientation gravity is physical immediately, but the camera and body use
-a very short visual snap instead of Gravity Changer's generic canonical-frame
-interpolation. Quarter turns settle in **0.12 s** and opposite half turns in
-**0.18 s**, with a fast ease-out.
+a short visual snap instead of Gravity Changer's generic canonical-frame
+interpolation. Quarter turns settle in **0.18 s** and opposite half turns in
+**0.24 s**, with a quadratic ease-out: still immediate in feel, but long enough to
+see the direction of the rotation.
 
-The transition transports the player's heading through the actual gravity change.
+Target selection and retained heading are deliberately separate. The rendered
+camera direction chooses the new gravity, while the player's navigation heading is
+captured independently from yaw with pitch treated as zero. Looking straight up or
+down just to select UP/DOWN therefore no longer destroys the direction the player
+was travelling. A DOWN↔UP turn keeps that world heading when the camera is levelled
+again.
+
 Perpendicular changes rotate only around the single axis required to reach the new
-floor. Opposite 180-degree changes use the current horizontal heading as their axis
-when possible, so changing DOWN↔UP does not arbitrarily reverse where the player is
-looking. Rapid Reorientation changes continue from the frame currently on screen
-rather than snapping back or queueing old rotations.
+floor. Rapid Reorientation changes continue from the frame currently on screen
+rather than snapping back or queueing old rotations. Each successful gravity change
+also starts a fresh vanilla fall-distance segment, so chaining legitimate
+Reorientation turns does not accumulate one artificial mega-fall.
 
 These timings are gameplay/presentation semantics and are not configurable.
 Clinging creates no client JSON configuration file; old
@@ -60,9 +67,13 @@ Unrelated Gravity Changer changes keep Gravity Changer's own animation behavior.
 - Land sideways, jump relative to your new floor and spend Clinging's restored
   charge.
 - Spend Clinging's turn and verify that even DOWN now waits for a real landing.
+- With gravity DOWN, face north, glance straight up to choose UP, then level the
+  camera again: your world heading should still be north.
 - Chain rapid Reorientation turns and watch each snap continue from the current
-  displayed frame.
+  displayed frame without accumulating fall damage from earlier segments.
 - Sprint-jump repeatedly across flat ground without accidental gravity changes.
+- Die and respawn after several turns; the first new turn must still use the same
+  Clinging snap presentation rather than Gravity Changer's old interpolation.
 - Give a tamed animal its own gravity effect and let it replay turns along the
   route where it follows you.
 - Use Reorientation while riding to turn any compatible airborne living mount
@@ -117,12 +128,13 @@ when the installed Scale API is absent or incompatible.
 
 ## Project status
 
-**0.1.0-alpha.10** is the current development version. It replaces canonical-frame
-camera SLERP for Clinging-owned turns with minimal snap-style gravity transport,
-removes configurable camera timing, prevents near-landing sprint-jumps from becoming
-false gravity inputs, and restores Clinging's exact one-voluntary-turn airborne
-budget including DOWN. It retains alpha.9's center-aligned clearance fallback and
-alpha.7/alpha.8 ownership/recovery hardening.
+**0.1.0-alpha.11** is the current development version. It keeps alpha.10's minimal
+snap-style gravity transport while separating target selection from navigation
+heading, preserving heading through vertical DOWN↔UP selection, making visual
+transition epochs survive death/respawn, resetting fall distance on actual
+Clinging-owned gravity changes and slowing the snap just enough to make its axis
+readable. It retains the sprint-jump intent guard, strict one-turn Clinging budget,
+center-aligned clearance fallback and earlier ownership/recovery hardening.
 
 CI covers dedicated server GameTests, JUnit geometry tests, the real default client
 suites, a separate real-client First Person 2.7.2 lane and optional Scale Brews

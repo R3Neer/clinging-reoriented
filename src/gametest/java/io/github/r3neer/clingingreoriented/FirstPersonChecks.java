@@ -35,27 +35,17 @@ public final class FirstPersonChecks {
                     player.setPose(pose);
                     for (float yaw : new float[]{0, 90, 180, -90}) {
                         player.yBodyRotO = yaw; player.yBodyRot = yaw;
-
-                        // Capture First Person's own current baseline instead of duplicating
-                        // its offset formula in this fixture. With ownership disabled our
-                        // mixin is a no-op, so this is the external behavior we must preserve.
                         ClingingReoriented.data(player).visualFrameOwned=false;
                         VisualTransitions.clear();
                         logic.updatePositionOffset(player, 1);
                         Vec3 baseline=logic.getOffset();
                         if(!Double.isFinite(baseline.x+baseline.y+baseline.z))
                             throw new AssertionError("First Person produced a non-finite baseline " + direction + " " + pose);
-
-                        // The same settled physical frame becomes eligible once Clinging owns
-                        // presentation. We rotate exactly First Person's baseline once.
                         ClingingReoriented.data(player).visualFrameOwned=true;
                         Vec3 expected = RotationUtil.vecPlayerToWorld(baseline, rotation);
                         logic.updatePositionOffset(player, 1);
                         if (logic.getOffset().distanceTo(expected) > 1e-5)
                             throw new AssertionError("Clinging-owned body offset mismatch " + direction + " " + pose + " actual=" + logic.getOffset() + " expected=" + expected + " baseline=" + baseline);
-
-                        // Third-party handlers operate after First Person builds its base offset;
-                        // their world-space contribution must not be rotated by Clinging.
                         Vec3 worldOffset = new Vec3(.13, .24, .35);
                         PlayerOffsetHandler handler = (p, delta, original, current) -> current.add(worldOffset);
                         FirstPersonAPI.getPlayerOffsetHandlers().add(handler);
@@ -66,14 +56,10 @@ public final class FirstPersonChecks {
                         } finally { FirstPersonAPI.getPlayerOffsetHandlers().remove(handler); }
                     }
                 }
-
-                // The transition epoch is a separate ownership source used while a
-                // Clinging animation is active. Exercise the real v2 metadata shape without
-                // committing the fixture's physical gravity to the synthetic target.
                 ClingingReoriented.data(player).visualFrameOwned=false;
                 float oldYaw=player.getYRot(), oldYawO=player.yRotO, oldPitch=player.getXRot();
                 Direction syntheticTarget=direction.getOpposite();
-                var plan=GravityTransition.plan(direction,syntheticTarget,oldYaw,oldPitch);
+                var plan=GravityTransition.plan(direction,syntheticTarget,GravityTransition.headingFromYaw(direction,oldYaw));
                 VisualTransitions.begin(player,syntheticTarget,plan.yawDelta(),plan.kind().ordinal(),++sequence[0]);
                 if(!VisualTransitions.owns(player))throw new AssertionError("Clinging transition epoch was not associated with the player animation");
                 VisualTransitions.clear();

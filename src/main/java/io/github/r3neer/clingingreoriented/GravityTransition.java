@@ -11,8 +11,8 @@ import org.joml.Vector3f;
 
 /** Pure geometry and gauge helpers for Clinging/Reorientation gravity snaps. */
 public final class GravityTransition {
-    public static final long QUARTER_TURN_NANOS = 120_000_000L;
-    public static final long HALF_TURN_NANOS = 180_000_000L;
+    public static final long QUARTER_TURN_NANOS = 180_000_000L;
+    public static final long HALF_TURN_NANOS = 240_000_000L;
     private static final double EPSILON = 1.0E-8;
 
     public enum TurnKind {
@@ -30,25 +30,45 @@ public final class GravityTransition {
         Direction target,
         TurnKind kind,
         Vec3 axis,
-        Vec3 oldWorldLook,
-        Vec3 transportedWorldLook,
+        Vec3 oldWorldHeading,
+        Vec3 transportedWorldHeading,
         float yawDelta
     ) {}
 
     private GravityTransition() {}
 
-    public static Plan plan(Direction previous, Direction target, float yaw, float pitch) {
+    /** World-space navigation heading encoded by local yaw, deliberately ignoring pitch. */
+    public static Vec3 headingFromYaw(Direction gravity, float yaw) {
+        if (gravity == null || !Float.isFinite(yaw)) throw new IllegalArgumentException("Heading source must be finite");
+        return RotationUtil.vecPlayerToWorld(RotationUtil.rotToVec(yaw, 0.0F), gravity).normalize();
+    }
+
+    /**
+     * Treat client heading as intent, not authority: remove any component along gravity.
+     * A degenerate/malformed value falls back to the authoritative server yaw.
+     */
+    public static Vec3 sanitizeHeading(Direction gravity, Vec3 requested, float fallbackYaw) {
+        Vec3 g = direction(gravity);
+        if (requested != null && Double.isFinite(requested.x + requested.y + requested.z) && requested.lengthSqr() > EPSILON) {
+            Vec3 projected = requested.subtract(g.scale(requested.dot(g)));
+            if (Double.isFinite(projected.x + projected.y + projected.z) && projected.lengthSqr() > EPSILON) return projected.normalize();
+        }
+        return headingFromYaw(gravity, fallbackYaw);
+    }
+
+    /** Plan a gravity-frame transport from a normalized world-space navigation heading. */
+    public static Plan plan(Direction previous, Direction target, Vec3 navigationHeading) {
         if (previous == null || target == null || previous == target) {
             throw new IllegalArgumentException("Gravity transition requires two distinct directions");
         }
-        if (!Float.isFinite(yaw) || !Float.isFinite(pitch)) {
-            throw new IllegalArgumentException("Rotation must be finite");
-        }
-
         Vec3 oldGravity = direction(previous);
         Vec3 newGravity = direction(target);
-        Vec3 oldLocalLook = RotationUtil.rotToVec(yaw, pitch);
-        Vec3 oldWorldLook = RotationUtil.vecPlayerToWorld(oldLocalLook, previous).normalize();
+        if (navigationHeading == null || !Double.isFinite(navigationHeading.x + navigationHeading.y + navigationHeading.z)) {
+            throw new IllegalArgumentException("Navigation heading must be finite");
+        }
+        Vec3 heading = navigationHeading.subtract(oldGravity.scale(navigationHeading.dot(oldGravity)));
+        if (heading.lengthSqr() <= EPSILON) throw new IllegalArgumentException("Navigation heading must lie in the old gravity plane");
+        heading = heading.normalize();
 
         double dot = oldGravity.dot(newGravity);
         TurnKind kind;
@@ -57,30 +77,23 @@ public final class GravityTransition {
         if (dot < -0.5D) {
             kind = TurnKind.HALF;
             angle = Math.PI;
-            Vec3 projectedHeading = oldWorldLook.subtract(oldGravity.scale(oldWorldLook.dot(oldGravity)));
-            if (projectedHeading.lengthSqr() <= EPSILON) {
-                axis = RotationUtil.vecPlayerToWorld(new Vec3(1.0D, 0.0D, 0.0D), previous).normalize();
-            } else {
-                axis = projectedHeading.normalize();
-            }
+            axis = heading;
         } else {
             kind = TurnKind.QUARTER;
             angle = Math.PI * 0.5D;
             axis = oldGravity.cross(newGravity);
-            if (axis.lengthSqr() <= EPSILON) {
-                throw new IllegalArgumentException("Unsupported non-opposite gravity pair");
-            }
+            if (axis.lengthSqr() <= EPSILON) throw new IllegalArgumentException("Unsupported gravity pair");
             axis = axis.normalize();
         }
 
-        Vec3 transported = rotate(oldWorldLook, axis, angle).normalize();
-        Vec3 targetLocalLook = RotationUtil.vecWorldToPlayer(transported, target).normalize();
-        var targetRotation = RotationUtil.vecToRot(targetLocalLook);
-        double horizontal = Math.hypot(targetLocalLook.x, targetLocalLook.z);
-        float targetYaw = horizontal <= 1.0E-6D ? yaw : targetRotation.x;
-        float yawDelta = Mth.wrapDegrees(targetYaw - yaw);
+        Vec3 transportedHeading = rotate(heading, axis, angle).normalize();
+        Vec3 oldLocalHeading = RotationUtil.vecWorldToPlayer(heading, previous).normalize();
+        Vec3 targetLocalHeading = RotationUtil.vecWorldToPlayer(transportedHeading, target).normalize();
+        float oldYaw = RotationUtil.vecToRot(oldLocalHeading).x;
+        float targetYaw = RotationUtil.vecToRot(targetLocalHeading).x;
+        float yawDelta = Mth.wrapDegrees(targetYaw - oldYaw);
 
-        return new Plan(previous, target, kind, axis, oldWorldLook, transported, yawDelta);
+        return new Plan(previous, target, kind, axis, heading, transportedHeading, yawDelta);
     }
 
     /**
@@ -104,10 +117,10 @@ public final class GravityTransition {
             .mul(new Quaternionf().rotateY((float)Math.toRadians(yawDelta)));
     }
 
-    public static float easeOutCubic(float progress) {
+    public static float easeOutQuadratic(float progress) {
         float t = Mth.clamp(progress, 0.0F, 1.0F);
         float remaining = 1.0F - t;
-        return 1.0F - remaining * remaining * remaining;
+        return 1.0F - remaining * remaining;
     }
 
     public static Vec3 rotate(Vec3 vector, Vec3 axis, double angle) {

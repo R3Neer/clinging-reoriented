@@ -20,8 +20,11 @@ public final class ClingingClient implements ClientModInitializer {
         if(!GravityInput.available(mc.player))return;
         if(PENDING.size()>=16) return;
         var forward=mc.gameRenderer.mainCamera().rotation().transform(new org.joml.Vector3f(0,0,-1));
-        var look=new net.minecraft.world.phys.Vec3(forward.x,forward.y,forward.z).normalize();
-        long id=++sequence; PENDING.add(id); ClientPlayNetworking.send(new Payloads.Request(id,ClingingReoriented.data(mc.player).revision,look));
+        var selectionLook=new net.minecraft.world.phys.Vec3(forward.x,forward.y,forward.z).normalize();
+        var gravity=com.moigferdsrte.gravitychanger.util.GravityDirectionUtil.getGravityDirection(mc.player);
+        var navigationHeading=GravityTransition.headingFromYaw(gravity,mc.player.getYRot());
+        long id=++sequence; PENDING.add(id);
+        ClientPlayNetworking.send(new Payloads.Request(id,ClingingReoriented.data(mc.player).revision,selectionLook,navigationHeading));
     }
     @Override public void onInitializeClient() {
         net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STARTED.register(client->BeaconPowers.install());
