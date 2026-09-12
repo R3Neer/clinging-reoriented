@@ -1,10 +1,12 @@
 # Architecture
 
-Clinging: Reoriented is server-authoritative. The client detects a fresh airborne
-jump-key press and submits the rendered look direction only to select the intended
-cardinal target. The server verifies effect ownership, state, charge, root vehicle,
-gravity direction and collision clearance before committing a change through
-Gravity Changer.
+Clinging: Reoriented is server-authoritative. A fresh airborne jump-key edge captures
+two different pieces of client intent at the same instant: the rendered camera
+forward (`selectionLook`) and the player's navigation heading (`navigationHeading`).
+The former chooses the intended cardinal target; the latter describes which way the
+player considers forward on the current gravity plane. The server still verifies
+effect ownership, state, charge, root vehicle, gravity direction and collision
+clearance before committing any change through Gravity Changer.
 
 `GravityInput` and the input mixins handle edge-triggered controls. `AirChanges`
 owns Clinging's per-airborne-stretch budget. Clinging permits exactly one voluntary
@@ -42,7 +44,22 @@ players keep normal Clinging/Reorientation input.
 The same predicate runs in client precheck and server authority; it is an intent
 filter, not a blanket sprint lockout.
 
-## Collision and retirement
+## Selection versus navigation heading
+
+`selectionLook` is the actual rendered camera direction and is used only by
+`LookDirection.select` to choose the target gravity. `navigationHeading` is derived
+from local yaw with pitch forced to zero and transformed into world space through
+the current gravity frame. It is used only to determine orientation transport.
+Consequently a temporary vertical look required to select UP or DOWN cannot erase
+the player's prior forward direction.
+
+The request protocol is `select_intent_v3` and carries both vectors. Client heading
+is input intent rather than physical authority: before geometry uses it, the server
+projects it onto the plane perpendicular to current gravity and normalizes it. A
+non-finite, nearly-zero or degenerate projection falls back to a heading rebuilt
+from authoritative server yaw with pitch zero.
+
+## Collision, fall segmentation and retirement
 
 Voluntary player turns are preflighted before gravity changes. The first candidate
 uses Gravity Changer's directional box at the current entity pivot. If blocked,
@@ -52,8 +69,16 @@ free. This preserves the body's world-space center rather than searching arbitra
 nearby space and avoids false `NO_SPACE` results caused solely by rotating around
 the old feet.
 
-A rejected candidate has zero positional, gravity, heading or momentum mutation.
-Mounted root/passenger hierarchies retain their existing all-or-nothing preflight.
+A rejected candidate has zero positional, gravity, heading, momentum or fall-state
+mutation. Mounted root/passenger hierarchies retain their existing all-or-nothing
+preflight.
+
+An actual Clinging-owned gravity-direction change also resets vanilla
+`fallDistance`. Gravity Changer already evaluates fall damage in local gravity
+space, so each new direction represents a new fall segment rather than continuing
+the distance accumulated toward the previous floor. The reset happens only after a
+successful direction change. The same rule is applied by `MobGravity` to mounts,
+pet replay and owned mob recovery.
 
 Forced player retirement first tests DOWN in place, then a deterministic loaded
 search limited to a true Euclidean displacement of four blocks. If every candidate
@@ -63,28 +88,39 @@ Clinging airborne budget.
 
 ## Heading transport
 
-`GravityTransition` defines the orientation policy before mutation. It derives the
-old world-space look from authoritative server yaw/pitch and the old Gravity Changer
-frame.
+`GravityTransition` defines the orientation policy before mutation. It accepts the
+old gravity, target gravity and sanitized world navigation heading; instantaneous
+pitch is deliberately absent from the planning inputs.
 
 For perpendicular gravity vectors it uses the normalized cross product as the
-single 90-degree world-space rotation axis. For opposite vectors, where the cross
-product is undefined, it projects the current world look onto the old horizontal
-plane and uses that heading as the 180-degree axis. Looking parallel to gravity
-falls back to the old local +X/right axis.
+single 90-degree world-space rotation axis. For opposite vectors, where that cross
+product is undefined, the navigation heading itself is the 180-degree axis. The
+heading is transported by that physical axis-angle rotation.
 
-The old world look is transported by the same axis-angle rotation. Under the target
-Gravity Changer frame, pitch is invariant and only a wrapped yaw delta is required.
-That delta is committed authoritatively with gravity. The client applies the delta
-to its *current* yaw, so mouse movement made after the input request was sent is not
-overwitten by a stale absolute rotation.
+`yawDelta` is calculated as a coordinate-gauge difference, not from a stale absolute
+server yaw: the original world heading is converted to old-local yaw and the
+transported heading is converted to target-local yaw, then the wrapped difference
+is taken. Applying that same delta to any current local yaw preserves the player's
+late mouse movement. Applying it while leaving local pitch unchanged reproduces the
+same physical rotation for the complete look vector, including near-vertical views.
 
-## Presentation ownership and snap animation
+The gauge delta is applied together to view, previous view, body and head yaw
+accumulators so vanilla interpolation cannot manufacture a separate third-person
+twist.
+
+## Presentation ownership, respawn epochs and snap animation
 
 Physical and presentation ownership are separate. A Clinging/Reorientation turn
 sends a monotonic `visual_transition_v2` epoch containing target direction,
 authoritative yaw delta and quarter/half-turn kind. Unrelated Gravity Changer
 transitions do not enter this path.
+
+Visual sequence numbers are connection-scoped. `PlayerData` is replaced when a
+`ServerPlayer` respawns, so the `COPY_FROM` path explicitly carries
+`visualSequence` into the replacement object. The active visual animation itself is
+entity-instance-scoped because `VisualTransitions` keys ownership by the old
+entity's `GravityRotationAnimation`; an animation cannot migrate from the corpse to
+the replacement player. Client sequence state resets only when the connection ends.
 
 On receipt the client captures the gravity quaternion actually being displayed,
 applies the logical yaw delta immediately and builds a compensated visual start
@@ -95,15 +131,15 @@ logical yaw has already moved into the canonical target gauge.
 specific animation instance has a Clinging-owned epoch. Before the target gravity
 attribute arrives it holds the compensated start. Once the target is observed it
 force-sets Gravity Changer's hidden animation state to the exact canonical endpoint
-and visually SLERPs only from the compensated start to that endpoint with
-`easeOutCubic`.
+and visually SLERPs only from the compensated start to that endpoint with quadratic
+ease-out.
 
-A settled 90-degree change therefore traverses exactly 90 degrees in **120 ms**;
-an opposite change traverses exactly 180 degrees in **180 ms**. There is no user
-camera-timing setting. An interrupted Reorientation turn captures the currently
-displayed frame, applies the new yaw gauge compensation and follows the shortest
-path from that real visual state to the latest canonical endpoint. Nothing is queued
-and there is no snap-back to an intermediate canonical frame.
+A settled 90-degree change traverses exactly 90 degrees in **180 ms**; an opposite
+change traverses exactly 180 degrees in **240 ms**. There is no user camera-timing
+setting. An interrupted Reorientation turn captures the currently displayed frame,
+applies the new yaw gauge compensation and follows the shortest path from that real
+visual state to the latest canonical endpoint. Nothing is queued and there is no
+snap-back to an intermediate canonical frame.
 
 Camera, third-person rendering and First Person all consume Gravity Changer's same
 visual gravity quaternion. The First Person offset mixin changes only offset-space
