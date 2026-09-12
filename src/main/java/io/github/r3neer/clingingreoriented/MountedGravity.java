@@ -30,7 +30,6 @@ public final class MountedGravity {
         GravityTransition.Plan transition=GravityTransition.plan(previous,direction,heading);
         if(!MobGravity.borrow(root,direction))return ClingingReoriented.Result.NO_SPACE;
         MobGravity.state(root).airUsed=true;
-        p.resetFallDistance();
         Payloads.visual(p,transition);ClingingReoriented.applyYaw(p,transition);s.visualFrameOwned=true;
         s.airChangeUsed=true;root.positionRider(p);p.setOnGround(false);
         Payloads.publish(p);
