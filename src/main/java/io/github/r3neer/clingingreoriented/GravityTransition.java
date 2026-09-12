@@ -3,11 +3,13 @@ package io.github.r3neer.clingingreoriented;
 import com.moigferdsrte.gravitychanger.util.RotationUtil;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
-/** Pure geometry for Clinging/Reorientation gravity snaps. */
+/** Pure geometry and gauge helpers for Clinging/Reorientation gravity snaps. */
 public final class GravityTransition {
     public static final long QUARTER_TURN_NANOS = 120_000_000L;
     public static final long HALF_TURN_NANOS = 180_000_000L;
@@ -79,6 +81,22 @@ public final class GravityTransition {
         float yawDelta = Mth.wrapDegrees(targetYaw - yaw);
 
         return new Plan(previous, target, kind, axis, oldWorldLook, transported, yawDelta);
+    }
+
+    /**
+     * Changing gravity changes the local yaw gauge, not the relative head/body pose.
+     * Apply the same delta to every yaw accumulator so vanilla interpolation cannot
+     * manufacture an extra third-person twist while the gravity frame snaps.
+     */
+    public static void applyYawGauge(Entity entity,float yawDelta) {
+        entity.setYRot(Mth.wrapDegrees(entity.getYRot()+yawDelta));
+        entity.yRotO=Mth.wrapDegrees(entity.yRotO+yawDelta);
+        if(entity instanceof LivingEntity living){
+            living.yBodyRot=Mth.wrapDegrees(living.yBodyRot+yawDelta);
+            living.yBodyRotO=Mth.wrapDegrees(living.yBodyRotO+yawDelta);
+            living.yHeadRot=Mth.wrapDegrees(living.yHeadRot+yawDelta);
+            living.yHeadRotO=Mth.wrapDegrees(living.yHeadRotO+yawDelta);
+        }
     }
 
     public static Quaternionf compensatedVisualStart(Quaternionf currentVisual, float yawDelta) {
