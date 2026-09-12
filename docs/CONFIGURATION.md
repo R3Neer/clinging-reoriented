@@ -4,9 +4,9 @@ Clinging: Reoriented currently exposes **no mod-owned configuration file**.
 
 Gravity snap timing is intentionally part of the gameplay/presentation contract:
 
-- perpendicular 90-degree turns: **0.12 seconds**;
-- opposite 180-degree turns: **0.18 seconds**;
-- easing: fast ease-out (`1 - (1-t)^3`).
+- perpendicular 90-degree turns: **0.18 seconds**;
+- opposite 180-degree turns: **0.24 seconds**;
+- easing: quadratic ease-out (`1 - (1-t)^2`).
 
 Physical gravity changes immediately; the short transition affects presentation
 only. The timings are fixed so multiplayer clients, First Person compatibility and
