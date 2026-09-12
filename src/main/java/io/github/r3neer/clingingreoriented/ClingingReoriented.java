@@ -17,15 +17,18 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.PositionMoveRotation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.*;
 import net.minecraft.network.protocol.game.ClientboundUpdateAttributesPacket;
 import java.util.List;
+import java.util.Set;
 
 public final class ClingingReoriented implements ModInitializer {
     public static final String ID = "clinging_reoriented";
     private static final double RETIREMENT_RADIUS = 4.0;
     private static final ThreadLocal<Boolean> WRITING = ThreadLocal.withInitial(() -> false);
+    private record TurnPlacement(Vec3 position,AABB box) {}
     public static PlayerData data(Player p) { return ((PlayerData.Holder)p).clinging$data(); }
     public static boolean hasEffect(LivingEntity p) { return p.hasEffect(Reorientation.EFFECT) || BuiltInRegistries.MOB_EFFECT.get(Identifier.fromNamespaceAndPath("alexsmobs", "clinging")).map(p::hasEffect).orElse(false); }
     public static boolean anchor(Player p) { return p.getMainHandItem().getItem() instanceof GravityAnchorItem || p.getOffhandItem().getItem() instanceof GravityAnchorItem; }
@@ -91,12 +94,14 @@ public final class ClingingReoriented implements ModInitializer {
         Direction direction=LookDirection.select(worldLook);
         if (direction==null) return Result.AMBIGUOUS;
         if (direction==GravityDirectionUtil.getGravityDirection(p)) return Result.UNCHANGED;
-        if (s.airChangeUsed && !p.hasEffect(Reorientation.EFFECT)) return Result.AIR_CHANGE_USED;
-        AABB box = RotationUtil.makeBoxFromDimensions(p.getDimensions(p.getPose()), direction, p.position());
-        if (!fits(p, box, null)) return Result.NO_SPACE;
+        // Clinging grants one arbitrary airborne turn, but a spent charge may always return
+        // to vanilla DOWN as a safety exit. The charge stays spent until a real landing.
+        if (s.airChangeUsed && !p.hasEffect(Reorientation.EFFECT) && direction!=Direction.DOWN) return Result.AIR_CHANGE_USED;
+        TurnPlacement placement=findTurnPlacement(p,direction);
+        if (placement==null) return Result.NO_SPACE;
         boolean airborne=!AirChanges.grounded(p);
         Payloads.visual(p,direction);
-        write(p, direction);
+        write(p, direction, placement.position());
         if(airborne)s.airChangeUsed=true;
         s.owned = true; s.visualFrameOwned=true; s.selected = direction; s.unbind();
         ScaleBridge.clear(p);
@@ -104,6 +109,19 @@ public final class ClingingReoriented implements ModInitializer {
         Payloads.publish(p);
         GravityBreadcrumbs.record(p,direction);
         return Result.SUCCESS;
+    }
+    private static TurnPlacement findTurnPlacement(Player p,Direction direction){
+        var dimensions=p.getDimensions(p.getPose());
+        Vec3 current=p.position();
+        AABB direct=RotationUtil.makeBoxFromDimensions(dimensions,direction,current);
+        if(fits(p,direct,null))return new TurnPlacement(current,direct);
+        // Rotating a 1.8-block body around its old feet can make the new thin axis overlap
+        // the floor/wall it just left. If that pivot fails, preserve the physical box center
+        // and retry before declaring the turn obstructed.
+        Vec3 centered=RotationUtil.getCenterAlignedPosition(p.getBoundingBox(),dimensions,direction);
+        if(centered.distanceToSqr(current)<=1.0E-12)return null;
+        AABB centeredBox=RotationUtil.makeBoxFromDimensions(dimensions,direction,centered);
+        return fits(p,centeredBox,null)?new TurnPlacement(centered,centeredBox):null;
     }
     public static boolean fits(Player p, AABB box, Entity selected) {
         if (!Double.isFinite(box.minX+box.minY+box.minZ+box.maxX+box.maxY+box.maxZ) || box.getXsize() <= 0 || box.getYsize() <= 0 || box.getZsize() <= 0) return false;
@@ -118,12 +136,20 @@ public final class ClingingReoriented implements ModInitializer {
         }
         return p.level().noCollision(p, interior);
     }
-    public static void write(Player p, Direction direction) {
+    public static void write(Player p, Direction direction) { write(p,direction,p.position()); }
+    public static void write(Player p, Direction direction,Vec3 position) {
         boolean old = WRITING.get(); WRITING.set(true);
         try {
             GravityDirectionUtil.setGravityDirection(p, direction);
-            p.setBoundingBox(RotationUtil.makeBoxFromDimensions(p.getDimensions(p.getPose()), direction, p.position()));
-            if (p instanceof ServerPlayer sp) sp.connection.send(new ClientboundUpdateAttributesPacket(p.getId(), List.of(p.getAttribute(ModAttributes.GRAVITY_DIRECTION))));
+            var attribute=p.getAttribute(ModAttributes.GRAVITY_DIRECTION);
+            if (p instanceof ServerPlayer sp && attribute!=null) {
+                // Match Gravity Changer's own ordering: tell the client the new frame before
+                // any absolute relocation required by center-aligned clearance.
+                sp.connection.send(new ClientboundUpdateAttributesPacket(p.getId(), List.of(attribute)));
+                if(position.distanceToSqr(p.position())>1.0E-12)
+                    sp.connection.teleport(new PositionMoveRotation(position,p.getDeltaMovement(),p.getYRot(),p.getXRot()),Set.of());
+            } else if(position.distanceToSqr(p.position())>1.0E-12) p.setPos(position);
+            p.setBoundingBox(RotationUtil.makeBoxFromDimensions(p.getDimensions(p.getPose()), direction, position));
         } finally { WRITING.set(old); }
     }
     public static void externalWrite(Player p, Direction direction) {
