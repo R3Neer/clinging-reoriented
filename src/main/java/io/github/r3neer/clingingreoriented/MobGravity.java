@@ -68,9 +68,11 @@ public final class MobGravity {
     }
     private static void positionPassengers(Entity vehicle){for(var passenger:vehicle.getPassengers()){vehicle.positionRider(passenger);positionPassengers(passenger);}}
     private static void commitTurn(LivingEntity e,Direction direction,Vec3 position,boolean relocate){
+        Direction previous=GravityDirectionUtil.getOwnGravityDirection(e);
         if(relocate)e.teleportTo(position.x,position.y,position.z);
         var attribute=e.getAttribute(ModAttributes.GRAVITY_DIRECTION);
         attribute.setBaseValue(DirectionalAttribute.valueOf(direction));
+        if(previous!=direction)e.resetFallDistance();
         e.setBoundingBox(RotationUtil.makeBoxFromDimensions(e.getDimensions(e.getPose()),direction,position));
         positionPassengers(e);
         e.setOnGround(false);e.verticalCollision=false;e.verticalCollisionBelow=false;e.horizontalCollision=false;
