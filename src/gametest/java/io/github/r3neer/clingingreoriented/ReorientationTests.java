@@ -54,7 +54,6 @@ public final class ReorientationTests {
             double plane=gravity.getAxisDirection()==Direction.AxisDirection.POSITIVE?box.max(axis):box.min(axis);
             var target=new Vec3(axis==Direction.Axis.X?plane:center.x,axis==Direction.Axis.Y?plane:center.y,axis==Direction.Axis.Z?plane:center.z);
             var block=BlockPos.containing(target.add(n.scale(.01)));
-            // Align the floor face exactly, including UP's player pivot convention.
             double face=gravity.getAxisDirection()==Direction.AxisDirection.POSITIVE?block.get(axis):block.get(axis)+1;
             p.setPos(p.position().add(n.scale((face-plane)*gravity.getAxisDirection().getStep())));
             h.getLevel().setBlockAndUpdate(block,Blocks.STONE.defaultBlockState());p.setOnGround(true);p.setDeltaMovement(Vec3.ZERO);
@@ -66,7 +65,7 @@ public final class ReorientationTests {
         }
         h.succeed();
     }
-    @GameTest(padding=24) public void spentClingingMayReturnDownButChargeStaysSpent(GameTestHelper h) {
+    @GameTest(padding=24) public void spentClingingRejectsEveryVoluntaryTurnIncludingDown(GameTestHelper h) {
         var p=h.makeMockServerPlayerInLevel();p.snapTo(h.absoluteVec(new Vec3(4,12,4)));
         for(var pos:BlockPos.betweenClosed(p.blockPosition().offset(-4,-4,-4),p.blockPosition().offset(4,4,4)))h.getLevel().setBlockAndUpdate(pos,Blocks.AIR.defaultBlockState());
         var clinging=BuiltInRegistries.MOB_EFFECT.get(Identifier.parse("alexsmobs:clinging")).orElseThrow();
@@ -75,11 +74,13 @@ public final class ReorientationTests {
         var s=ClingingReoriented.data(p);s.owned=true;s.selected=Direction.EAST;s.airChangeUsed=true;
         p.setOnGround(false);p.setDeltaMovement(Vec3.ZERO);
         var down=ClingingReoriented.attempt(p,new Vec3(0,-1,0));
-        h.assertTrue(down==ClingingReoriented.Result.SUCCESS,"spent Clinging can return to DOWN: "+down);
-        h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(p)==Direction.DOWN,"safety return restores DOWN");
-        h.assertTrue(s.airChangeUsed,"safety return does not refund airborne charge");
-        var second=ClingingReoriented.attempt(p,new Vec3(1,0,0));
-        h.assertTrue(second==ClingingReoriented.Result.AIR_CHANGE_USED,"another arbitrary turn still needs a landing: "+second);
+        h.assertTrue(down==ClingingReoriented.Result.AIR_CHANGE_USED,"spent Clinging rejects voluntary DOWN: "+down);
+        h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(p)==Direction.EAST,"rejected DOWN leaves gravity unchanged");
+        h.assertTrue(s.airChangeUsed,"rejected turn keeps charge spent");
+        p.addEffect(new MobEffectInstance(Reorientation.EFFECT,200));
+        var unlimited=ClingingReoriented.attempt(p,new Vec3(0,-1,0));
+        h.assertTrue(unlimited==ClingingReoriented.Result.SUCCESS,"Reorientation permits the same DOWN turn: "+unlimited);
+        h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(p)==Direction.DOWN,"Reorientation reaches DOWN");
         h.succeed();
     }
     @GameTest(padding=24) public void oldFloorDoesNotFalselyRejectCenteredSidewaysTurn(GameTestHelper h) {
@@ -88,7 +89,6 @@ public final class ReorientationTests {
         var clinging=BuiltInRegistries.MOB_EFFECT.get(Identifier.parse("alexsmobs:clinging")).orElseThrow();
         p.addEffect(new MobEffectInstance(clinging,200));
         h.getLevel().setBlockAndUpdate(p.blockPosition().below(),Blocks.STONE.defaultBlockState());
-        // The old floor is still physically adjacent, but the input is already airborne.
         p.setOnGround(false);p.setDeltaMovement(Vec3.ZERO);
         var dimensions=p.getDimensions(p.getPose());var before=p.getBoundingBox();var beforeCenter=before.getCenter();
         var direct=com.moigferdsrte.gravitychanger.util.RotationUtil.makeBoxFromDimensions(dimensions,Direction.EAST,p.position());
