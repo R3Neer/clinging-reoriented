@@ -1,7 +1,6 @@
 package io.github.r3neer.clingingreoriented;
 
 import com.moigferdsrte.gravitychanger.util.GravityDirectionUtil;
-import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -57,7 +56,7 @@ public final class GravityPolishGameTests {
         var oldPlayer=h.makeMockServerPlayerInLevel();
         var replacement=h.makeMockServerPlayerInLevel();
         var old=ClingingReoriented.data(oldPlayer);old.visualSequence=37;old.revision=9;
-        ServerPlayerEvents.COPY_FROM.invoker().copyFrom(oldPlayer,replacement,false);
+        ClingingReoriented.copyPlayerState(oldPlayer,replacement,false);
         var next=ClingingReoriented.data(replacement);
         h.assertTrue(next.visualSequence==37,"death respawn preserves connection visual epoch");
         h.assertTrue(next.revision==10,"respawn revision advances");
