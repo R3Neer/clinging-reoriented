@@ -66,6 +66,41 @@ public final class ReorientationTests {
         }
         h.succeed();
     }
+    @GameTest(padding=24) public void spentClingingMayReturnDownButChargeStaysSpent(GameTestHelper h) {
+        var p=h.makeMockServerPlayerInLevel();p.snapTo(h.absoluteVec(new Vec3(4,12,4)));
+        for(var pos:BlockPos.betweenClosed(p.blockPosition().offset(-4,-4,-4),p.blockPosition().offset(4,4,4)))h.getLevel().setBlockAndUpdate(pos,Blocks.AIR.defaultBlockState());
+        var clinging=BuiltInRegistries.MOB_EFFECT.get(Identifier.parse("alexsmobs:clinging")).orElseThrow();
+        p.addEffect(new MobEffectInstance(clinging,200));
+        ClingingReoriented.write(p,Direction.EAST);
+        var s=ClingingReoriented.data(p);s.owned=true;s.selected=Direction.EAST;s.airChangeUsed=true;
+        p.setOnGround(false);p.setDeltaMovement(Vec3.ZERO);
+        var down=ClingingReoriented.attempt(p,new Vec3(0,-1,0));
+        h.assertTrue(down==ClingingReoriented.Result.SUCCESS,"spent Clinging can return to DOWN: "+down);
+        h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(p)==Direction.DOWN,"safety return restores DOWN");
+        h.assertTrue(s.airChangeUsed,"safety return does not refund airborne charge");
+        var second=ClingingReoriented.attempt(p,new Vec3(1,0,0));
+        h.assertTrue(second==ClingingReoriented.Result.AIR_CHANGE_USED,"another arbitrary turn still needs a landing: "+second);
+        h.succeed();
+    }
+    @GameTest(padding=24) public void oldFloorDoesNotFalselyRejectCenteredSidewaysTurn(GameTestHelper h) {
+        var p=h.makeMockServerPlayerInLevel();p.snapTo(h.absoluteVec(new Vec3(5.5,5,5.5)));
+        for(var pos:BlockPos.betweenClosed(p.blockPosition().offset(-4,-3,-4),p.blockPosition().offset(4,5,4)))h.getLevel().setBlockAndUpdate(pos,Blocks.AIR.defaultBlockState());
+        var clinging=BuiltInRegistries.MOB_EFFECT.get(Identifier.parse("alexsmobs:clinging")).orElseThrow();
+        p.addEffect(new MobEffectInstance(clinging,200));
+        h.getLevel().setBlockAndUpdate(p.blockPosition().below(),Blocks.STONE.defaultBlockState());
+        p.setOnGround(true);p.setDeltaMovement(Vec3.ZERO);
+        var dimensions=p.getDimensions(p.getPose());var before=p.getBoundingBox();var beforeCenter=before.getCenter();
+        var direct=com.moigferdsrte.gravitychanger.util.RotationUtil.makeBoxFromDimensions(dimensions,Direction.EAST,p.position());
+        h.assertFalse(h.getLevel().noCollision(p,direct.deflate(1e-7)),"fixture proves old-feet pivot clips the old floor");
+        var centeredPosition=com.moigferdsrte.gravitychanger.util.RotationUtil.getCenterAlignedPosition(before,dimensions,Direction.EAST);
+        var centeredBox=com.moigferdsrte.gravitychanger.util.RotationUtil.makeBoxFromDimensions(dimensions,Direction.EAST,centeredPosition);
+        h.assertTrue(h.getLevel().noCollision(p,centeredBox.deflate(1e-7)),"center-preserving rotation has enough room");
+        var result=ClingingReoriented.attempt(p,new Vec3(1,0,0));
+        h.assertTrue(result==ClingingReoriented.Result.SUCCESS,"clear centered turn succeeds: "+result);
+        h.assertTrue(p.position().distanceToSqr(centeredPosition)<1e-10,"turn uses the validated centered placement");
+        h.assertTrue(p.getBoundingBox().getCenter().distanceToSqr(beforeCenter)<1e-10,"physical body center is preserved");
+        h.succeed();
+    }
     @GameTest public void realBrewingRecipes(GameTestHelper h) {
         var brewing=h.getLevel().potionBrewing();
         for(boolean extended:new boolean[]{false,true})for(var bottle:new Item[]{Items.POTION,Items.SPLASH_POTION,Items.LINGERING_POTION}) {
