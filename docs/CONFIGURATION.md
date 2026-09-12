@@ -1,29 +1,22 @@
 # Configuration
 
-Clinging: Reoriented currently exposes one client-side presentation setting. The
-first client launch creates:
+Clinging: Reoriented currently exposes **no mod-owned configuration file**.
 
-`config/clinging-reoriented-client.json`
+Gravity snap timing is intentionally part of the gameplay/presentation contract:
 
-```json
-{
-  "cameraRotationSeconds": 0.25
-}
-```
+- perpendicular 90-degree turns: **0.12 seconds**;
+- opposite 180-degree turns: **0.18 seconds**;
+- easing: fast ease-out (`1 - (1-t)^3`).
 
-`cameraRotationSeconds` accepts decimal values from `0.05` to `10`. Lower values
-rotate faster. Restart Minecraft after editing the file.
+Physical gravity changes immediately; the short transition affects presentation
+only. The timings are fixed so multiplayer clients, First Person compatibility and
+the turn-feel contract all use the same behavior.
 
-The setting applies only to ordinary Gravity Changer visual transitions that
-Clinging: Reoriented itself initiates: Clinging turns, Reorientation turns,
-Reorientation-driven passenger/root orientation changes and their own animated
-return to DOWN. Physical gravity changes immediately, world momentum is preserved
-and the camera/body transforms remain synchronized.
+Earlier alphas created `config/clinging-reoriented-client.json`. Alpha.10 and later
+do not read, create, rewrite or migrate that file. An old file may be deleted; if it
+remains on disk it is simply ignored.
 
-An unrelated Gravity Changer change, Gravity Anchor/Core transition, command or
-other mod does **not** inherit this configured duration. Gravity Changer keeps its
-own timing and remains the animation/physics authority for those changes.
-
-Invalid content, including a missing `cameraRotationSeconds` key, falls back to
-0.25 seconds and produces a log warning. The invalid file is left untouched so
-that it can be corrected manually.
+Unrelated Gravity Changer changes, Gravity Anchor/Core transitions, commands and
+other mods keep their own Gravity Changer presentation behavior. Clinging's fixed
+snap policy applies only to transitions initiated by Clinging/Reorientation,
+including forced retirement that Clinging itself owns.

@@ -18,12 +18,14 @@ public final class MountedGravity {
         if(!(p.getRootVehicle() instanceof LivingEntity root) || root instanceof Player || !MobGravity.supported(root))return ClingingReoriented.Result.BLOCKED;
         if(root.onGround() || AirChanges.grounded(root))return ClingingReoriented.Result.MOUNT_ACTION;
         if(root.isFallFlying() || root.isInWater())return ClingingReoriented.Result.BLOCKED;
+        Direction previous=GravityDirectionUtil.getGravityDirection(root);
         Direction direction=LookDirection.select(look);
         if(direction==null)return ClingingReoriented.Result.AMBIGUOUS;
-        if(direction==GravityDirectionUtil.getGravityDirection(root))return ClingingReoriented.Result.UNCHANGED;
+        if(direction==previous)return ClingingReoriented.Result.UNCHANGED;
+        GravityTransition.Plan transition=GravityTransition.plan(previous,direction,p.getYRot(),p.getXRot());
         if(!MobGravity.borrow(root,direction))return ClingingReoriented.Result.NO_SPACE;
         MobGravity.state(root).airUsed=true;
-        Payloads.visual(p,direction);s.visualFrameOwned=true;
+        Payloads.visual(p,transition);ClingingReoriented.applyYaw(p,transition);s.visualFrameOwned=true;
         s.airChangeUsed=true;root.positionRider(p);p.setOnGround(false);
         Payloads.publish(p);
         GravityBreadcrumbs.record(p,direction);

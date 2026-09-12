@@ -2,40 +2,60 @@
 
 ## Unreleased
 
+### Gravity snap and heading
+
+- Replace Clinging/Reorientation's duration-only patch of Gravity Changer's
+  canonical-frame SLERP with a Clinging-owned minimal gravity transport.
+- Use the single 90-degree cross-product axis for perpendicular gravity changes and
+  the current horizontal heading as the 180-degree axis for opposite changes,
+  falling back to the current right axis when heading is degenerate.
+- Transport the logical world look through the same rotation, preserve pitch and
+  commit only the required wrapped yaw delta under the canonical target frame.
+- Present quarter turns as fixed **120 ms** snaps and opposite turns as fixed
+  **180 ms** snaps using cubic ease-out; unrelated Gravity Changer animations keep
+  upstream behavior.
+- Start an interrupted Reorientation transition from the frame currently displayed
+  instead of queueing or snapping back to an intermediate canonical frame.
+
+### Input intent
+
+- Reserve airborne Space for an imminent sprint landing when the player is sprinting
+  toward support predicted to be reached on the next gravity-relative simulation
+  step, preventing ordinary sprint-jump chains from becoming accidental turns.
+- Apply the same gravity-direction-agnostic reservation in client precheck and
+  server authority, including Gravity Changer gravity-strength scaling.
+- Restore Clinging's exact one-voluntary-turn airborne budget: after the charge is
+  spent, DOWN is rejected just like every other voluntary target. Reorientation
+  remains unlimited and forced retirement to DOWN remains independent of charge.
+
+### Configuration and presentation ownership
+
+- Remove the Clinging-owned camera timing JSON setting entirely. Alpha.10 no longer
+  reads or creates `config/clinging-reoriented-client.json`; legacy files are inert.
+- Keep camera, third-person model and First Person on the same Clinging-owned visual
+  gravity quaternion instead of implementing separate orientation trajectories.
+
 ### Gameplay and collision clearance
 
-- Let spent Clinging always return to vanilla `DOWN` as a safety exit without
-  refunding its one arbitrary airborne turn; another non-DOWN turn still requires
-  a real landing.
-- When the current entity pivot makes a rotated player box clip only the floor or
-  wall being left behind, retry the same rotation with Gravity Changer's
-  center-aligned placement before returning `NO_SPACE`.
-- Preserve the physical body's world-space center for that fallback and keep real
+- Retain alpha.9's center-aligned fallback when the old feet pivot alone makes a
+  rotated player box clip the floor or wall being left behind.
+- Preserve the physical body's world-space center for that fallback and keep genuine
   obstruction rejection atomic.
-
-### Presentation
-
-- Change the default Clinging/Reorientation camera transition from 1.0 seconds to
-  0.25 seconds. Existing user configuration files remain authoritative.
 
 ### Compatibility and build isolation
 
-- Remove the transitional production compile-time dependency on Scale Brews.
-- Resolve legacy Scale platform hooks reflectively and target `PlatformPhysics`
-  through a `@Pseudo` mixin whose optional injections use `require = 0`, so absent
-  or incompatible Scale versions leave Clinging's base behavior available without
-  probing Scale classes during Mixin bootstrap.
-- Add a build guard that rejects Scale Brews on production `compileClasspath`.
-- Keep Scale beta.5 coverage in CI as an isolated runtime-only fixture instead of a
-  compile API, while the required build/server/client lanes run with no Scale JAR.
+- Keep Scale Brews out of production compileClasspath and resolve transitional
+  legacy Scale hooks reflectively behind optional fail-closed integration.
+- Keep Scale beta.5 and First Person 2.7.2 coverage in isolated CI lanes rather than
+  production dependencies.
 
 ### Validation
 
-- Add server regressions for a spent-Clinging DOWN safety return, retained spent
-  charge, center-aligned clearance beside an old floor and the existing genuine
-  obstruction rejection.
-- Update the client configuration unit test for the 0.25-second default and invalid
-  configuration fallback.
+- Add JUnit coverage for every cardinal gravity pair, transported heading, canonical
+  endpoint identity, fixed snap timing and opposite-direction degeneracies.
+- Add server regressions for gravity-relative sprint-jump reservation, altered
+  gravity strength and the restored one-turn Clinging budget including DOWN.
+- Update real-client and First Person fixtures for visual-transition protocol v2.
 
 ## [0.1.0-alpha.8] - 2026-09-11
 
@@ -44,12 +64,9 @@ changes relative to alpha.7.
 
 ### Documentation and packaging
 
-- Replace pre-publication "candidate" wording with the actual released state.
-- Update the current-version references in the README, guide and compatibility
-  documentation from alpha.7 to alpha.8 while preserving alpha.7 as historical
-  hardening evidence.
-- Rewrite validation/packaging text so it describes the exact validated-main-artifact
-  release process rather than a future rebuild step that has already happened.
+- Replace pre-publication candidate wording with the actual released state.
+- Update current-version references while preserving alpha.7 as historical hardening
+  evidence.
 - Repeat the full server, default-client and First Person CI lanes before publication.
 
 ## [0.1.0-alpha.7] - 2026-09-11
@@ -66,36 +83,25 @@ Correctness and ownership hardening without adding a new gameplay feature set.
   or borrowed and preserves later/existing external gravity.
 - Restore the mount's previous frame when a Reorientation loan ends.
 - Make root/passenger turns and recovery transactional across the complete passenger
-  hierarchy: failed candidates cause zero position/gravity/momentum mutation.
+  hierarchy.
 
 ### Presentation and networking
 
-- Scope `cameraRotationSeconds` to visual transitions initiated by Clinging or
-  Reorientation; unrelated Gravity Changer changes keep upstream timing.
-- Give First Person the same Clinging-owned visual boundary instead of globally
-  patching every non-DOWN gravity frame.
-- Add bounded, one-shot latest-interval validation to the transitional moving-surface
-  reference path so old authentic support samples cannot be replayed for another
-  correction.
+- Scope the then-configurable camera timing to transitions initiated by Clinging or
+  Reorientation instead of globally patching Gravity Changer.
+- Give First Person the same Clinging-owned visual boundary.
+- Add bounded, one-shot latest-interval validation to moving-surface references.
 
 ### Compatibility
 
-- Treat mounted gravity generically for every compatible living root vehicle.
-- Remove Clinging's bee-flight, chicken-glide and wolf-pounce Tiny Mount shims;
-  Scale Brews owns gravity-awareness for movement vectors generated by Scale itself.
-- Keep Scale Brews outside alpha.7's runtime/support target while its shared
-  entity-collision architecture remains unfinished.
-- Update Alchemical Leather compatibility documentation to alpha.3.
+- Treat mounted gravity generically for compatible living root vehicles.
+- Remove Tiny-Mount-specific movement shims from Clinging.
+- Keep Scale Brews outside the required runtime/support target.
 
 ### Validation
 
-- Expand the required server suite to 42 GameTests plus 10 JUnit tests and retain
-  real default client GameTests without runtime Scale Brews.
-- Add adversarial holdouts for blocked retirement/retry, external mob ownership,
-  passenger-only recovery obstruction and stale/replayed support references.
-- Pass a fresh real-client compatibility lane with First Person 2.7.2 and Not Enough
-  Animations 1.12.4, proving that external gravity retains First Person's native
-  offset while Clinging-owned frames rotate that baseline exactly once.
+- Expand required server/JUnit/client coverage and add adversarial holdouts for
+  retirement, ownership, passenger recovery and stale support references.
 
 ## [0.1.0-alpha.6] - 2026-09-09
 
@@ -105,24 +111,18 @@ First public alpha candidate.
 
 - Use a fresh airborne Space press to choose the nearest cardinal gravity direction
   from the rendered look.
-- Limit Clinging to one successful turn per airborne stretch and add the unlimited
-  Reorientation effect and potion family.
-- Preserve world momentum, reject obstructed destination boxes and distinguish
-  successful and failed attempts with sounds.
-- Give usable Elytra priority over gravity turns.
-- Add tier-two Clinging beacon support, mounted Reorientation and passive mob effect
-  lifetime.
-- Let eligible following pets replay bounded positional gravity trails.
+- Limit Clinging to one successful turn per airborne stretch and add unlimited
+  Reorientation.
+- Preserve world momentum, reject obstructed destination boxes, give usable Elytra
+  priority and add beacon, mount and pet-route behavior.
 
 ### Presentation and compatibility
 
-- Add configurable client camera duration, one second by default.
-- Add optional compatibility with Alchemical Leather, Scale Brews, First Person and
-  Scale Visual Compat.
-- Keep Gravity Changer authoritative for movement, collision and camera transforms.
+- Introduce the original client camera-duration option and optional compatibility
+  with Alchemical Leather, Scale Brews and First Person. Later alphas replace this
+  presentation model.
 
 ### Validation
 
-- Pass 39 server GameTests, 10 JUnit tests and two real-client suites.
-- Retain dedicated negative coverage without Scale Brews.
-- Record outstanding multiplayer, long-session and full-pack visual QA explicitly.
+- Pass the initial required server, JUnit and client suites and record outstanding
+  multiplayer/full-pack QA explicitly.

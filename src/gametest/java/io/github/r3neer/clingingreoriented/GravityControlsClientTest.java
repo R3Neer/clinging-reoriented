@@ -2,7 +2,6 @@ package io.github.r3neer.clingingreoriented;
 
 import com.moigferdsrte.gravitychanger.client.GravityRotationAnimation;
 import com.moigferdsrte.gravitychanger.util.*;
-import io.github.r3neer.clingingreoriented.client.CameraConfig;
 import io.github.r3neer.clingingreoriented.client.VisualTransitions;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -17,14 +16,15 @@ import net.minecraft.world.inventory.BeaconMenu;
 import net.minecraft.client.gui.screens.inventory.BeaconScreen;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 
-/** Physical jump edges, owned camera timing, vanilla Elytra deployment and the real beacon screen. */
+/** Physical jump edges, owned snap presentation, vanilla Elytra deployment and the real beacon screen. */
 public final class GravityControlsClientTest implements FabricClientGameTest {
     private static void tap(ClientGameTestContext c){c.getInput().holdKey(o->o.keyJump);c.waitTicks(2);c.getInput().releaseKey(o->o.keyJump);c.waitTicks(3);}
     @Override public void runTest(ClientGameTestContext c){
         try(var world=c.worldBuilder().create()){
             c.waitFor(mc->mc.player!=null);
-            checkCameraOwnership(c);
+            checkSnapOwnership(c);
             world.getServer().runOnServer(server->{
                 var p=server.getPlayerList().getPlayers().getFirst();p.setGameMode(GameType.SURVIVAL);
                 p.teleport(new TeleportTransition(server.overworld(),new Vec3(0,150,0),Vec3.ZERO,0,0,TeleportTransition.DO_NOTHING));
@@ -51,33 +51,47 @@ public final class GravityControlsClientTest implements FabricClientGameTest {
             c.waitTicks(3);checkBeacon(c,true);c.takeScreenshot("beacon-clinging-tier-two");c.setScreen(()->null);
         }
     }
-    private static void checkCameraOwnership(ClientGameTestContext c){
+    private static void checkSnapOwnership(ClientGameTestContext c){
         c.runOnClient(mc->{
-            var config=CameraConfig.path();
             try {
-                var temporary=java.nio.file.Files.createTempFile("clinging-camera-test-",".json");
-                try {
-                    java.nio.file.Files.writeString(temporary,"{\"cameraRotationSeconds\":2.0}");
-                    CameraConfig.load(temporary);
-                    var target=RotationUtil.getEntityRotationQuaternion(Direction.EAST);
+                var target=RotationUtil.getEntityRotationQuaternion(Direction.EAST);
 
-                    var unrelated=new GravityRotationAnimation();
-                    unrelated.forceSet(Direction.DOWN,0);unrelated.getRotation(Direction.EAST,0);
-                    if(Math.abs(unrelated.getRotation(Direction.EAST,1_250_000_000L).dot(target))<.99999f)
-                        throw new AssertionError("Unowned Gravity Changer transition did not retain upstream 1.25 s timing");
+                var unrelated=new GravityRotationAnimation();
+                unrelated.forceSet(Direction.DOWN,0);unrelated.getRotation(Direction.EAST,0);
+                if(Math.abs(unrelated.getRotation(Direction.EAST,1_250_000_000L).dot(target))<.99999f)
+                    throw new AssertionError("Unowned Gravity Changer transition did not retain upstream 1.25 s timing");
 
-                    var owned=animation(mc.player);
-                    owned.forceSet(Direction.DOWN,0);
-                    VisualTransitions.begin(mc.player,Direction.EAST,1);
-                    owned.getRotation(Direction.EAST,0);
-                    if(Math.abs(owned.getRotation(Direction.EAST,1_250_000_000L).dot(target))>.999f)
-                        throw new AssertionError("Owned Clinging transition ignored configured 2 s duration");
-                    if(Math.abs(owned.getRotation(Direction.EAST,2_000_000_000L).dot(target))<.99999f)
-                        throw new AssertionError("Owned Clinging transition did not finish at configured duration");
-                    VisualTransitions.clear();
-                } finally {java.nio.file.Files.deleteIfExists(temporary);}
-            } catch(java.io.IOException|ReflectiveOperationException failure){throw new AssertionError(failure);}
-            finally {CameraConfig.load(config);VisualTransitions.clear();}
+                var owned=animation(mc.player);
+                owned.forceSet(Direction.DOWN,0);
+                float originalYaw=mc.player.getYRot(), originalPitch=mc.player.getXRot(), originalYawOld=mc.player.yRotO;
+                float originalBody=mc.player.yBodyRot, originalBodyOld=mc.player.yBodyRotO;
+                float originalHead=mc.player.yHeadRot, originalHeadOld=mc.player.yHeadRotO;
+                mc.player.yBodyRot=Mth.wrapDegrees(originalYaw-23.0F);mc.player.yBodyRotO=Mth.wrapDegrees(originalYawOld-19.0F);
+                mc.player.yHeadRot=Mth.wrapDegrees(originalYaw+17.0F);mc.player.yHeadRotO=Mth.wrapDegrees(originalYawOld+11.0F);
+                float bodyDelta=Mth.wrapDegrees(mc.player.yBodyRot-originalYaw);
+                float bodyOldDelta=Mth.wrapDegrees(mc.player.yBodyRotO-originalYawOld);
+                float headDelta=Mth.wrapDegrees(mc.player.yHeadRot-originalYaw);
+                float headOldDelta=Mth.wrapDegrees(mc.player.yHeadRotO-originalYawOld);
+
+                var plan=GravityTransition.plan(Direction.DOWN,Direction.EAST,originalYaw,originalPitch);
+                VisualTransitions.begin(mc.player,Direction.EAST,plan.yawDelta(),plan.kind().ordinal(),1);
+                if(Math.abs(Mth.wrapDegrees(mc.player.yBodyRot-mc.player.getYRot())-bodyDelta)>1e-4f
+                    ||Math.abs(Mth.wrapDegrees(mc.player.yBodyRotO-mc.player.yRotO)-bodyOldDelta)>1e-4f
+                    ||Math.abs(Mth.wrapDegrees(mc.player.yHeadRot-mc.player.getYRot())-headDelta)>1e-4f
+                    ||Math.abs(Mth.wrapDegrees(mc.player.yHeadRotO-mc.player.yRotO)-headOldDelta)>1e-4f)
+                    throw new AssertionError("Yaw gauge change altered relative body/head pose");
+
+                var start=owned.getRotation(Direction.EAST,0);
+                if(Math.abs(start.dot(target))>.999f)throw new AssertionError("Clinging snap began at its target instead of a compensated start frame");
+                if(Math.abs(owned.getRotation(Direction.EAST,GravityTransition.QUARTER_TURN_NANOS).dot(target))<.99999f)
+                    throw new AssertionError("Clinging quarter-turn did not finish at fixed 120 ms duration");
+                if(VisualTransitions.owns(owned))throw new AssertionError("Completed snap still owns Gravity Changer animation");
+
+                mc.player.setYRot(originalYaw);mc.player.setXRot(originalPitch);mc.player.yRotO=originalYawOld;
+                mc.player.yBodyRot=originalBody;mc.player.yBodyRotO=originalBodyOld;
+                mc.player.yHeadRot=originalHead;mc.player.yHeadRotO=originalHeadOld;
+                VisualTransitions.clear();
+            } catch(ReflectiveOperationException failure){throw new AssertionError(failure);}
         });
     }
     private static GravityRotationAnimation animation(Entity entity) throws ReflectiveOperationException {
