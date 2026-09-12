@@ -15,19 +15,22 @@ Temporary working document. Delete before merge.
 - Failed/unchanged attempts change no orientation/fall state.
 - Foreign Gravity Changer transitions remain untouched.
 
-## Implementation checklist v1
+## Implementation checklist v2
 
 ### A. Input protocol: separate selection look and navigation heading
 
-- [ ] Extend `Payloads.Request` to v3 with `selectionLook` and `navigationHeading` world vectors.
+- [ ] Extend `Payloads.Request` to a new v3 schema with `selectionLook` and `navigationHeading` world vectors.
 - [ ] Client `ClingingClient.press()` captures both on the same input edge:
   - [ ] selection look from rendered camera forward;
-  - [ ] heading from player's current local yaw with pitch forced to 0, transformed by current gravity.
-- [ ] Keep both vectors normalized before sending.
+  - [ ] heading from player's current local yaw with pitch forced to 0, transformed by current logical gravity.
+- [ ] Normalize both vectors before sending.
 - [ ] Server validates selection look finite/nonzero exactly as today.
-- [ ] Server validates heading finite/nonzero and approximately perpendicular to current gravity.
-- [ ] If heading validation fails, reconstruct heading from authoritative server yaw with pitch=0 instead of rejecting the entire turn.
-- [ ] Mounted Reorientation uses the same rider heading snapshot while target selection still comes from selection look.
+- [ ] Server sanitizes heading instead of demanding perfect client geometry:
+  - [ ] reject non-finite/nearly-zero raw input from direct use;
+  - [ ] project raw heading onto the plane perpendicular to current gravity;
+  - [ ] normalize the projected heading when non-degenerate;
+  - [ ] if projection degenerates, reconstruct heading from authoritative server yaw with pitch=0 and current gravity.
+- [ ] Mounted Reorientation uses the same rider heading snapshot while target selection still comes only from selection look.
 
 ### B. Pure geometry redesign
 
@@ -38,20 +41,22 @@ Temporary working document. Delete before merge.
 - [ ] Convert original heading into old-local yaw and transported heading into target-local yaw using `RotationUtil.vecWorldToPlayer` + `vecToRot`.
 - [ ] `yawDelta = wrap(targetLocalYaw - oldLocalYaw)`.
 - [ ] Do not use pitch or instantaneous full look to choose the 180° axis.
-- [ ] Retain diagnostic axis/transported heading fields in `Plan` for tests.
+- [ ] Retain diagnostic axis/old heading/transported heading fields in `Plan` for tests.
 - [ ] Unit-test every ordered direction pair and representative headings.
 - [ ] Explicit regressions:
   - [ ] DOWN -> UP with NORTH/EAST/SOUTH/WEST heading keeps the same world heading;
   - [ ] UP -> DOWN likewise;
-  - [ ] DOWN -> NORTH with heading NORTH ends with world look/heading transported toward UP;
-  - [ ] yaw delta remains identical for the same heading regardless of pitch.
+  - [ ] DOWN -> NORTH with heading NORTH transports the heading toward world UP;
+  - [ ] applying the same yaw delta to arbitrary local pitch reproduces the same physical rotation, proving pitch independence;
+  - [ ] malformed/off-plane headings are sanitized before `plan`, never inside quaternion math.
 - [ ] Keep quaternion compensated-start proofs, including arbitrary intermediate visual frames.
 
 ### C. Authoritative logical commit
 
 - [ ] `ClingingReoriented.attempt(...)` accepts both selection look and navigation heading.
+- [ ] Preserve a convenience overload for internal/tests that derives heading from the player's current yaw.
 - [ ] Target selection uses only selection look.
-- [ ] Transition planning uses only validated/fallback navigation heading.
+- [ ] Transition planning uses only sanitized/fallback navigation heading.
 - [ ] Apply the resulting yaw gauge delta additively on server using existing gauge helper.
 - [ ] Preserve all yaw/head/body relative offsets.
 - [ ] Preserve pitch and velocity.
@@ -61,18 +66,18 @@ Temporary working document. Delete before merge.
 
 ### D. Respawn-safe visual epochs
 
-- [ ] Copy `visualSequence` from old `PlayerData` to new `PlayerData` for both alive-copy and death respawn.
-- [ ] Do not reset client `VisualTransitions.latestSequence` on respawn.
-- [ ] Ensure old active animation remains associated only with the dead entity's animation object and cannot own the replacement player's animation.
-- [ ] Add server GameTest/unit-level state regression proving visual sequence survives death copy and next emitted sequence is monotonic.
-- [ ] Add client integration regression: establish a high accepted sequence, replace/respawn player state, accept the first subsequent transition rather than falling back to upstream timing.
+- [ ] Copy `visualSequence` from old `PlayerData` to new `PlayerData` before the alive/death branch so both respawn modes preserve monotonicity.
+- [ ] Do not reset client `VisualTransitions.latestSequence` on respawn; it remains connection-scoped and resets only on disconnect.
+- [ ] Ensure old active animation remains associated only with the dead entity's `GravityRotationAnimation` and cannot own the replacement player's animation.
+- [ ] Add server GameTest/state regression proving visual sequence survives death copy.
+- [ ] Add client integration or focused client regression proving a post-respawn sequence strictly above the pre-death value is accepted and receives owned snap timing/yaw compensation.
 
 ### E. Fall-distance segmentation
 
 - [ ] Reset vanilla `fallDistance` only when a Clinging-owned operation actually changes gravity.
 - [ ] Player `writeTransition`: capture previous direction; after successful direction change call `resetFallDistance()`.
-- [ ] Generic internal `write` used for direct Clinging state restoration should also reset when direction changes.
-- [ ] `MobGravity.commitTurn`: reset fall distance when old != new, covering mounts, pet replay and owned restore.
+- [ ] Generic internal `write` used for direct Clinging state restoration also resets when old != new.
+- [ ] `MobGravity.commitTurn`: capture old direction and reset fall distance when old != new, covering mounts, pet replay and owned restore.
 - [ ] Do not reset on failed/no-space/unchanged selection.
 - [ ] Tests cover:
   - [ ] successful voluntary player turn resets nonzero fall distance;
@@ -86,8 +91,8 @@ Temporary working document. Delete before merge.
 - [ ] Change fixed half duration 180 ms -> 240 ms.
 - [ ] Replace ease-out cubic with ease-out quadratic `1-(1-t)^2`.
 - [ ] Rename helper/tests/docs from cubic to quadratic.
-- [ ] Assert monotonic easing and representative timing fractions.
-- [ ] Client test verifies owned quarter turn is not complete at 120 ms and is canonical by 180 ms.
+- [ ] Assert monotonic easing and representative fractions (`t=.5 -> .75`, `t=1 -> 1`).
+- [ ] Client test verifies owned quarter turn is visibly incomplete at 120 ms and canonical by 180 ms.
 - [ ] Half-turn endpoint verified at 240 ms.
 - [ ] Unowned Gravity Changer still retains upstream 1.25 s behavior.
 
