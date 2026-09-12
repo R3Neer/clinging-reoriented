@@ -19,6 +19,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.PositionMoveRotation;
+import net.minecraft.world.entity.Relative;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.*;
 import net.minecraft.network.protocol.game.ClientboundUpdateAttributesPacket;
@@ -118,9 +119,6 @@ public final class ClingingReoriented implements ModInitializer {
         Vec3 current=p.position();
         AABB direct=RotationUtil.makeBoxFromDimensions(dimensions,direction,current);
         if(fits(p,direct,null))return new TurnPlacement(current,direct);
-        // Rotating a 1.8-block body around its old feet can make the new thin axis overlap
-        // the floor/wall it just left. If that pivot fails, preserve the physical box center
-        // and retry before declaring the turn obstructed.
         Vec3 centered=RotationUtil.getCenterAlignedPosition(p.getBoundingBox(),dimensions,direction);
         if(centered.distanceToSqr(current)<=1.0E-12)return null;
         AABB centeredBox=RotationUtil.makeBoxFromDimensions(dimensions,direction,centered);
@@ -146,8 +144,6 @@ public final class ClingingReoriented implements ModInitializer {
             GravityDirectionUtil.setGravityDirection(p, direction);
             var attribute=p.getAttribute(ModAttributes.GRAVITY_DIRECTION);
             if (p instanceof ServerPlayer sp && attribute!=null) {
-                // Match Gravity Changer's own ordering: tell the client the new frame before
-                // any absolute relocation required by center-aligned clearance.
                 sp.connection.send(new ClientboundUpdateAttributesPacket(p.getId(), List.of(attribute)));
                 if(position.distanceToSqr(p.position())>1.0E-12)
                     sp.connection.teleport(new PositionMoveRotation(position,p.getDeltaMovement(),p.getYRot(),p.getXRot()),Set.of());
@@ -168,7 +164,10 @@ public final class ClingingReoriented implements ModInitializer {
             if(attribute!=null){
                 p.connection.send(new ClientboundUpdateAttributesPacket(p.getId(),List.of(attribute)));
                 if(position.distanceToSqr(p.position())>1.0E-12)
-                    p.connection.teleport(new PositionMoveRotation(position,p.getDeltaMovement(),p.getYRot(),p.getXRot()),Set.of());
+                    // Position must be authoritative, but rotation is already transported by
+                    // visual_transition_v2. Relative zero keeps any mouse input made after
+                    // the request instead of restoring a stale absolute yaw/pitch.
+                    p.connection.teleport(new PositionMoveRotation(position,p.getDeltaMovement(),0.0F,0.0F),Set.of(Relative.Y_ROT,Relative.X_ROT));
             }
             p.setBoundingBox(RotationUtil.makeBoxFromDimensions(p.getDimensions(p.getPose()),direction,position));
         }finally{WRITING.set(old);}
@@ -202,7 +201,6 @@ public final class ClingingReoriented implements ModInitializer {
             s.owned=false; s.visualFrameOwned=false; s.retirementPending=false; Payloads.publish(p);
         }
     }
-    /** Forced cleanup is local and bounded; voluntary selection never calls this search. */
     public static boolean retire(ServerPlayer p) {
         Direction previous=GravityDirectionUtil.getGravityDirection(p);
         if(previous==Direction.DOWN)return true;
