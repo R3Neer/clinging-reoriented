@@ -67,18 +67,22 @@ public final class MobGravity {
         return fits(root,box)&&passengersFit(root,direction,position);
     }
     private static void positionPassengers(Entity vehicle){for(var passenger:vehicle.getPassengers()){vehicle.positionRider(passenger);positionPassengers(passenger);}}
-    private static void resetPlayerPassengerFallDistance(Entity vehicle){
+    private static void capturePlayerPassengerGravities(Entity vehicle,java.util.Map<Player,Direction> result){
         for(var passenger:vehicle.getPassengers()){
-            if(passenger instanceof Player player)player.resetFallDistance();
-            resetPlayerPassengerFallDistance(passenger);
+            if(passenger instanceof Player player)result.put(player,GravityDirectionUtil.getGravityDirection(player));
+            capturePlayerPassengerGravities(passenger,result);
         }
     }
     private static void commitTurn(LivingEntity e,Direction direction,Vec3 position,boolean relocate){
         Direction previous=GravityDirectionUtil.getOwnGravityDirection(e);
+        var passengerGravityBefore=new java.util.IdentityHashMap<Player,Direction>();
+        capturePlayerPassengerGravities(e,passengerGravityBefore);
         if(relocate)e.teleportTo(position.x,position.y,position.z);
         var attribute=e.getAttribute(ModAttributes.GRAVITY_DIRECTION);
         attribute.setBaseValue(DirectionalAttribute.valueOf(direction));
-        if(previous!=direction){e.resetFallDistance();resetPlayerPassengerFallDistance(e);}
+        if(previous!=direction)e.resetFallDistance();
+        for(var entry:passengerGravityBefore.entrySet())
+            if(GravityDirectionUtil.getGravityDirection(entry.getKey())!=entry.getValue())entry.getKey().resetFallDistance();
         e.setBoundingBox(RotationUtil.makeBoxFromDimensions(e.getDimensions(e.getPose()),direction,position));
         positionPassengers(e);
         e.setOnGround(false);e.verticalCollision=false;e.verticalCollisionBelow=false;e.horizontalCollision=false;
