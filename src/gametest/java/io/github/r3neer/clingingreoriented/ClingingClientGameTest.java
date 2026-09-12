@@ -21,7 +21,6 @@ public final class ClingingClientGameTest implements FabricClientGameTest {
             world.getServer().runOnServer(server->{
                 var level=server.overworld();
                 for(var pos:BlockPos.betweenClosed(new BlockPos(-5,79,-5),new BlockPos(5,86,5)))level.setBlockAndUpdate(pos,pos.getY()==79?Blocks.STONE.defaultBlockState():Blocks.AIR.defaultBlockState());
-                // No nearby surface: selection must work in empty air.
                 var p=server.getPlayerList().getPlayers().getFirst();p.setGameMode(GameType.SURVIVAL);
                 p.teleport(new TeleportTransition(level,new Vec3(.5,82,.5),Vec3.ZERO,-90,0,TeleportTransition.DO_NOTHING));
                 p.setNoGravity(true);
@@ -40,8 +39,7 @@ public final class ClingingClientGameTest implements FabricClientGameTest {
             if(!SOUNDS.contains(net.minecraft.sounds.SoundEvents.AMETHYST_BLOCK_CHIME))throw new AssertionError("Missing success sound");
             context.takeScreenshot("clinging-east-gravity");
 
-            // A spent Clinging charge may always return to DOWN. This used to be the
-            // client failure fixture; it now exercises the safety return instead.
+            // Spent Clinging rejects every voluntary second turn, including DOWN.
             world.getServer().runOnServer(server->{
                 var p=server.getPlayerList().getPlayers().getFirst();
                 var local=com.moigferdsrte.gravitychanger.util.RotationUtil.vecWorldToPlayer(new Vec3(0,-1,0),Direction.EAST);
@@ -49,28 +47,24 @@ public final class ClingingClientGameTest implements FabricClientGameTest {
                 float pitch=(float)Math.toDegrees(Math.asin(-local.y));
                 p.teleport(new TeleportTransition(server.overworld(),new Vec3(4,85,4),Vec3.ZERO,yaw,pitch,TeleportTransition.DO_NOTHING));
             });
-            context.waitFor(mc->mc.player.position().distanceTo(new Vec3(4,85,4))<.1);
-            context.waitTicks(3);SOUNDS.clear();
+            context.waitFor(mc->mc.player.position().distanceTo(new Vec3(4,85,4))<.1);context.waitTicks(3);SOUNDS.clear();
+            tapJump(context);context.waitTicks(10);
+            if(!SOUNDS.contains(net.minecraft.sounds.SoundEvents.NOTE_BLOCK_BASS.value()))throw new AssertionError("Missing spent-charge DOWN failure sound");
+            context.runOnClient(mc->{if(GravityDirectionUtil.getOwnGravityDirection(mc.player)!=Direction.EAST)throw new AssertionError("Spent Clinging returned to DOWN voluntarily");});
+            boolean stillSpent=world.getServer().computeOnServer(server->ClingingReoriented.data(server.getPlayerList().getPlayers().getFirst()).airChangeUsed);
+            if(!stillSpent)throw new AssertionError("Rejected DOWN turn refunded Clinging charge");
+
+            // Reorientation removes the budget. The exact same DOWN input now succeeds.
+            world.getServer().runOnServer(server->server.getPlayerList().getPlayers().getFirst().addEffect(new MobEffectInstance(Reorientation.EFFECT,1200)));
+            context.waitFor(mc->mc.player.hasEffect(Reorientation.EFFECT));SOUNDS.clear();
             tapJump(context);
             context.waitFor(mc->GravityDirectionUtil.getOwnGravityDirection(mc.player)==Direction.DOWN);
             context.waitFor(mc->Math.abs(((com.moigferdsrte.gravitychanger.client.GravityAnimationEntity)mc.player).gravitychanger$getVisualGravityRotation(Direction.DOWN).dot(com.moigferdsrte.gravitychanger.util.RotationUtil.getEntityRotationQuaternion(Direction.DOWN)))>.99999f);
-            if(!SOUNDS.contains(net.minecraft.sounds.SoundEvents.AMETHYST_BLOCK_CHIME))throw new AssertionError("Missing safety-return success sound");
-            boolean stillSpent=world.getServer().computeOnServer(server->ClingingReoriented.data(server.getPlayerList().getPlayers().getFirst()).airChangeUsed);
-            if(!stillSpent)throw new AssertionError("DOWN safety return refunded Clinging charge");
+            if(!SOUNDS.contains(net.minecraft.sounds.SoundEvents.AMETHYST_BLOCK_CHIME))throw new AssertionError("Missing Reorientation DOWN success sound");
 
-            // Re-aim along SOUTH while still airborne. Clinging must reject another
-            // arbitrary turn and emit the failure cue.
+            // And another airborne turn still succeeds under Reorientation.
             world.getServer().runOnServer(server->{var p=server.getPlayerList().getPlayers().getFirst();p.teleport(new TeleportTransition(server.overworld(),new Vec3(4,85,4),Vec3.ZERO,0,0,TeleportTransition.DO_NOTHING));});
-            context.waitFor(mc->mc.player.position().distanceTo(new Vec3(4,85,4))<.1);context.waitTicks(3);SOUNDS.clear();
-            tapJump(context);context.waitTicks(10);
-            if(!SOUNDS.contains(net.minecraft.sounds.SoundEvents.NOTE_BLOCK_BASS.value()))throw new AssertionError("Missing spent-charge failure sound");
-            context.runOnClient(mc->{if(GravityDirectionUtil.getOwnGravityDirection(mc.player)!=Direction.DOWN)throw new AssertionError("Spent Clinging changed gravity after safety return");});
-
-            // Reorientation removes the arbitrary-turn budget and the same SOUTH input
-            // now succeeds.
-            world.getServer().runOnServer(server->server.getPlayerList().getPlayers().getFirst().addEffect(new MobEffectInstance(Reorientation.EFFECT,1200)));
-            context.waitFor(mc->mc.player.hasEffect(Reorientation.EFFECT));
-            tapJump(context);
+            context.waitTicks(3);tapJump(context);
             context.waitFor(mc->GravityDirectionUtil.getOwnGravityDirection(mc.player)==Direction.SOUTH);
             world.getServer().runOnServer(server->server.getPlayerList().getPlayers().getFirst().removeAllEffects());
             context.waitFor(mc->GravityDirectionUtil.getOwnGravityDirection(mc.player)==Direction.DOWN);
@@ -107,8 +101,6 @@ public final class ClingingClientGameTest implements FabricClientGameTest {
             world.getServer().runOnServer(server->{var p=server.getPlayerList().getPlayers().getFirst();p.setNoGravity(true);p.setDeltaMovement(Vec3.ZERO);p.removeAllEffects();});
             context.waitFor(mc->GravityDirectionUtil.getOwnGravityDirection(mc.player)==Direction.DOWN);
             if(net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("firstperson")) {
-                // Giant visual fixtures need clearance in every orientation; the
-                // preceding wall would otherwise force the client into crouching.
                 world.getServer().runCommand("fill -30 100 -10 -10 120 10 air");
                 world.getServer().runCommand("tp @a -20 110 0 0 80");
                 world.getServer().runCommand("clear @a");
