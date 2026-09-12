@@ -28,9 +28,9 @@ change direct infusion compatibility.
 
 ### Scale Brews
 
-Scale Brews is **not part of the alpha.8 runtime/support target** while its larger
-shared entity-collision architecture is still under active development. Clinging's
-production sources and compile classpath do not depend on Scale Brews.
+Scale Brews is **not part of the current alpha.9 runtime/support target** while its
+larger shared entity-collision architecture is still under active development.
+Clinging's production sources and compile classpath do not depend on Scale Brews.
 
 The remaining transitional legacy platform integration is isolated behind a
 reflective bridge and a pseudo mixin. Clinging detects the specific legacy API it
@@ -55,12 +55,12 @@ from generic mounted gravity.
 
 ### First Person
 
-The optional client mixin targets First Person 2.7.2. Its contract in alpha.8 is
+The optional client mixin targets First Person 2.7.2. Its current contract is
 narrow: it transforms First Person's existing body offset only for visual frames
 or transitions owned by Clinging: Reoriented. Unrelated Gravity Changer gravity
 retains First Person's ordinary behavior. First Person is not required.
 
-The alpha.8 compatibility lane installs First Person 2.7.2 together with Not Enough
+The compatibility lane installs First Person 2.7.2 together with Not Enough
 Animations 1.12.4 and runs the real client GameTest without Scale Brews. The fixture
 checks an external/unowned gravity baseline, the same frame under Clinging ownership,
 and an additional third-party world-space offset handler. Scale Visual Compat is no
