@@ -1,7 +1,6 @@
 package io.github.r3neer.clingingreoriented;
 
 import net.fabricmc.fabric.api.networking.v1.*;
-import net.minecraft.core.Direction;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -29,10 +28,12 @@ public final class Payloads {
         public static final StreamCodec<RegistryFriendlyByteBuf,Reply> CODEC=StreamCodec.of((b,v)->{b.writeVarLong(v.sequence);b.writeVarInt(v.result);},b->new Reply(b.readVarLong(),b.readVarInt()));
         @Override public Type<Reply> type(){return TYPE;}
     }
-    /** Sent only to the affected player and only for a transition initiated by Clinging. */
-    public record VisualTransition(int direction,long sequence) implements CustomPacketPayload {
-        public static final Type<VisualTransition> TYPE=Payloads.type("visual_transition_v1");
-        public static final StreamCodec<RegistryFriendlyByteBuf,VisualTransition> CODEC=StreamCodec.of((b,v)->{b.writeVarInt(v.direction);b.writeVarLong(v.sequence);},b->new VisualTransition(b.readVarInt(),b.readVarLong()));
+    /** Sent only to the affected player for a transition initiated by Clinging/Reorientation. */
+    public record VisualTransition(int direction,float yawDelta,int kind,long sequence) implements CustomPacketPayload {
+        public static final Type<VisualTransition> TYPE=Payloads.type("visual_transition_v2");
+        public static final StreamCodec<RegistryFriendlyByteBuf,VisualTransition> CODEC=StreamCodec.of(
+            (b,v)->{b.writeVarInt(v.direction);b.writeFloat(v.yawDelta);b.writeVarInt(v.kind);b.writeVarLong(v.sequence);},
+            b->new VisualTransition(b.readVarInt(),b.readFloat(),b.readVarInt(),b.readVarLong()));
         @Override public Type<VisualTransition> type(){return TYPE;}
     }
     public record State(int player,int direction,boolean owned,boolean visualOwned,int support,java.util.UUID supportUuid,int revision) implements CustomPacketPayload {
@@ -63,9 +64,10 @@ public final class Payloads {
             ServerPlayNetworking.send(p,new Reply(request.sequence,result.ordinal()));
         });
     }
-    public static void visual(ServerPlayer p,Direction direction){
+    public static void visual(ServerPlayer p,GravityTransition.Plan plan){
         var s=ClingingReoriented.data(p);long sequence=++s.visualSequence;
-        if(ServerPlayNetworking.canSend(p,VisualTransition.TYPE))ServerPlayNetworking.send(p,new VisualTransition(direction.get3DDataValue(),sequence));
+        if(ServerPlayNetworking.canSend(p,VisualTransition.TYPE))ServerPlayNetworking.send(p,new VisualTransition(
+            plan.target().get3DDataValue(),plan.yawDelta(),plan.kind().ordinal(),sequence));
     }
     public static void sendState(ServerPlayer p,ServerPlayer recipient) {
         if(!ServerPlayNetworking.canSend(recipient,State.TYPE)) return;
