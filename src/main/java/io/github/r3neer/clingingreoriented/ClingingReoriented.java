@@ -15,6 +15,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.PositionMoveRotation;
@@ -87,25 +88,27 @@ public final class ClingingReoriented implements ModInitializer {
         reconcile(p);
         var s = data(p);
         if (!hasEffect(p) || !p.isAlive() || p.isSpectator() || p.isSleeping() || p.isFallFlying() || p.getAbilities().flying || anchor(p) || s.retirementPending) return Result.BLOCKED;
+        if(worldLook==null || !Double.isFinite(worldLook.x+worldLook.y+worldLook.z) || worldLook.lengthSqr()<1.0E-10D)return Result.AMBIGUOUS;
+        worldLook=worldLook.normalize();
         if(p.isPassenger())return MountedGravity.attempt(p,worldLook);
         if(!GravityInput.available(p))return Result.BLOCKED;
         var attr = p.getAttribute(ModAttributes.GRAVITY_DIRECTION);
         if (attr == null || !attr.getModifiers().isEmpty() || (!s.owned && GravityDirectionUtil.getOwnGravityDirection(p) != Direction.DOWN)) return Result.FOREIGN_GRAVITY;
+        Direction previous=GravityDirectionUtil.getGravityDirection(p);
         Direction direction=LookDirection.select(worldLook);
         if (direction==null) return Result.AMBIGUOUS;
-        if (direction==GravityDirectionUtil.getGravityDirection(p)) return Result.UNCHANGED;
-        // Clinging grants one arbitrary airborne turn, but a spent charge may always return
-        // to vanilla DOWN as a safety exit. The charge stays spent until a real landing.
-        if (s.airChangeUsed && !p.hasEffect(Reorientation.EFFECT) && direction!=Direction.DOWN) return Result.AIR_CHANGE_USED;
+        if (direction==previous) return Result.UNCHANGED;
+        if (s.airChangeUsed && !p.hasEffect(Reorientation.EFFECT)) return Result.AIR_CHANGE_USED;
         TurnPlacement placement=findTurnPlacement(p,direction);
         if (placement==null) return Result.NO_SPACE;
+        GravityTransition.Plan transition=GravityTransition.plan(previous,direction,p.getYRot(),p.getXRot());
         boolean airborne=!AirChanges.grounded(p);
-        Payloads.visual(p,direction);
-        write(p, direction, placement.position());
+        Payloads.visual(p,transition);
+        writeTransition(p,direction,placement.position(),transition);
         if(airborne)s.airChangeUsed=true;
         s.owned = true; s.visualFrameOwned=true; s.selected = direction; s.unbind();
         ScaleBridge.clear(p);
-        p.setOnGround(false); p.verticalCollision=false; p.verticalCollisionBelow=false; p.horizontalCollision=false;
+        p.setOnGround(false); p.verticalCollision=false;p.verticalCollisionBelow=false;p.horizontalCollision=false;
         Payloads.publish(p);
         GravityBreadcrumbs.record(p,direction);
         return Result.SUCCESS;
@@ -152,6 +155,24 @@ public final class ClingingReoriented implements ModInitializer {
             p.setBoundingBox(RotationUtil.makeBoxFromDimensions(p.getDimensions(p.getPose()), direction, position));
         } finally { WRITING.set(old); }
     }
+    static void applyYaw(ServerPlayer p,GravityTransition.Plan transition){
+        float next=Mth.wrapDegrees(p.getYRot()+transition.yawDelta());
+        p.setYRot(next);p.yRotO=next;
+    }
+    private static void writeTransition(ServerPlayer p,Direction direction,Vec3 position,GravityTransition.Plan transition){
+        boolean old=WRITING.get();WRITING.set(true);
+        try{
+            GravityDirectionUtil.setGravityDirection(p,direction);
+            applyYaw(p,transition);
+            var attribute=p.getAttribute(ModAttributes.GRAVITY_DIRECTION);
+            if(attribute!=null){
+                p.connection.send(new ClientboundUpdateAttributesPacket(p.getId(),List.of(attribute)));
+                if(position.distanceToSqr(p.position())>1.0E-12)
+                    p.connection.teleport(new PositionMoveRotation(position,p.getDeltaMovement(),p.getYRot(),p.getXRot()),Set.of());
+            }
+            p.setBoundingBox(RotationUtil.makeBoxFromDimensions(p.getDimensions(p.getPose()),direction,position));
+        }finally{WRITING.set(old);}
+    }
     public static void externalWrite(Player p, Direction direction) {
         if (WRITING.get() || p.level().isClientSide()) return;
         var s = data(p);
@@ -183,15 +204,22 @@ public final class ClingingReoriented implements ModInitializer {
     }
     /** Forced cleanup is local and bounded; voluntary selection never calls this search. */
     public static boolean retire(ServerPlayer p) {
+        Direction previous=GravityDirectionUtil.getGravityDirection(p);
+        if(previous==Direction.DOWN)return true;
+        GravityTransition.Plan transition=GravityTransition.plan(previous,Direction.DOWN,p.getYRot(),p.getXRot());
         Vec3 origin=p.position();
         var dimensions=p.getDimensions(p.getPose());
-        if (fits(p, RotationUtil.makeBoxFromDimensions(dimensions, Direction.DOWN, origin), null)) { Payloads.visual(p,Direction.DOWN);write(p,Direction.DOWN); return true; }
+        if (fits(p, RotationUtil.makeBoxFromDimensions(dimensions, Direction.DOWN, origin), null)) {
+            Payloads.visual(p,transition);writeTransition(p,Direction.DOWN,origin,transition);return true;
+        }
         double maxDistanceSqr=RETIREMENT_RADIUS*RETIREMENT_RADIUS+1.0E-9;
         for (int radius=1; radius<=8; radius++) for (int y=-radius; y<=radius; y++) for(int x=-radius;x<=radius;x++) for(int z=-radius;z<=radius;z++) {
             if (Math.max(Math.abs(x),Math.max(Math.abs(y),Math.abs(z))) != radius) continue;
             Vec3 target=origin.add(x*.5,y*.5,z*.5);
             if(target.distanceToSqr(origin)>maxDistanceSqr)continue;
-            if (fits(p,RotationUtil.makeBoxFromDimensions(dimensions,Direction.DOWN,target),null)) { Payloads.visual(p,Direction.DOWN);write(p,Direction.DOWN); p.teleportTo(target.x,target.y,target.z); return true; }
+            if (fits(p,RotationUtil.makeBoxFromDimensions(dimensions,Direction.DOWN,target),null)) {
+                Payloads.visual(p,transition);writeTransition(p,Direction.DOWN,target,transition);return true;
+            }
         }
         return false;
     }
