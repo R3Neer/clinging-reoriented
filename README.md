@@ -16,15 +16,18 @@ nearest world-cardinal direction to your view.
 
 ## Two ways to turn
 
-- **Clinging** grants one successful gravity turn per airborne stretch. Landing
-  on your local floor restores the charge.
+- **Clinging** grants one arbitrary gravity turn per airborne stretch. Landing
+  on your local floor restores the charge. After spending it, you may still choose
+  **DOWN** as a safety return, but the charge remains spent until a real landing.
 - **Reorientation** grants unlimited airborne turns. Brew it by adding a
   **shulker shell** to a Clinging potion. Extended, splash and lingering forms
   retain the ordinary brewing routes.
 
-A valid turn preserves position and world momentum. It is rejected when the
-rotated collision box would be obstructed, the chosen direction is unchanged,
-or another mechanic owns the input. Holding Space never repeats a turn.
+A valid turn preserves world momentum and the physical body's world-space center
+when a feet-pivot rotation would otherwise clip the floor or wall being left behind.
+It is still rejected when the rotated body is genuinely obstructed, the chosen
+direction is unchanged, or another mechanic owns the input. Holding Space never
+repeats a turn.
 
 Usable Elytra always take priority: Space deploys the Elytra instead of changing
 gravity, and no turns are accepted while gliding. Gravity Changer remains the
@@ -35,6 +38,8 @@ owner of acceleration, movement, jumping, collisions and camera rotation.
 - Jump into open air, look toward a wall and press Space again.
 - Land sideways, jump relative to your new floor and spend Clinging's restored
   charge.
+- After spending Clinging's airborne turn, look back toward DOWN to use the safety
+  return without receiving another arbitrary turn.
 - Brew Reorientation and cross a room without agreeing on which way is down.
 - Give a tamed animal its own gravity effect and let it replay turns along the
   route where it follows you.
@@ -78,11 +83,11 @@ versions on every multiplayer participant. See the
   remains deliberately excluded from its villager-trade economy.
 - **First Person** is optional. Clinging scopes its body-offset correction to
   Clinging-owned visual frames/transitions instead of becoming a global
-  Gravity Changer patch. Alpha.8 CI exercises First Person 2.7.2 in a separate
+  Gravity Changer patch. CI exercises First Person 2.7.2 in a separate
   real-client lane.
 
 Scale Brews is under active architectural development and is **not part of the
-alpha.8 runtime/support target**. Clinging's mounted-gravity contract is generic:
+current runtime/support target**. Clinging's mounted-gravity contract is generic:
 a Tiny Mount is just a living root vehicle. Scale is responsible for making its
 own flight/glide/pounce mechanics honor that root's gravity when Scale is ready.
 Optional legacy Scale integration is discovered reflectively and disables itself
@@ -94,7 +99,7 @@ The first client launch creates `config/clinging-reoriented-client.json`:
 
 ```json
 {
-  "cameraRotationSeconds": 1.0
+  "cameraRotationSeconds": 0.25
 }
 ```
 
@@ -106,18 +111,20 @@ See [configuration](docs/CONFIGURATION.md).
 
 ## Project status
 
-**0.1.0-alpha.8** is a documentation-sync prerelease of the alpha.7 hardening
-implementation. It intentionally makes no gameplay behavior changes relative to
-alpha.7; current main additionally removes the transitional compile-time dependency
-on optional Scale Brews without changing Clinging's base gameplay contract.
+**0.1.0-alpha.9** is the current development version on `main`. It keeps the
+alpha.7/alpha.8 ownership and recovery hardening, removes the transitional
+compile-time dependency on optional Scale Brews, shortens Clinging-owned camera
+transitions to 0.25 seconds by default, adds a DOWN safety return for spent Clinging
+and fixes false `NO_SPACE` rejections caused only by rotating around the old feet
+pivot beside an otherwise clear floor or wall.
 
-The release validation covers **42 dedicated server GameTests**, 10 JUnit tests,
-the real default client GameTest suites and a separate real-client First Person
-2.7.2 lane, all without loading optional Scale Brews at runtime. The adversarial
-coverage includes bounded retirement/retry, external mob-gravity ownership, atomic
-passenger recovery and stale/replayed moving-surface references. Full-pack human
-playtesting, dedicated multiplayer latency and long pet routes remain manual checks;
-automated success is not presented as human gameplay QA.
+CI covers dedicated server GameTests, JUnit tests, the real default client suites,
+a separate real-client First Person 2.7.2 lane and optional Scale Brews runtime
+compatibility lanes. The adversarial coverage includes bounded retirement/retry,
+external mob-gravity ownership, atomic passenger recovery, stale/replayed moving-
+surface references and genuine obstruction rejection. Full-pack human playtesting,
+dedicated multiplayer latency and long pet routes remain manual checks; automated
+success is not presented as human gameplay QA.
 
 ## Build and contribute
 
