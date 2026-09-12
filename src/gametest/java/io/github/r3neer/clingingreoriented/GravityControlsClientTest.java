@@ -54,11 +54,10 @@ public final class GravityControlsClientTest implements FabricClientGameTest {
     private static void checkSnapOwnership(ClientGameTestContext c){
         c.runOnClient(mc->{
             try {
-                var target=RotationUtil.getEntityRotationQuaternion(Direction.EAST);
-
+                var eastTarget=RotationUtil.getEntityRotationQuaternion(Direction.EAST);
                 var unrelated=new GravityRotationAnimation();
                 unrelated.forceSet(Direction.DOWN,0);unrelated.getRotation(Direction.EAST,0);
-                if(Math.abs(unrelated.getRotation(Direction.EAST,1_250_000_000L).dot(target))<.99999f)
+                if(Math.abs(unrelated.getRotation(Direction.EAST,1_250_000_000L).dot(eastTarget))<.99999f)
                     throw new AssertionError("Unowned Gravity Changer transition did not retain upstream 1.25 s timing");
 
                 var owned=animation(mc.player);
@@ -73,19 +72,30 @@ public final class GravityControlsClientTest implements FabricClientGameTest {
                 float headDelta=Mth.wrapDegrees(mc.player.yHeadRot-originalYaw);
                 float headOldDelta=Mth.wrapDegrees(mc.player.yHeadRotO-originalYawOld);
 
-                var plan=GravityTransition.plan(Direction.DOWN,Direction.EAST,originalYaw,originalPitch);
+                var plan=GravityTransition.plan(Direction.DOWN,Direction.EAST,GravityTransition.headingFromYaw(Direction.DOWN,originalYaw));
                 VisualTransitions.begin(mc.player,Direction.EAST,plan.yawDelta(),plan.kind().ordinal(),1);
                 if(Math.abs(Mth.wrapDegrees(mc.player.yBodyRot-mc.player.getYRot())-bodyDelta)>1e-4f
                     ||Math.abs(Mth.wrapDegrees(mc.player.yBodyRotO-mc.player.yRotO)-bodyOldDelta)>1e-4f
                     ||Math.abs(Mth.wrapDegrees(mc.player.yHeadRot-mc.player.getYRot())-headDelta)>1e-4f
                     ||Math.abs(Mth.wrapDegrees(mc.player.yHeadRotO-mc.player.yRotO)-headOldDelta)>1e-4f)
                     throw new AssertionError("Yaw gauge change altered relative body/head pose");
-
                 var start=owned.getRotation(Direction.EAST,0);
-                if(Math.abs(start.dot(target))>.999f)throw new AssertionError("Clinging snap began at its target instead of a compensated start frame");
-                if(Math.abs(owned.getRotation(Direction.EAST,GravityTransition.QUARTER_TURN_NANOS).dot(target))<.99999f)
-                    throw new AssertionError("Clinging quarter-turn did not finish at fixed 120 ms duration");
-                if(VisualTransitions.owns(owned))throw new AssertionError("Completed snap still owns Gravity Changer animation");
+                if(Math.abs(start.dot(eastTarget))>.999f)throw new AssertionError("Clinging snap began at its target instead of a compensated start frame");
+                if(Math.abs(owned.getRotation(Direction.EAST,120_000_000L).dot(eastTarget))>.99999f)
+                    throw new AssertionError("Quarter-turn became visually complete by old 120 ms timing");
+                if(Math.abs(owned.getRotation(Direction.EAST,GravityTransition.QUARTER_TURN_NANOS).dot(eastTarget))<.99999f)
+                    throw new AssertionError("Clinging quarter-turn did not finish at fixed 180 ms duration");
+                if(VisualTransitions.owns(owned))throw new AssertionError("Completed quarter snap still owns Gravity Changer animation");
+
+                VisualTransitions.clear();owned.forceSet(Direction.DOWN,0);
+                var upTarget=RotationUtil.getEntityRotationQuaternion(Direction.UP);
+                var half=GravityTransition.plan(Direction.DOWN,Direction.UP,GravityTransition.headingFromYaw(Direction.DOWN,mc.player.getYRot()));
+                VisualTransitions.begin(mc.player,Direction.UP,half.yawDelta(),half.kind().ordinal(),2);
+                owned.getRotation(Direction.UP,0);
+                if(Math.abs(owned.getRotation(Direction.UP,180_000_000L).dot(upTarget))>.99999f)
+                    throw new AssertionError("Half-turn became complete by old 180 ms timing");
+                if(Math.abs(owned.getRotation(Direction.UP,GravityTransition.HALF_TURN_NANOS).dot(upTarget))<.99999f)
+                    throw new AssertionError("Clinging half-turn did not finish at fixed 240 ms duration");
 
                 mc.player.setYRot(originalYaw);mc.player.setXRot(originalPitch);mc.player.yRotO=originalYawOld;
                 mc.player.yBodyRot=originalBody;mc.player.yBodyRotO=originalBodyOld;
