@@ -1,36 +1,37 @@
 package io.github.r3neer.clingingreoriented;
 
-import com.moigferdsrte.gravitychanger.util.GravityDirectionUtil;
-import com.moigferdsrte.gravitychanger.util.RotationUtil;
 import com.moigferdsrte.gravitychanger.init.ModAttributes;
 import com.moigferdsrte.gravitychanger.item.GravityAnchorItem;
+import com.moigferdsrte.gravitychanger.util.GravityDirectionUtil;
+import com.moigferdsrte.gravitychanger.util.RotationUtil;
 import io.github.r3neer.clingingreoriented.geometry.LookDirection;
+import java.util.List;
+import java.util.Set;
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
-import net.fabricmc.fabric.api.networking.v1.EntityTrackingEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
-import net.minecraft.core.Direction;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.networking.v1.EntityTrackingEvents;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.protocol.game.ClientboundUpdateAttributesPacket;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.PositionMoveRotation;
 import net.minecraft.world.entity.Relative;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.phys.*;
-import net.minecraft.network.protocol.game.ClientboundUpdateAttributesPacket;
-import java.util.List;
-import java.util.Set;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 public final class ClingingReoriented implements ModInitializer {
     public static final String ID = "clinging_reoriented";
     private static final double RETIREMENT_RADIUS = 4.0;
     private static final ThreadLocal<Boolean> WRITING = ThreadLocal.withInitial(() -> false);
     private record TurnPlacement(Vec3 position,AABB box) {}
+
     public static PlayerData data(Player p) { return ((PlayerData.Holder)p).clinging$data(); }
     public static boolean hasEffect(LivingEntity p) { return p.hasEffect(Reorientation.EFFECT) || BuiltInRegistries.MOB_EFFECT.get(Identifier.fromNamespaceAndPath("alexsmobs", "clinging")).map(p::hasEffect).orElse(false); }
     public static boolean anchor(Player p) { return p.getMainHandItem().getItem() instanceof GravityAnchorItem || p.getOffhandItem().getItem() instanceof GravityAnchorItem; }
@@ -52,6 +53,7 @@ public final class ClingingReoriented implements ModInitializer {
         var s=data(p);boolean next=s.owned||mountedVisualOwned(p);
         if(s.visualFrameOwned!=next){s.visualFrameOwned=next;Payloads.publish(p);}
     }
+
     @Override public void onInitialize() {
         AnatomyBridge.initialize();
         Reorientation.initialize();
@@ -76,13 +78,13 @@ public final class ClingingReoriented implements ModInitializer {
                 next.anchorBorrowed = old.anchorBorrowed; next.anchorExpired = old.anchorExpired;
                 next.visualFrameOwned=old.visualFrameOwned;
             } else if(data(oldPlayer).owned || data(oldPlayer).ownedAtDeath || data(oldPlayer).anchorBorrowed) {
-                // Vanilla restoreFrom copies base attributes even on death.
                 write(newPlayer,Direction.DOWN);
             }
         });
         ServerPlayerEvents.AFTER_RESPAWN.register((oldPlayer,newPlayer,alive)->Payloads.publish(newPlayer));
         EntityTrackingEvents.START_TRACKING.register((entity, observer) -> { if (entity instanceof ServerPlayer p) Payloads.sendState(p, observer); });
     }
+
     public enum Result { SUCCESS, NO_SURFACE, AMBIGUOUS, NO_SPACE, BLOCKED, FOREIGN_GRAVITY, UNCHANGED, AIR_CHANGE_USED, MOUNT_ACTION }
     public static Result attempt(ServerPlayer p) { return attempt(p, p.getLookAngle()); }
     public static Result attempt(ServerPlayer p, Vec3 worldLook) {
@@ -114,6 +116,7 @@ public final class ClingingReoriented implements ModInitializer {
         GravityBreadcrumbs.record(p,direction);
         return Result.SUCCESS;
     }
+
     private static TurnPlacement findTurnPlacement(Player p,Direction direction){
         var dimensions=p.getDimensions(p.getPose());
         Vec3 current=p.position();
@@ -124,6 +127,7 @@ public final class ClingingReoriented implements ModInitializer {
         AABB centeredBox=RotationUtil.makeBoxFromDimensions(dimensions,direction,centered);
         return fits(p,centeredBox,null)?new TurnPlacement(centered,centeredBox):null;
     }
+
     public static boolean fits(Player p, AABB box, Entity selected) {
         if (!Double.isFinite(box.minX+box.minY+box.minZ+box.maxX+box.maxY+box.maxZ) || box.getXsize() <= 0 || box.getYsize() <= 0 || box.getZsize() <= 0) return false;
         if (box.minY < p.level().getMinY() || box.maxY > p.level().getMaxY()+1 || !p.level().getWorldBorder().isWithinBounds(box)) return false;
@@ -137,6 +141,7 @@ public final class ClingingReoriented implements ModInitializer {
         }
         return p.level().noCollision(p, interior);
     }
+
     public static void write(Player p, Direction direction) { write(p,direction,p.position()); }
     public static void write(Player p, Direction direction,Vec3 position) {
         boolean old = WRITING.get(); WRITING.set(true);
@@ -151,10 +156,11 @@ public final class ClingingReoriented implements ModInitializer {
             p.setBoundingBox(RotationUtil.makeBoxFromDimensions(p.getDimensions(p.getPose()), direction, position));
         } finally { WRITING.set(old); }
     }
+
     static void applyYaw(ServerPlayer p,GravityTransition.Plan transition){
-        float next=Mth.wrapDegrees(p.getYRot()+transition.yawDelta());
-        p.setYRot(next);p.yRotO=next;
+        GravityTransition.applyYawGauge(p,transition.yawDelta());
     }
+
     private static void writeTransition(ServerPlayer p,Direction direction,Vec3 position,GravityTransition.Plan transition){
         boolean old=WRITING.get();WRITING.set(true);
         try{
@@ -164,20 +170,19 @@ public final class ClingingReoriented implements ModInitializer {
             if(attribute!=null){
                 p.connection.send(new ClientboundUpdateAttributesPacket(p.getId(),List.of(attribute)));
                 if(position.distanceToSqr(p.position())>1.0E-12)
-                    // Position must be authoritative, but rotation is already transported by
-                    // visual_transition_v2. Relative zero keeps any mouse input made after
-                    // the request instead of restoring a stale absolute yaw/pitch.
                     p.connection.teleport(new PositionMoveRotation(position,p.getDeltaMovement(),0.0F,0.0F),Set.of(Relative.Y_ROT,Relative.X_ROT));
             }
             p.setBoundingBox(RotationUtil.makeBoxFromDimensions(p.getDimensions(p.getPose()),direction,position));
         }finally{WRITING.set(old);}
     }
+
     public static void externalWrite(Player p, Direction direction) {
         if (WRITING.get() || p.level().isClientSide()) return;
         var s = data(p);
         if (s.anchorBorrowed && anchor(p)) return;
         if (s.owned) { s.owned=false; s.visualFrameOwned=false; s.retirementPending=false; s.unbind(); if (p instanceof ServerPlayer sp) Payloads.publish(sp); }
     }
+
     public static void reconcile(ServerPlayer p) {
         var s=data(p);
         MountedGravity.refresh(p);
@@ -201,6 +206,7 @@ public final class ClingingReoriented implements ModInitializer {
             s.owned=false; s.visualFrameOwned=false; s.retirementPending=false; Payloads.publish(p);
         }
     }
+
     public static boolean retire(ServerPlayer p) {
         Direction previous=GravityDirectionUtil.getGravityDirection(p);
         if(previous==Direction.DOWN)return true;
