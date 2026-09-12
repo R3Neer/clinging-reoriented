@@ -78,15 +78,19 @@ public final class ClingingClientGameTest implements FabricClientGameTest {
             context.takeScreenshot("clinging-restored-down");
 
             // Real client integration: jump, choose a wall five blocks away, fall,
-            // land and jump away. Unlike the input-only fixture, gravity is enabled.
+            // land and jump away. This fixture starts from its own clean airborne-turn
+            // budget; landing/jump charge restoration is covered independently on the
+            // server and must not make this camera/physics scenario timing-dependent.
             world.getServer().runOnServer(server->{
                 var level=server.overworld();var p=server.getPlayerList().getPlayers().getFirst();
                 for(var pos:BlockPos.betweenClosed(new BlockPos(-5,79,-5),new BlockPos(6,96,5)))level.setBlockAndUpdate(pos,pos.getY()==79 || pos.getX()==6?Blocks.STONE.defaultBlockState():Blocks.AIR.defaultBlockState());
                 p.teleport(new TeleportTransition(level,new Vec3(1,80,.5),Vec3.ZERO,-90,0,TeleportTransition.DO_NOTHING));
                 p.setNoGravity(false);p.setDeltaMovement(Vec3.ZERO);
                 p.addEffect(new MobEffectInstance(BuiltInRegistries.MOB_EFFECT.get(Identifier.parse("alexsmobs:clinging")).orElseThrow(),1200));
+                ClingingReoriented.data(p).airChangeUsed=false;
             });
             context.waitFor(mc->mc.player.onGround() && Math.abs(mc.player.getX()-1)<.1 && ClingingReoriented.hasEffect(mc.player));
+            context.waitTicks(3);
             context.getInput().holdKey(options->options.keyJump);
             context.waitFor(mc->mc.player.getY()>80.65);
             context.getInput().releaseKey(options->options.keyJump);context.waitTicks(2);
