@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory;
 
 /** Client-only visual timing. Read once at startup, never from the render loop. */
 public final class CameraConfig {
-    public static final double DEFAULT_SECONDS = 1.0;
+    public static final double DEFAULT_SECONDS = 0.25;
     private static double seconds = DEFAULT_SECONDS;
     public static Path path() { return FabricLoader.getInstance().getConfigDir().resolve("clinging-reoriented-client.json"); }
     public static double durationNanos() { return seconds * 1_000_000_000.0; }
