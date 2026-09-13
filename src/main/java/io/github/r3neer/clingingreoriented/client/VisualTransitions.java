@@ -6,6 +6,7 @@ import com.moigferdsrte.gravitychanger.util.RotationUtil;
 import io.github.r3neer.clingingreoriented.ClingingReoriented;
 import io.github.r3neer.clingingreoriented.GravityTransition;
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -81,7 +82,23 @@ public final class VisualTransitions {
 
     public static boolean owns(GravityRotationAnimation animation){if(animation==null)return false;synchronized(ACTIVE){return ACTIVE.containsKey(animation);}}
     public static boolean owns(Entity entity){GravityRotationAnimation animation=animation(entity);return animation!=null&&owns(animation);}
-    public static void tick(Entity local){if(local==null)return;GravityRotationAnimation animation=animation(local);if(animation!=null&&owns(animation))animation.getRotation(GravityDirectionUtil.getGravityDirection(local),System.nanoTime());}
+
+    /**
+     * Advance every Clinging-owned animation once per client tick, including tracked
+     * entities that are currently outside the renderer/frustum. Presentation time is
+     * tied to the gravity event, not to the first later frame in which the entity is drawn.
+     */
+    public static void tickAll(){
+        java.util.List<Map.Entry<GravityRotationAnimation,Active>> snapshot;
+        synchronized(ACTIVE){snapshot=new ArrayList<>(ACTIVE.entrySet());}
+        long now=System.nanoTime();
+        for(var entry:snapshot){
+            var animation=entry.getKey();var active=entry.getValue();var entity=active.entity();
+            if(animation==null||entity==null||entity.isRemoved()){if(animation!=null)clear(animation);continue;}
+            animation.getRotation(GravityDirectionUtil.getGravityDirection(entity),now);
+        }
+    }
+
     public static Quaternionf current(Entity entity){GravityRotationAnimation animation=animation(entity);return animation==null?RotationUtil.getEntityRotationQuaternion(GravityDirectionUtil.getGravityDirection(entity)):animation.getRotation(GravityDirectionUtil.getGravityDirection(entity),System.nanoTime());}
     public static void clear(){synchronized(ACTIVE){ACTIVE.clear();}synchronized(LATEST_ENTITY_SEQUENCE){LATEST_ENTITY_SEQUENCE.clear();}latestSequence=-1;}
     private static void clear(GravityRotationAnimation animation){synchronized(ACTIVE){ACTIVE.remove(animation);}}
