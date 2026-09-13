@@ -11,7 +11,13 @@
       "io.github.r3neer.clingingreoriented.AnimalGravityTests",
       "io.github.r3neer.clingingreoriented.HardeningAdversarialTests",
       "io.github.r3neer.clingingreoriented.WaterClingingGameTests",
-      "io.github.r3neer.clingingreoriented.EntitySnapGameTests"
+      "io.github.r3neer.clingingreoriented.EntitySnapGameTests",
+      "io.github.r3neer.clingingreoriented.GravityInputGameTests",
+      "io.github.r3neer.clingingreoriented.GravityPolishGameTests",
+      "io.github.r3neer.clingingreoriented.LandingSurfaceApiGameTests",
+      "io.github.r3neer.clingingreoriented.ImpactGameTests",
+      "io.github.r3neer.clingingreoriented.LandingStateGameTests",
+      "io.github.r3neer.clingingreoriented.GravityFallStateGameTests"
     ],
     "fabric-client-gametest": [
       "io.github.r3neer.clingingreoriented.ClingingClientGameTest",
