@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.1.0-alpha.12] - 2026-09-13
+
 ### Underwater controls
 
 - Keep Vanilla Space-to-ascend behavior intact in water: single presses and held
@@ -21,14 +23,59 @@
   face: body/side contact does not count, while actually standing on a seabed/floor
   block does.
 
+### Sprint-jump and stronger jumps
+
+- Scale the near-landing sprint-jump reservation with effective jump power instead
+  of using a fixed one-tick prediction for every jump.
+- Preserve alpha.11 exactly at normal `0.42` jump power, then widen the prediction
+  proportionally through `JUMP_STRENGTH` plus Vanilla Jump Boost power, capped at
+  **three ticks**.
+- Predict the complete gravity-relative swept AABB over the selected horizon, while
+  retaining the existing sprinting, airborne, descending and real-support gates.
+- Keep ascending players and players without imminent support available to
+  Clinging/Reorientation even with strong Jump Boost/Leaping-style modifiers.
+
+### Mount and pet snap presentation
+
+- Give Clinging-owned mount and pet gravity changes the same **180 ms quarter-turn /
+  240 ms half-turn quadratic snap** used by players instead of exposing Gravity
+  Changer's generic canonical interpolation.
+- Add tracked-entity visual ownership with exact entity ID+UUID resolution,
+  per-entity monotonic sequences, tracking-recipient delivery and explicit passenger
+  delivery.
+- Transport the mob's server body/head yaw through the same physical turn rather
+  than applying a client-only cosmetic rotation.
+- Make mounted hierarchies share one physical rotation. For opposite turns the
+  rider's navigation heading chooses the common 180-degree axis; the root mount's
+  own heading is rebased through that axis to derive its own yaw gauge.
+- Let standalone pet replay derive the turn from the pet's own heading, and apply
+  the same owned presentation to mob restoration/retirement.
+- Keep same-direction writes inert and unrelated Gravity Changer changes entirely
+  outside Clinging visual ownership.
+- Advance active tracked-entity snaps each client tick even while the mob is
+  off-screen, preventing an old 180/240 ms transition from replaying only when the
+  entity later re-enters the renderer.
+
 ### Validation
 
-- Add pure detector tests for edge timing, release, expiry, pair consumption and
-  context reset.
-- Add a real-client water fixture proving single/held Space ascends without requests,
-  double Space turns exactly once, repeated Reorientation pairs work, and a rejected
-  spent-Clinging double tap still preserves Vanilla ascent.
+- Add pure detector tests for underwater edge timing, release, expiry, pair
+  consumption and context reset.
+- Add a real-client water fixture proving single/held Space ascends without
+  requests, double Space turns exactly once, repeated Reorientation pairs work, and
+  a rejected spent-Clinging double tap still preserves Vanilla ascent.
 - Add server GameTests for water/side-contact non-recharge and seabed recharge.
+- Add jump-power GameTests for normal baseline, Jump Boost I/II monotonicity,
+  boosted-only near-landing reservation, ascending/no-support cases, sideways
+  gravity, gravity-strength interaction and the three-tick cap.
+- Add geometry tests for rebasing multiple entity headings through one chosen
+  physical quarter/half-turn plan.
+- Add server tests proving successful pet/mounted owned turns publish exactly one
+  visual epoch after preflight, same-direction/failed turns do not mutate visual
+  state, mounted half-turns share the rider-selected axis, and foreign Gravity
+  Changer writes remain foreign.
+- Add focused real-client coverage for non-player snap enrollment, canonical
+  completion even while the entity is not rendered, and the foreign-transition
+  ownership boundary.
 
 ## [0.1.0-alpha.11] - 2026-09-13
 
