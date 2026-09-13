@@ -14,9 +14,23 @@ public final class ClingingClient implements ClientModInitializer {
     private static long sequence;
     private static final Set<Long> PENDING=new HashSet<>();
     private static final Map<Integer,Payloads.State> STATES=new HashMap<>();
+    private static final WaterDoubleTapDetector WATER_DOUBLE_TAP=new WaterDoubleTapDetector();
+
+    /** Existing airborne/Elytra-adjacent Space path. Water owns single Space presses. */
     public static void press() {
         var mc=Minecraft.getInstance();
-        if(mc.player==null || mc.gui.screen()!=null || mc.gui.overlay()!=null || !mc.isWindowActive() || !ClingingReoriented.hasEffect(mc.player) || !ClientPlayNetworking.canSend(Payloads.Request.TYPE)) return;
+        if(mc.player!=null && mc.player.isInWater())return;
+        sendRequest(mc);
+    }
+
+    private static void pressWaterDoubleTap(Minecraft mc) {
+        if(mc.player==null || !mc.player.isInWater())return;
+        sendRequest(mc);
+    }
+
+    private static void sendRequest(Minecraft mc) {
+        if(mc.player==null || mc.gui.screen()!=null || mc.gui.overlay()!=null || !mc.isWindowActive() || !mc.player.isAlive()
+            || !ClingingReoriented.hasEffect(mc.player) || !ClientPlayNetworking.canSend(Payloads.Request.TYPE)) return;
         if(!GravityInput.available(mc.player))return;
         if(PENDING.size()>=16) return;
         var forward=mc.gameRenderer.mainCamera().rotation().transform(new org.joml.Vector3f(0,0,-1));
@@ -26,6 +40,16 @@ public final class ClingingClient implements ClientModInitializer {
         long id=++sequence; PENDING.add(id);
         ClientPlayNetworking.send(new Payloads.Request(id,ClingingReoriented.data(mc.player).revision,selectionLook,navigationHeading));
     }
+
+    private static void waterInputTick(Minecraft client) {
+        boolean context=client.player!=null && client.player.isAlive() && client.player.isInWater()
+            && client.gui.screen()==null && client.gui.overlay()==null && client.isWindowActive()
+            && ClingingReoriented.hasEffect(client.player) && ClientPlayNetworking.canSend(Payloads.Request.TYPE);
+        boolean jumpDown=client.options.keyJump.isDown();
+        long nowMs=System.nanoTime()/1_000_000L;
+        if(WATER_DOUBLE_TAP.update(context,jumpDown,nowMs))pressWaterDoubleTap(client);
+    }
+
     @Override public void onInitializeClient() {
         net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STARTED.register(client->BeaconPowers.install());
         ClientPlayNetworking.registerGlobalReceiver(Payloads.Reply.TYPE,(reply,context)->{
@@ -44,8 +68,9 @@ public final class ClingingClient implements ClientModInitializer {
             var previous=STATES.get(state.player());
             if(previous==null || state.revision()>=previous.revision()) STATES.put(state.player(),state);
         });
-        ClientPlayConnectionEvents.DISCONNECT.register((handler,client)->{PENDING.clear();STATES.clear();sequence=0;VisualTransitions.clear();});
+        ClientPlayConnectionEvents.DISCONNECT.register((handler,client)->{PENDING.clear();STATES.clear();sequence=0;VisualTransitions.clear();WATER_DOUBLE_TAP.reset();});
         ClientTickEvents.END_CLIENT_TICK.register(client->{
+            waterInputTick(client);
             if(client.level==null) return;
             for(var it=STATES.entrySet().iterator();it.hasNext();) {
                 var snapshot=it.next().getValue();
