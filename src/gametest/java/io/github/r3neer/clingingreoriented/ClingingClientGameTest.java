@@ -55,7 +55,7 @@ public final class ClingingClientGameTest implements FabricClientGameTest {
                 var p=server.getPlayerList().getPlayers().getFirst();
                 return ClingingReoriented.attempt(p,new Vec3(0,-1,0),GravityTransition.headingFromYaw(Direction.EAST,p.getYRot()));
             });
-            if(spentResult!=ClingingReoriented.Result.BLOCKED)throw new AssertionError("Spent Clinging accepted a second airborne turn: "+spentResult);
+            if(spentResult!=ClingingReoriented.Result.AIR_CHANGE_USED)throw new AssertionError("Spent Clinging accepted a second airborne turn: "+spentResult);
             context.runOnClient(mc->{if(GravityDirectionUtil.getOwnGravityDirection(mc.player)!=Direction.EAST)throw new AssertionError("Spent Clinging returned to DOWN voluntarily");});
             boolean stillSpent=world.getServer().computeOnServer(server->ClingingReoriented.data(server.getPlayerList().getPlayers().getFirst()).airChangeUsed);
             if(!stillSpent)throw new AssertionError("Rejected DOWN turn refunded Clinging charge");
