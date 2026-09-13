@@ -20,8 +20,11 @@ public abstract class MovementMixin {
     @Inject(method="move",at=@At("TAIL"))
     private void clinging$contact(MoverType type,Vec3 delta,CallbackInfo ci){
         Entity self=(Entity)(Object)this;
+        // Measure the completed world-space move before any support bookkeeping can alter
+        // contact state. checkFallDamage may already have handled this sequence; the sequence
+        // fence makes this fallback a no-op in that normal path.
+        if(self instanceof LivingEntity living){ImpactDamage.afterMove(living);ImpactState.endMove(living);}
         if(self instanceof Player p)MovingSurface.afterMove(p);
-        if(self instanceof LivingEntity living)ImpactState.endMove(living);
     }
     @Inject(method="checkFallDamage",at=@At("HEAD"),cancellable=true)
     private void clinging$impact(double ya,boolean onGround,BlockState onState,BlockPos pos,CallbackInfo ci){
