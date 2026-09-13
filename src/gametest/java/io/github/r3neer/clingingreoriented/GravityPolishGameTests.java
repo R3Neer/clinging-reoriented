@@ -36,40 +36,44 @@ public final class GravityPolishGameTests {
     }
 
     @GameTest(padding=24)
-    public void successfulPlayerTurnStartsNewFallSegmentButUnchangedDoesNot(GameTestHelper h){
+    public void successfulPlayerTurnPreservesWorldMomentumAndDoesNotSegmentFallHistory(GameTestHelper h){
         var p=h.makeMockServerPlayerInLevel();p.snapTo(h.absoluteVec(new Vec3(5,10,5)));clear(h,p.blockPosition(),6);
-        p.addEffect(new MobEffectInstance(Reorientation.EFFECT,400));p.setOnGround(false);p.setNoGravity(true);p.setDeltaMovement(Vec3.ZERO);
-        p.fallDistance=13.0F;
+        p.addEffect(new MobEffectInstance(Reorientation.EFFECT,400));p.setOnGround(false);p.setNoGravity(true);
+        Vec3 momentum=new Vec3(.31,-.74,.22);p.setDeltaMovement(momentum);p.fallDistance=13.0F;
         var heading=GravityTransition.headingFromYaw(Direction.DOWN,p.getYRot());
         var result=ClingingReoriented.attempt(p,new Vec3(1,0,0),heading);
         h.assertTrue(result==ClingingReoriented.Result.SUCCESS,"successful turn fixture: "+result);
         h.assertTrue(GravityDirectionUtil.getGravityDirection(p)==Direction.EAST,"fixture changed gravity");
-        h.assertTrue(p.fallDistance==0.0F,"successful gravity change resets vanilla fall distance");
+        assertVec(h,momentum,p.getDeltaMovement(),1.0E-12,"gravity change preserves world momentum exactly");
+        h.assertTrue(p.fallDistance==13.0F,"gravity change no longer resets vanilla fall history as a segmentation hack");
 
         p.fallDistance=7.0F;
         var unchanged=ClingingReoriented.attempt(p,new Vec3(1,0,0),GravityTransition.headingFromYaw(Direction.EAST,p.getYRot()));
         h.assertTrue(unchanged==ClingingReoriented.Result.UNCHANGED,"same direction is unchanged: "+unchanged);
-        h.assertTrue(p.fallDistance==7.0F,"unchanged turn must not reset fall distance");
+        h.assertTrue(p.fallDistance==7.0F,"unchanged turn also leaves fall history untouched");
         h.succeed();
     }
 
     @GameTest(padding=24)
-    public void mobAndMountedRootDirectionChangesStartNewFallSegments(GameTestHelper h){
+    public void mobAndMountedRootDirectionChangesPreserveMomentumAndFallHistory(GameTestHelper h){
         var wolf=h.spawn(EntityTypes.WOLF,new BlockPos(5,10,5));wolf.setNoAi(true);clear(h,wolf.blockPosition(),6);
-        wolf.fallDistance=11.0F;
+        Vec3 wolfMomentum=new Vec3(.2,-.6,.3);wolf.setDeltaMovement(wolfMomentum);wolf.fallDistance=11.0F;
         h.assertTrue(MobGravity.turn(wolf,Direction.EAST,false),"direct owned-style mob turn succeeds");
-        h.assertTrue(wolf.fallDistance==0.0F,"mob direction change resets fall distance");
+        assertVec(h,wolfMomentum,wolf.getDeltaMovement(),1.0E-12,"mob turn preserves world momentum");
+        h.assertTrue(wolf.fallDistance==11.0F,"mob direction change no longer segments fallDistance");
         wolf.fallDistance=6.0F;
         h.assertTrue(MobGravity.turn(wolf,Direction.EAST,false),"same-frame mob commit remains valid");
-        h.assertTrue(wolf.fallDistance==6.0F,"same mob gravity does not reset fall distance");
+        h.assertTrue(wolf.fallDistance==6.0F,"same mob gravity leaves fall history untouched");
 
         var horse=h.spawn(EntityTypes.HORSE,new BlockPos(10,10,5));horse.setNoAi(true);clear(h,horse.blockPosition(),5);
         var rider=h.makeMockServerPlayerInLevel();rider.snapTo(horse.position());
         h.assertTrue(rider.startRiding(horse,true,true),"rider attaches to mounted-root fixture");
+        Vec3 horseMomentum=new Vec3(.15,-.55,-.2);horse.setDeltaMovement(horseMomentum);
         horse.fallDistance=15.0F;rider.fallDistance=9.0F;horse.setOnGround(false);
         h.assertTrue(MobGravity.borrow(horse,Direction.NORTH),"mounted-root borrow succeeds");
-        h.assertTrue(horse.fallDistance==0.0F,"mounted/root gravity change resets root fall distance");
-        h.assertTrue(rider.fallDistance==0.0F,"mounted/root gravity change resets affected player passenger fall distance");
+        assertVec(h,horseMomentum,horse.getDeltaMovement(),1.0E-12,"mounted root keeps world momentum through gravity loan");
+        h.assertTrue(horse.fallDistance==15.0F,"mounted/root gravity change does not reset root fall history");
+        h.assertTrue(rider.fallDistance==9.0F,"effective rider-frame change does not reset passenger fall history");
         h.succeed();
     }
 
