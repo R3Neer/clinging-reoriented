@@ -51,6 +51,35 @@ final class GravityTransitionTest {
     }
 
     @Test
+    void rebaseKeepsSharedPhysicalAxisButUsesEntityHeading() {
+        var riderQuarter=GravityTransition.plan(Direction.DOWN,Direction.NORTH,new Vec3(1,0,0));
+        var mountQuarter=GravityTransition.rebase(riderQuarter,new Vec3(0,0,-1));
+        assertEquals(riderQuarter.previous(),mountQuarter.previous());
+        assertEquals(riderQuarter.target(),mountQuarter.target());
+        assertEquals(riderQuarter.kind(),mountQuarter.kind());
+        assertVecEquals(riderQuarter.axis(),mountQuarter.axis(),EPS,"quarter turn axis is shared");
+        assertVecEquals(new Vec3(0,0,-1),mountQuarter.oldWorldHeading(),EPS,"mount keeps its own source heading");
+        assertVecEquals(GravityTransition.rotate(new Vec3(0,0,-1),riderQuarter.axis(),Math.PI*.5D).normalize(),mountQuarter.transportedWorldHeading(),EPS,"mount heading follows rider physical quarter turn");
+
+        var riderHalf=GravityTransition.plan(Direction.DOWN,Direction.UP,new Vec3(1,0,0));
+        var mountHalf=GravityTransition.rebase(riderHalf,new Vec3(0,0,-1));
+        assertEquals(GravityTransition.TurnKind.HALF,mountHalf.kind());
+        assertVecEquals(riderHalf.axis(),mountHalf.axis(),EPS,"half turn axis is chosen once by rider");
+        assertVecEquals(GravityTransition.rotate(new Vec3(0,0,-1),riderHalf.axis(),Math.PI).normalize(),mountHalf.transportedWorldHeading(),EPS,"mount heading rotates around rider-selected half-turn axis");
+        assertNotEquals(riderHalf.yawDelta(),mountHalf.yawDelta(),1.0E-4F,"different headings may need different yaw gauges");
+    }
+
+    @Test
+    void rebaseProjectsHeadingOntoOldGravityPlane() {
+        var physical=GravityTransition.plan(Direction.EAST,Direction.WEST,new Vec3(0,0,-1));
+        var rebased=GravityTransition.rebase(physical,new Vec3(7,2,-3));
+        assertEquals(0.0D,rebased.oldWorldHeading().x,EPS);
+        assertEquals(1.0D,rebased.oldWorldHeading().length(),EPS);
+        assertThrows(IllegalArgumentException.class,()->GravityTransition.rebase(physical,new Vec3(1,0,0)));
+        assertThrows(IllegalArgumentException.class,()->GravityTransition.rebase(physical,new Vec3(Double.NaN,0,0)));
+    }
+
+    @Test
     void compensatedStartPreservesCompositeWorldLook() {
         for (Direction from : Direction.values()) for (Direction to : Direction.values()) {
             if (from == to) continue;
