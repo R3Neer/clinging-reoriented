@@ -157,8 +157,7 @@ public final class ClingingReoriented implements ModInitializer {
     public static void write(Player p, Direction direction,Vec3 position) {
         boolean oldWriting = WRITING.get(); WRITING.set(true);
         try {
-            boolean changed=GravityDirectionUtil.setGravityDirection(p,direction);
-            if(changed)p.resetFallDistance();
+            GravityDirectionUtil.setGravityDirection(p,direction);
             var attribute=p.getAttribute(ModAttributes.GRAVITY_DIRECTION);
             if (p instanceof ServerPlayer sp && attribute!=null) {
                 sp.connection.send(new ClientboundUpdateAttributesPacket(p.getId(), List.of(attribute)));
@@ -176,8 +175,7 @@ public final class ClingingReoriented implements ModInitializer {
     private static void writeTransition(ServerPlayer p,Direction direction,Vec3 position,GravityTransition.Plan transition){
         boolean oldWriting=WRITING.get();WRITING.set(true);
         try{
-            boolean changed=GravityDirectionUtil.setGravityDirection(p,direction);
-            if(changed)p.resetFallDistance();
+            GravityDirectionUtil.setGravityDirection(p,direction);
             applyYaw(p,transition);
             var attribute=p.getAttribute(ModAttributes.GRAVITY_DIRECTION);
             if(attribute!=null){
