@@ -31,22 +31,31 @@ public final class GravityFallState {
             state.gravityFallActive=true;
             state.gravityFallLanding=false;
             state.gravityFallLandingGravity=GravityDirectionUtil.getGravityDirection(player);
+            state.gravityFallLandingEtaTicks=0.0D;
             GravityFallSync.publish(player,GravityFallSync.Phase.START,null);
             return;
         }
 
         Direction landingTarget=null;
-        if(state.landingCommitted)landingTarget=state.landingGravity;
-        else if(imminent)landingTarget=candidate.get().gravity();
+        double landingEta=0.0D;
+        if(state.landingCommitted){
+            landingTarget=state.landingGravity;
+            landingEta=state.landingEtaTicks;
+        }else if(imminent){
+            landingTarget=candidate.get().gravity();
+            landingEta=candidate.get().etaTicks();
+        }
 
         if(landingTarget!=null){
-            if(!state.gravityFallLanding || state.gravityFallLandingGravity!=landingTarget){
-                state.gravityFallLanding=true;
-                state.gravityFallLandingGravity=landingTarget;
-                GravityFallSync.publish(player,GravityFallSync.Phase.LAND,landingTarget);
-            }
+            landingEta=Math.max(0.0D,Math.min(BODY_LANDING_HORIZON,landingEta));
+            boolean changed=!state.gravityFallLanding || state.gravityFallLandingGravity!=landingTarget;
+            state.gravityFallLanding=true;
+            state.gravityFallLandingGravity=landingTarget;
+            state.gravityFallLandingEtaTicks=landingEta;
+            if(changed)GravityFallSync.publish(player,GravityFallSync.Phase.LAND,landingTarget,landingEta);
         }else if(state.gravityFallLanding){
             state.gravityFallLanding=false;
+            state.gravityFallLandingEtaTicks=0.0D;
             GravityFallSync.publish(player,GravityFallSync.Phase.RESUME,null);
         }
     }
