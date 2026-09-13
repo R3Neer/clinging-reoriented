@@ -1,4 +1,4 @@
-# TM analysis — underwater input and jump-aware landing grace
+# TM analysis — underwater input, jump-aware landing grace and mob snaps
 
 Temporary working document. Delete before merge.
 
@@ -6,54 +6,23 @@ Temporary working document. Delete before merge.
 
 1. Reorientation/Clinging should remain usable in water without stealing Vanilla's normal Space-to-ascend control. In water, one press/hold of Space must remain ordinary swimming; a deliberate double press may request a gravity turn.
 2. Sprint-jump protection near landing must scale with jump power. A Leaping/Jump Boost player should not accidentally reorient simply because a stronger jump makes the fixed alpha.11 landing-grace prediction too short.
+3. Mounts and pets whose gravity is changed by Clinging/Reorientation must use the same short minimal snap presentation as the player instead of Gravity Changer's generic canonical interpolation.
 
-## Existing water input architecture
+## Underwater input
 
-- Outside water, `JumpInputMixin` wraps `LocalPlayer.tryToStartFallFlying()` and calls `ClingingClient.press()` only when Vanilla did not start gliding.
-- This is intentionally tied to the airborne fresh-Space path and is not a general key-edge detector.
-- `ClingingClient.press()` currently sends one gravity-selection request after local eligibility checks. It does not consume the Vanilla key state.
-- `GravityInput.available()` does not reject water by itself; Elytra priority explicitly yields while in water, so a server-authoritative turn can already succeed underwater if a request reaches it.
+The existing airborne `JumpInputMixin` is intentionally tied to the fresh-Space/Elytra path, not general key polling. Underwater input therefore passively observes `keyJump.isDown()` and detects rising edges without consuming or rewriting Vanilla input.
 
-## Required underwater input semantics
+Required semantics:
 
-1. First Space press in water is never delayed, cancelled or consumed by Clinging. Vanilla sees it normally and can ascend.
-2. Holding Space never counts as repeated taps and never spams gravity requests.
-3. A second rising edge after a real release, within a fixed 250 ms window, requests Clinging/Reorientation.
-4. The second press is still visible to Vanilla, so ascent continues even when the gravity attempt succeeds or fails.
-5. The two presses are consumed as one gesture: after a detected double tap, a third rapid press starts a new pair rather than immediately triggering again.
-6. Leaving water, losing the player/context, opening UI/overlay, losing focus, death/respawn, dimension/world replacement or disconnect invalidates a partial water double tap.
-7. Entering water while Space is already held must not synthesize a first press.
-8. The detector is client presentation/input state only; server authority and all normal rejection reasons remain unchanged.
+- first Space press/hold in water remains pure Vanilla ascent;
+- after a real release, a second rising edge within 250 ms requests a turn;
+- holding never repeats;
+- the detected pair is consumed even if server authority rejects the request;
+- entering water while already holding Space cannot synthesize a first tap;
+- leaving water, UI/focus loss, death/respawn, player replacement, level replacement or disconnect invalidates a partial pair;
+- client selection/heading capture and server authority remain the same as air.
 
-## Water detector design
-
-Use passive polling of `Minecraft.options.keyJump.isDown()` from the existing client tick. Never call `consumeClick()` and never rewrite the key state.
-
-Maintain a small detector state:
-
-- whether the detector currently owns an active water context;
-- previous sampled `jumpDown` value;
-- timestamp of the first water rising edge, or none;
-- current `LocalPlayer` and `ClientLevel` identity so respawn/dimension replacement cannot inherit a partial gesture.
-
-On context entry, initialize `previousDown` to the current physical key state and clear the timestamp. On every valid water tick:
-
-- rising edge = `jumpDown && !previousDown`;
-- first rising edge stores `now` and does nothing to Clinging;
-- next rising edge within 250 ms clears the stored edge and returns `doubleTap=true`;
-- if the window expired, the new edge replaces the old first edge;
-- no edge while held.
-
-Use a monotonic millisecond clock and expose the state machine as a pure helper accepting `nowMs` for deterministic tests.
-
-## Interaction with the existing air path
-
-`JumpInputMixin` must not accidentally turn on a single underwater press if Vanilla happens to traverse the fall-flying call site. Split intent entry points:
-
-- air path: refuse water and preserve current airborne behavior;
-- water-double path: only invoked by the detector after the second water rising edge.
-
-Both routes converge on the same request construction/sending code so selection look, navigation heading, sequence/revision handling and result sounds remain identical.
+The implemented detector is a pure helper using a monotonic millisecond clock, with client integration scoped to the exact `LocalPlayer` and `ClientLevel` identity.
 
 ## Clinging recharge semantics
 
@@ -68,30 +37,49 @@ Explicit regressions must prove:
 
 ## Jump-power-aware sprint-landing grace
 
-Alpha.11's `sprintLandingJumpReserved` reserves a fresh Space only when the player is sprinting, descending toward the active gravity floor and the next predicted movement intersects support. The prediction currently uses:
+Alpha.11's `sprintLandingJumpReserved` reserves a fresh Space only when the player is sprinting, descending toward the active gravity floor and a one-step prediction reaches support. The prediction uses current gravity-relative downward speed plus Gravity Changer acceleration and clamps travel to 0.60 blocks.
 
-- `toward = velocity dot gravityUnit`;
-- one-tick gravity acceleration from Gravity Changer;
-- travel clamped to `[0.10, 0.60]` blocks.
+That baseline is correct for normal jumping but feels too short under Leaping. Stronger jump power changes the cadence and range over which players queue the next sprint jump, while the fixed one-tick grace remains unchanged.
 
-That exactly protects the normal-jump case, but the grace horizon is fixed. Minecraft's effective jump power is based on the normal 0.42 player jump strength plus Jump Boost's public jump-power contribution; stronger jumps produce a larger/faster landing arc. A fixed one-tick/0.60-block reservation can therefore stop matching the player's sprint-jump rhythm under Leaping.
+Policy:
 
-The policy should scale only upward from alpha.11's baseline:
-
-- normal effective jump power `0.42` => grace horizon exactly `1.0` tick, preserving current behavior;
+- normal effective jump power `0.42` => grace horizon exactly `1.0` tick, preserving alpha.11;
 - stronger jump power => `graceTicks = effectiveJumpPower / 0.42`;
-- cap the horizon at `3.0` ticks so pathological/custom effect levels cannot reserve Space from many blocks away;
-- weaker/custom jump power never reduces the existing one-tick protection.
+- cap at `3.0` ticks;
+- weaker/custom jump power never reduces the existing one-tick protection;
+- effective power uses `Attributes.JUMP_STRENGTH` when present plus `Player.getJumpBoostPower()`, so Jump Boost and compatible jump-strength modifiers participate without potion-name special cases;
+- predict gravity-relative travel over horizon `h` as `toward*h + acceleration*h*(h+1)/2`, clamp max travel to `0.60*h`, and collision-test the complete swept AABB from current to predicted body;
+- sprinting, airborne, descending and actual predicted support remain mandatory, so stronger jump power never creates a blanket lockout.
 
-Use the player's `Attributes.JUMP_STRENGTH` value when that attribute is present, otherwise the vanilla player baseline `0.42`, then add `player.getJumpBoostPower()`. This captures ordinary Leaping and compatible jump-strength modifiers without keying policy to one potion name.
+## Why mounts/pets still use the old Gravity Changer turn
 
-Predict gravity-relative travel over the fractional grace horizon using the same current toward velocity and Gravity Changer acceleration. Preserve alpha.11 exactly at horizon 1:
+The snap mixin itself is generic: `GravitySnapMixin` can override the `GravityRotationAnimation` of any entity. The missing piece is ownership/networking.
 
-`predictedTravel = toward*h + acceleration*h*(h+1)/2`
+`VisualTransitions.begin(...)` is currently activated only by the player-only `visual_transition_v2` payload. `MountedGravity` sends that payload to the rider after `MobGravity.borrow(...)`, so the rider's camera/body gets the alpha.11 snap but the root mount's own `GravityRotationAnimation` is never enrolled. Pet `MobGravity.replay(...)` changes the pet's gravity without sending any visual transition at all. Gravity Changer therefore owns those entity animations and uses its generic long canonical-frame path.
 
-and cap travel to `0.60*h`. At `h=1` this reduces to the existing `toward + acceleration`, clamped to 0.60. Probe collision along the downward sweep rather than only at the endpoint so the longer boosted horizon cannot tunnel through a support block.
+The fix should not duplicate camera geometry. It should generalize visual ownership to non-player entities:
 
-The predicate remains intentionally narrow: it still requires sprinting, descending, and actual predicted support. Jump power never creates a blanket period where gravity turns are disabled.
+- add an entity-scoped visual-transition payload carrying entity id + UUID, target, yaw delta, turn kind and per-mob sequence;
+- send it to players tracking the mob plus any ServerPlayer passengers before the physical gravity commit;
+- client resolves the exact entity and starts `VisualTransitions` ownership on that entity's existing Gravity Changer animation;
+- keep local-player visual sequence handling connection-scoped for the respawn invariant; entity sequences are tracked independently per entity UUID and reset on disconnect;
+- apply the same yaw-gauge transform to the mob on server and client so its world heading/body pose is transported rather than merely cosmetically animated.
+
+### Common physical rotation for mounted hierarchies
+
+For a mounted Reorientation turn the rider already defines the intended physical transition. In 90-degree turns the axis is unique. In 180-degree turns it is the rider's navigation heading.
+
+The mount must not independently choose a different 180-degree axis from its own heading, or rider and mount can visibly rotate around different axes while attached. Instead:
+
+1. build the rider's normal transition plan;
+2. use that plan's axis/kind as the one physical rotation for the mounted gravity change;
+3. rebase the root mount's own navigation heading through that same physical rotation to calculate the mount-specific `yawDelta`;
+4. send the mount's entity visual payload and apply that delta before committing root gravity;
+5. rider and mount therefore share one physical snap while each preserves its own local/world facing semantics.
+
+A pet replay has no rider-defined physical transition, so the pet's own gravity-relative heading selects the 180-degree axis and the ordinary `GravityTransition.plan(...)` is sufficient.
+
+Forced/owned mob retirement and rider-loan restoration should use the same entity snap because they are still Clinging-owned gravity changes. Foreign Gravity Changer writes remain untouched.
 
 ## Versioning
 
@@ -107,5 +95,9 @@ Alpha.11 is already published. These behavior changes target development version
 - Failed gravity requests never interfere with swimming input.
 - Normal jump power retains alpha.11 sprint-landing reservation behavior.
 - Jump Boost/Leaping increases only the near-landing reservation horizon, proportionally and with a hard cap.
-- Sprinting while ascending or without predicted support remains available to Clinging/Reorientation regardless of jump power.
-- Existing air, Elytra, First Person, Scale Brews and snap behavior remain unchanged.
+- Sprinting while ascending or without predicted support remains available regardless of jump power.
+- Mount roots and pets use the same 180/240 ms quadratic minimal snap instead of Gravity Changer's generic interpolation.
+- Rider and root mount use the same physical rotation axis for one mounted turn.
+- Pet standalone/replay turns preserve the pet's own heading using the same geometry policy.
+- Foreign Gravity Changer transitions stay upstream.
+- Existing player heading, respawn, fall, First Person and Scale Brews behavior remains unchanged.
