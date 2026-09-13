@@ -28,6 +28,14 @@ public final class ImpactGameTests {
     }
 
     @GameTest(padding=20)
+    public void lowerRealImpactSpeedProducesLessDamage(GameTestHelper h){
+        floor(h,4,Blocks.STONE);
+        var fast=owned(h,h.absoluteVec(new Vec3(4.0,5.01,4.0)),Direction.EAST);float beforeFast=fast.getHealth();fast.move(MoverType.SELF,new Vec3(0,-1.2,0));float fastLoss=beforeFast-fast.getHealth();
+        var slow=owned(h,h.absoluteVec(new Vec3(7.0,5.01,7.0)),Direction.EAST);float beforeSlow=slow.getHealth();slow.move(MoverType.SELF,new Vec3(0,-.55,0));float slowLoss=beforeSlow-slow.getHealth();
+        h.assertTrue(fastLoss>slowLoss,"damage follows real impact speed, so physical braking is rewarded");h.succeed();
+    }
+
+    @GameTest(padding=20)
     public void lowSpeedAndTangentialMotionDoNotCreateImpactDamage(GameTestHelper h){
         floor(h,4,Blocks.STONE);var p=owned(h,h.absoluteVec(new Vec3(5.5,5.01,5.5)),Direction.EAST);
         float before=p.getHealth();p.move(MoverType.SELF,new Vec3(.5,0,.5));
@@ -42,5 +50,17 @@ public final class ImpactGameTests {
         float beforeStone=stone.getHealth();stone.move(MoverType.SELF,new Vec3(0,-1.2,0));float stoneLoss=beforeStone-stone.getHealth();
         h.assertTrue(stoneLoss>0,"stone fixture produces impact damage");
         h.assertTrue(hayLoss<stoneLoss,"hay block keeps its vanilla fallOn reduction for lateral-gravity impact");h.succeed();
+    }
+
+    @GameTest(padding=20)
+    public void armedImpactSurvivesOwnershipExitAfterLateTurnAndDamagesOnce(GameTestHelper h){
+        floor(h,4,Blocks.STONE);var p=owned(h,h.absoluteVec(new Vec3(5.5,5.01,5.5)),Direction.EAST);
+        p.move(MoverType.SELF,new Vec3(0,.01,0));
+        h.assertTrue(ImpactState.state(p).armed,"managed airborne motion arms the impact tracker");
+        p.removeAllEffects();var owner=ClingingReoriented.data(p);owner.owned=false;owner.visualFrameOwned=false;
+        p.setOnGround(false);float before=p.getHealth();p.move(MoverType.SELF,new Vec3(0,-1.2,0));
+        h.assertTrue(p.getHealth()<before,"ownership exit after arming cannot erase pending high-speed impact");
+        float after=p.getHealth();p.move(MoverType.SELF,Vec3.ZERO);
+        h.assertTrue(p.getHealth()==after,"one collision sample cannot be charged twice");h.succeed();
     }
 }
