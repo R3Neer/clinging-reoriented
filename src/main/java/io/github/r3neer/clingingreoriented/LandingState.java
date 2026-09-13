@@ -6,7 +6,7 @@ import java.util.Optional;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerPlayer;
 
-/** Short-lived server authority for the final landing window; presentation hooks are layered on top. */
+/** Short-lived server authority for the final landing window and its presentation commitment. */
 public final class LandingState {
     private LandingState() {}
 
@@ -14,7 +14,8 @@ public final class LandingState {
         var state=ClingingReoriented.data(player);
         Direction gravity=GravityDirectionUtil.getGravityDirection(player);
         if(!eligibleContext(player)){
-            state.airborneTicks=0;state.clearLandingCommit();return;
+            if(state.freeFlightVisualHeld)Payloads.cancelLanding(player,false);
+            state.freeFlightVisualHeld=false;state.airborneTicks=0;state.clearLandingCommit();state.visualBaseKnown=false;return;
         }
         if(AirChanges.grounded(player)){
             touchdown(player,gravity);return;
@@ -22,7 +23,8 @@ public final class LandingState {
         state.airborneTicks=Math.min(1_000_000,state.airborneTicks+1);
         if(!state.visualBaseKnown){state.visualBaseDirection=gravity;state.visualBaseKnown=true;}
         if(!ClingingReoriented.controlsPhysics(player)){
-            state.clearLandingCommit();return;
+            if(state.landingCommitted)cancel(player,true);
+            return;
         }
 
         Optional<LandingPrediction.Candidate> predicted=LandingPrediction.predict(player,LandingPrediction.MAX_TICKS);
@@ -30,7 +32,7 @@ public final class LandingState {
             if(gravity!=state.landingGravity || player.level().getGameTime()>state.landingDeadlineTick
                 || predicted.isEmpty() || !same(predicted.get().contact(),state.landingContact)
                 || !LandingSurfaces.revalidate(player,gravity,state.landingContact)){
-                cancel(player,false);
+                cancel(player,true);
             }else state.landingEtaTicks=predicted.get().etaTicks();
             return;
         }
@@ -51,22 +53,27 @@ public final class LandingState {
     }
 
     public static void cancel(ServerPlayer player,boolean visualBecameNonCanonical){
-        var state=ClingingReoriented.data(player);state.clearLandingCommit();
+        var state=ClingingReoriented.data(player);
+        if(state.landingCommitted&&state.freeFlightVisualHeld)Payloads.cancelLanding(player,true);
+        state.clearLandingCommit();
         if(visualBecameNonCanonical)state.visualBaseKnown=false;
     }
 
     public static void lifecycleClear(ServerPlayer player){
-        var state=ClingingReoriented.data(player);state.airborneTicks=0;state.clearLandingCommit();state.visualBaseKnown=false;
+        var state=ClingingReoriented.data(player);state.airborneTicks=0;state.clearLandingCommit();state.visualBaseKnown=false;state.freeFlightVisualHeld=false;
     }
 
     private static void touchdown(ServerPlayer player,Direction gravity){
-        var state=ClingingReoriented.data(player);state.airborneTicks=0;state.clearLandingCommit();state.visualBaseDirection=gravity;state.visualBaseKnown=true;
+        var state=ClingingReoriented.data(player);boolean wasCommitted=state.landingCommitted;
+        if(!wasCommitted&&state.freeFlightVisualHeld)Payloads.cancelLanding(player,false);
+        state.freeFlightVisualHeld=false;state.airborneTicks=0;state.clearLandingCommit();state.visualBaseDirection=gravity;state.visualBaseKnown=true;
     }
 
     private static void commit(ServerPlayer player,LandingPrediction.Candidate candidate,GravityTransition.TurnKind kind){
         var state=ClingingReoriented.data(player);
         state.landingCommitted=true;state.landingContact=candidate.contact();state.landingGravity=candidate.gravity();state.landingKind=kind;
         state.landingEtaTicks=candidate.etaTicks();state.landingDeadlineTick=player.level().getGameTime()+(long)Math.ceil(candidate.etaTicks())+2L;state.landingSequence++;
+        Payloads.land(player,candidate.gravity(),kind);
     }
 
     private static GravityTransition.TurnKind kindFor(PlayerData state,Direction target){
