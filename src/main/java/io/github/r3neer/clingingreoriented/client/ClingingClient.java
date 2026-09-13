@@ -5,6 +5,7 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.*;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.Direction;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.player.Player;
@@ -15,6 +16,8 @@ public final class ClingingClient implements ClientModInitializer {
     private static final Set<Long> PENDING=new HashSet<>();
     private static final Map<Integer,Payloads.State> STATES=new HashMap<>();
     private static final WaterDoubleTapDetector WATER_DOUBLE_TAP=new WaterDoubleTapDetector();
+    private static Player waterPlayer;
+    private static ClientLevel waterLevel;
 
     /** Existing airborne/Elytra-adjacent Space path. Water owns single Space presses. */
     public static void press() {
@@ -42,6 +45,9 @@ public final class ClingingClient implements ClientModInitializer {
     }
 
     private static void waterInputTick(Minecraft client) {
+        if(client.player!=waterPlayer || client.level!=waterLevel){
+            WATER_DOUBLE_TAP.reset();waterPlayer=client.player;waterLevel=client.level;
+        }
         boolean context=client.player!=null && client.player.isAlive() && client.player.isInWater()
             && client.gui.screen()==null && client.gui.overlay()==null && client.isWindowActive()
             && ClingingReoriented.hasEffect(client.player) && ClientPlayNetworking.canSend(Payloads.Request.TYPE);
@@ -68,7 +74,9 @@ public final class ClingingClient implements ClientModInitializer {
             var previous=STATES.get(state.player());
             if(previous==null || state.revision()>=previous.revision()) STATES.put(state.player(),state);
         });
-        ClientPlayConnectionEvents.DISCONNECT.register((handler,client)->{PENDING.clear();STATES.clear();sequence=0;VisualTransitions.clear();WATER_DOUBLE_TAP.reset();});
+        ClientPlayConnectionEvents.DISCONNECT.register((handler,client)->{
+            PENDING.clear();STATES.clear();sequence=0;VisualTransitions.clear();WATER_DOUBLE_TAP.reset();waterPlayer=null;waterLevel=null;
+        });
         ClientTickEvents.END_CLIENT_TICK.register(client->{
             waterInputTick(client);
             if(client.level==null) return;
