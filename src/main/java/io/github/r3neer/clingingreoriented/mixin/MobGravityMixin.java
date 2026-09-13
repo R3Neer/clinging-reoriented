@@ -20,6 +20,7 @@ public abstract class MobGravityMixin implements MobGravity.Holder {
         out.putInt("clinging_reoriented:mob_borrow_previous_ownership",clinging$mobState.borrowedPreviousOwnership.ordinal());
         out.putInt("clinging_reoriented:mob_borrow_previous_direction",clinging$mobState.borrowedPreviousDirection.get3DDataValue());
         out.putBoolean("clinging_reoriented:mob_air_used",clinging$mobState.airUsed);
+        out.putLong("clinging_reoriented:mob_visual_sequence",clinging$mobState.visualSequence);
     }
     @Inject(method="readAdditionalSaveData",at=@At("TAIL"))
     private void clinging$loadMob(ValueInput in,CallbackInfo ci){
@@ -40,5 +41,6 @@ public abstract class MobGravityMixin implements MobGravity.Holder {
             else if(effectSeen&&actual!=Direction.DOWN){clinging$mobState.ownership=MobGravity.Ownership.EXTERNAL;clinging$mobState.ownedDirection=actual;}
         }
         clinging$mobState.airUsed=in.getBooleanOr("clinging_reoriented:mob_air_used",false);
+        clinging$mobState.visualSequence=Math.max(0L,in.getLongOr("clinging_reoriented:mob_visual_sequence",0L));
     }
 }
