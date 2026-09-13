@@ -21,6 +21,7 @@ public final class LandingSurfaces {
     private static final Object LOCK = new Object();
     private static final Map<Identifier,LandingSurfaceProvider> PROVIDERS = new HashMap<>();
     private static final Set<String> WARNED = new HashSet<>();
+    private static final double TIE=1.0E-12D;
 
     static { PROVIDERS.put(VANILLA, new VanillaLandingSurfaceProvider()); }
 
@@ -42,7 +43,7 @@ public final class LandingSurfaces {
         }
     }
 
-    public record SweepHit(Contact contact, double fraction) {
+    public record SweepHit(Contact contact, double fraction, boolean support) {
         public SweepHit {
             if (contact == null || !Double.isFinite(fraction) || fraction < 0.0D || fraction > 1.0D)
                 throw new IllegalArgumentException("Invalid landing sweep hit");
@@ -81,7 +82,7 @@ public final class LandingSurfaces {
         return Optional.empty();
     }
 
-    /** Earliest provider hit; equal fractions are resolved by stable provider id ordering. */
+    /** Earliest geometric contact across providers. At an exact tie, valid support wins before stable provider-id order. */
     public static Optional<SweepHit> sweep(LivingEntity entity, Direction gravity, AABB startBody, AABB endBody) {
         if (entity == null || gravity == null || !finite(startBody) || !finite(endBody)) return Optional.empty();
         var query = new LandingSurfaceProvider.Query(entity, gravity);
@@ -89,8 +90,9 @@ public final class LandingSurfaces {
         for (var entry : snapshot()) {
             var local = safeSweep(entry.getKey(), entry.getValue(), query, startBody, endBody);
             if (local.isEmpty()) continue;
-            var hit = new SweepHit(wrap(entry.getKey(), gravity, local.get().contact()), local.get().fraction());
-            if (best == null || hit.fraction() < best.fraction() - 1.0E-12D) best = hit;
+            var hit = new SweepHit(wrap(entry.getKey(), gravity, local.get().contact()), local.get().fraction(),local.get().support());
+            if (best == null || hit.fraction() < best.fraction() - TIE
+                || Math.abs(hit.fraction()-best.fraction())<=TIE && hit.support() && !best.support()) best = hit;
         }
         return Optional.ofNullable(best);
     }
