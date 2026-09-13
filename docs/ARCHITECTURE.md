@@ -35,14 +35,25 @@ existing external direction.
 
 Usable Elytra retain priority over Clinging. In addition, `GravityInput` reserves a
 fresh airborne Space for an imminent sprint landing only when all of these are true:
-the player is sprinting, moving toward the current gravity floor and a bounded
-next-tick collision prediction reaches support. The prediction uses the active
-Gravity Changer gravity vector and gravity-strength attribute, so it works for all
-six directions instead of assuming world DOWN. Ascending, distant or non-sprinting
-players keep normal Clinging/Reorientation input.
+the player is sprinting, airborne, moving toward the current gravity floor, the
+current body is clear and a bounded swept collision prediction reaches real support.
+Ascending, distant or non-sprinting players keep normal Clinging/Reorientation
+input.
 
-The same predicate runs in client precheck and server authority; it is an intent
-filter, not a blanket sprint lockout.
+Alpha.12 makes the prediction horizon jump-power-aware. Effective jump power uses
+`Attributes.JUMP_STRENGTH` when present (otherwise Vanilla's `0.42`) plus
+`Player.getJumpBoostPower()`. The landing horizon is
+`clamp(effectiveJumpPower / 0.42, 1, 3)` ticks, so normal jumping preserves
+alpha.11's exact one-tick guard while stronger Jump Boost/Leaping-style jumps widen
+only the near-landing reservation. Invalid/non-finite values fail back to the normal
+baseline.
+
+Over horizon `h`, gravity-relative travel is predicted as
+`toward*h + acceleration*h*(h+1)/2`, capped at `0.60*h`. Collision is tested over
+the complete swept AABB between current and predicted body, not only at the endpoint.
+Gravity acceleration comes through Gravity Changer, so gravity-strength modifiers
+and all six directions participate. The same predicate runs in client precheck and
+server authority; it is an intent filter, not a blanket sprint lockout.
 
 ### Underwater Space arbitration
 
@@ -102,7 +113,9 @@ the old feet.
 
 A rejected candidate has zero positional, gravity, heading, momentum or fall-state
 mutation. Mounted root/passenger hierarchies retain their existing all-or-nothing
-preflight.
+preflight. Entity visual ownership is also created only after that preflight has
+succeeded, immediately before the physical commit; failed candidates cannot publish
+a cosmetic turn for a change that never happened.
 
 An actual Clinging-owned gravity-direction change also resets vanilla
 `fallDistance`. Gravity Changer already evaluates fall damage in local gravity
@@ -141,23 +154,44 @@ is taken. Applying that same delta to any current local yaw preserves the player
 late mouse movement. Applying it while leaving local pitch unchanged reproduces the
 same physical rotation for the complete look vector, including near-vertical views.
 
+`GravityTransition.rebase(physicalPlan, entityHeading)` is the mounted equivalent.
+It retains the already chosen previous/target directions, turn kind and physical
+axis, projects the mount's own heading onto the old gravity plane, transports that
+heading through the same axis-angle and derives a mount-specific `yawDelta`. This is
+important for opposite mounted turns: the rider chooses the physical 180-degree axis
+once, rather than allowing rider and root mount to rotate around unrelated axes.
+Pet replay has no rider-defined plan and therefore constructs an ordinary plan from
+the pet's own heading.
+
 The gauge delta is applied together to view, previous view, body and head yaw
 accumulators so vanilla interpolation cannot manufacture a separate third-person
-twist.
+twist. The same gauge operation is applied to Clinging-owned mobs on the server and
+to their tracked client entities.
 
 ## Presentation ownership, respawn epochs and snap animation
 
-Physical and presentation ownership are separate. A Clinging/Reorientation turn
-sends a monotonic `visual_transition_v2` epoch containing target direction,
-authoritative yaw delta and quarter/half-turn kind. Unrelated Gravity Changer
-transitions do not enter this path.
+Physical and presentation ownership are separate. Player turns use the monotonic
+`visual_transition_v2` payload containing target direction, authoritative yaw delta
+and quarter/half-turn kind. Clinging-owned non-player changes use a distinct
+`entity_visual_transition` payload containing entity ID, UUID, target direction,
+yaw delta, turn kind and a per-mob monotonic sequence. Unrelated Gravity Changer
+transitions do not enter either path.
 
-Visual sequence numbers are connection-scoped. `PlayerData` is replaced when a
-`ServerPlayer` respawns, so the `COPY_FROM` path explicitly carries
+Player visual sequence numbers are connection-scoped. `PlayerData` is replaced when
+a `ServerPlayer` respawns, so the `COPY_FROM` path explicitly carries
 `visualSequence` into the replacement object. The active visual animation itself is
 entity-instance-scoped because `VisualTransitions` keys ownership by the old
 entity's `GravityRotationAnimation`; an animation cannot migrate from the corpse to
-the replacement player. Client sequence state resets only when the connection ends.
+the replacement player. Client player-sequence state resets only when the connection
+ends.
+
+Mob sequences live in `MobGravity.State` and are persisted with the entity so a
+chunk unload/reload cannot make a genuinely newer transition look stale to a client
+that stayed connected. The server sends an entity transition to every player
+tracking that entity and explicitly includes all `ServerPlayer` passengers in the
+root hierarchy. The client resolves both entity ID and UUID against the current
+`ClientLevel`; a missing entity, reused ID or stale UUID fails closed. Accepted
+entity sequences are tracked independently per UUID and cleared on disconnect.
 
 On receipt the client captures the gravity quaternion actually being displayed,
 applies the logical yaw delta immediately and builds a compensated visual start
@@ -177,6 +211,14 @@ setting. An interrupted Reorientation turn captures the currently displayed fram
 applies the new yaw gauge compensation and follows the shortest path from that real
 visual state to the latest canonical endpoint. Nothing is queued and there is no
 snap-back to an intermediate canonical frame.
+
+For mounts, `MountedGravity` creates the rider's physical plan before mutation and
+passes that same plan into `MobGravity.borrow`. The root receives the rebased entity
+plan and tracked entity payload, while the rider keeps the ordinary local-player
+payload. Pet replay, owned restoration and owned retirement create entity plans from
+the mob's own heading. Same-direction writes create neither payload nor yaw mutation.
+Foreign/external Gravity Changer writes never acquire Clinging visual ownership and
+continue to use upstream animation behavior.
 
 Camera, third-person rendering and First Person all consume Gravity Changer's same
 visual gravity quaternion. The First Person offset mixin changes only offset-space
