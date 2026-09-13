@@ -4,6 +4,7 @@ import io.github.r3neer.clingingreoriented.api.LandingSurfaceProvider;
 import io.github.r3neer.clingingreoriented.api.LandingSurfaces;
 import io.github.r3neer.clingingreoriented.geometry.FaceGeometry;
 import java.util.Optional;
+import java.util.UUID;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -12,13 +13,14 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 
 public final class LandingSurfaceApiGameTests {
-    private static LandingSurfaceProvider provider(String id) {
+    private static LandingSurfaceProvider provider(UUID target,String id) {
         return new LandingSurfaceProvider() {
             @Override public Optional<LocalContact> currentSupport(Query query) {
+                if(!query.entity().getUUID().equals(target))return Optional.empty();
                 return Optional.of(new LocalContact(id, 1L, FaceGeometry.vector(query.gravity().getOpposite())));
             }
             @Override public boolean revalidate(Query query, LocalContact contact) {
-                return contact != null && contact.localId().equals(id) && contact.revision() == 1L;
+                return query.entity().getUUID().equals(target) && contact != null && contact.localId().equals(id) && contact.revision() == 1L;
             }
         };
     }
@@ -28,7 +30,7 @@ public final class LandingSurfaceApiGameTests {
         var p=h.makeMockServerPlayerInLevel();
         p.snapTo(h.absoluteVec(new Vec3(5.5,7.0,5.5)));p.setDeltaMovement(Vec3.ZERO);p.setOnGround(false);
         Identifier id=Identifier.fromNamespaceAndPath("clinging_reoriented_test","air_support");
-        var registration=LandingSurfaces.register(id,provider("fixture"));
+        var registration=LandingSurfaces.register(id,provider(p.getUUID(),"fixture"));
         try {
             h.assertTrue(AirChanges.grounded(p),"registered surface provider can define support without forging vanilla onGround");
             var contact=LandingSurfaces.currentSupport(p,Direction.DOWN).orElseThrow();
@@ -47,14 +49,14 @@ public final class LandingSurfaceApiGameTests {
         p.snapTo(h.absoluteVec(new Vec3(5.5,7.0,5.5)));p.setDeltaMovement(Vec3.ZERO);p.setOnGround(false);
         Identifier id=Identifier.fromNamespaceAndPath("clinging_reoriented_test","broken");
         LandingSurfaceProvider broken=new LandingSurfaceProvider(){
-            @Override public Optional<LocalContact> currentSupport(Query query){throw new IllegalStateException("fixture failure");}
-            @Override public boolean revalidate(Query query,LocalContact contact){throw new IllegalStateException("fixture failure");}
+            @Override public Optional<LocalContact> currentSupport(Query query){if(query.entity().getUUID().equals(p.getUUID()))throw new IllegalStateException("fixture failure");return Optional.empty();}
+            @Override public boolean revalidate(Query query,LocalContact contact){if(query.entity().getUUID().equals(p.getUUID()))throw new IllegalStateException("fixture failure");return false;}
         };
         var registration=LandingSurfaces.register(id,broken);
         try {
             h.assertFalse(AirChanges.grounded(p),"provider exception fails closed instead of becoming support");
             boolean duplicateRejected=false;
-            try { LandingSurfaces.register(id,provider("replacement")); }
+            try { LandingSurfaces.register(id,provider(p.getUUID(),"replacement")); }
             catch(IllegalStateException expected){ duplicateRejected=true; }
             h.assertTrue(duplicateRejected,"duplicate provider id cannot silently replace an owner");
         } finally { registration.close(); }
