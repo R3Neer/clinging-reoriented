@@ -14,6 +14,7 @@ import org.joml.Vector3f;
 public final class BodyOrientation {
     public static final double DIRECTION_EPSILON_SQR=1.0E-6D;
     private static final double PARALLEL_EPSILON=1.0E-6D;
+    private static final double OPPOSITE_EPSILON=1.0E-10D;
 
     public record State(Quaternionf orientation,Vec3 direction) {
         public State {
@@ -54,13 +55,13 @@ public final class BodyOrientation {
         return new Quaternionf(delta).mul(new Quaternionf(frame).normalize()).normalize();
     }
 
-    /** World-space shortest arc, with a deterministic twist-preserving axis for the 180-degree case. */
+    /** World-space shortest arc, with a deterministic twist-preserving axis only for the truly degenerate 180-degree case. */
     public static Quaternionf shortestArc(Vec3 fromDirection,Vec3 toDirection,Quaternionf frame){
         Vec3 from=normalized(fromDirection,"from");
         Vec3 to=normalized(toDirection,"to");
         double dot=Math.max(-1.0D,Math.min(1.0D,from.dot(to)));
         if(dot>=1.0D-PARALLEL_EPSILON)return new Quaternionf();
-        if(dot<=-1.0D+PARALLEL_EPSILON){
+        if(dot<=-1.0D+OPPOSITE_EPSILON){
             Vec3 axis=oppositeAxis(from,frame);
             return new Quaternionf().rotateAxis((float)Math.PI,(float)axis.x,(float)axis.y,(float)axis.z).normalize();
         }
