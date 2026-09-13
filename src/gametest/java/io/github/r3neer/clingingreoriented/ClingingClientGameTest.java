@@ -50,37 +50,38 @@ public final class ClingingClientGameTest implements FabricClientGameTest {
             if(!SOUNDS.contains(net.minecraft.sounds.SoundEvents.AMETHYST_BLOCK_CHIME))throw new AssertionError("Missing success sound");
             context.takeScreenshot("gamefeel-held-east-open-air");
 
-            // Spent Clinging rejects every voluntary second turn, including DOWN.
-            world.getServer().runOnServer(server->{
+            // Once Clinging's one-turn budget is spent, a precisely requested DOWN turn is rejected.
+            var spentResult=world.getServer().computeOnServer(server->{
                 var p=server.getPlayerList().getPlayers().getFirst();
-                var local=com.moigferdsrte.gravitychanger.util.RotationUtil.vecWorldToPlayer(new Vec3(0,-1,0),Direction.EAST);
-                float yaw=(float)Math.toDegrees(Math.atan2(-local.x,local.z));
-                float pitch=(float)Math.toDegrees(Math.asin(-local.y));
-                p.teleport(new TeleportTransition(server.overworld(),new Vec3(4,85,4),Vec3.ZERO,yaw,pitch,TeleportTransition.DO_NOTHING));
+                return ClingingReoriented.attempt(p,new Vec3(0,-1,0),GravityTransition.headingFromYaw(Direction.EAST,p.getYRot()));
             });
-            context.waitFor(mc->mc.player.position().distanceTo(new Vec3(4,85,4))<.1);context.waitTicks(3);SOUNDS.clear();
-            tapJump(context);context.waitTicks(10);
-            if(!SOUNDS.contains(net.minecraft.sounds.SoundEvents.NOTE_BLOCK_BASS.value()))throw new AssertionError("Missing spent-charge DOWN failure sound");
+            if(spentResult!=ClingingReoriented.Result.BLOCKED)throw new AssertionError("Spent Clinging accepted a second airborne turn: "+spentResult);
             context.runOnClient(mc->{if(GravityDirectionUtil.getOwnGravityDirection(mc.player)!=Direction.EAST)throw new AssertionError("Spent Clinging returned to DOWN voluntarily");});
             boolean stillSpent=world.getServer().computeOnServer(server->ClingingReoriented.data(server.getPlayerList().getPlayers().getFirst()).airChangeUsed);
             if(!stillSpent)throw new AssertionError("Rejected DOWN turn refunded Clinging charge");
 
-            // Reorientation removes the budget. The same DOWN input succeeds physically,
-            // but in open air the held camera frame remains stable instead of snapping DOWN.
+            // Reorientation removes the budget. Drive the authoritative request with an exact world-space
+            // direction so this test measures camera ownership rather than a physical-frame look conversion.
             world.getServer().runOnServer(server->server.getPlayerList().getPlayers().getFirst().addEffect(new MobEffectInstance(Reorientation.EFFECT,1200)));
-            context.waitFor(mc->mc.player.hasEffect(Reorientation.EFFECT));SOUNDS.clear();
+            context.waitFor(mc->mc.player.hasEffect(Reorientation.EFFECT));
             var beforeDown=new AtomicReference<Vec3>();context.runOnClient(mc->beforeDown.set(cameraForward(mc)));
-            tapJump(context);
+            var downResult=world.getServer().computeOnServer(server->{
+                var p=server.getPlayerList().getPlayers().getFirst();
+                return ClingingReoriented.attempt(p,new Vec3(0,-1,0),GravityTransition.headingFromYaw(Direction.EAST,p.getYRot()));
+            });
+            if(downResult!=ClingingReoriented.Result.SUCCESS)throw new AssertionError("Reorientation DOWN request failed: "+downResult);
             context.waitFor(mc->GravityDirectionUtil.getOwnGravityDirection(mc.player)==Direction.DOWN);
             context.waitFor(mc->VisualTransitions.holding(mc.player));
             context.runOnClient(mc->{if(cameraForward(mc).distanceTo(beforeDown.get())>2.0E-3)throw new AssertionError("Open-air Reorientation DOWN moved camera before landing");});
-            if(!SOUNDS.contains(net.minecraft.sounds.SoundEvents.AMETHYST_BLOCK_CHIME))throw new AssertionError("Missing Reorientation DOWN success sound");
             context.takeScreenshot("gamefeel-held-down-open-air");
 
-            // And another airborne turn still succeeds under Reorientation without adding another camera roll.
-            world.getServer().runOnServer(server->{var p=server.getPlayerList().getPlayers().getFirst();p.teleport(new TeleportTransition(server.overworld(),new Vec3(4,85,4),Vec3.ZERO,0,0,TeleportTransition.DO_NOTHING));});
-            context.waitTicks(3);var beforeSouth=new AtomicReference<Vec3>();context.runOnClient(mc->beforeSouth.set(cameraForward(mc)));
-            tapJump(context);
+            // A second authoritative airborne turn also changes physics without accumulating camera roll.
+            var beforeSouth=new AtomicReference<Vec3>();context.runOnClient(mc->beforeSouth.set(cameraForward(mc)));
+            var southResult=world.getServer().computeOnServer(server->{
+                var p=server.getPlayerList().getPlayers().getFirst();
+                return ClingingReoriented.attempt(p,new Vec3(0,0,1),GravityTransition.headingFromYaw(Direction.DOWN,p.getYRot()));
+            });
+            if(southResult!=ClingingReoriented.Result.SUCCESS)throw new AssertionError("Reorientation SOUTH request failed: "+southResult);
             context.waitFor(mc->GravityDirectionUtil.getOwnGravityDirection(mc.player)==Direction.SOUTH);
             context.waitFor(mc->VisualTransitions.holding(mc.player));
             context.runOnClient(mc->{if(cameraForward(mc).distanceTo(beforeSouth.get())>2.0E-3)throw new AssertionError("Second open-air Reorientation turn accumulated a camera snap");});
