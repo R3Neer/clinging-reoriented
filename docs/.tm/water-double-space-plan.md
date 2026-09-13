@@ -1,115 +1,106 @@
-# TM implementation plan — underwater input and jump-aware landing grace
+# TM implementation plan — underwater input, jump-aware landing grace and entity snaps
 
 Temporary working document. Delete before merge.
 
 ## Frozen behavioral policy
 
-- Outside water, Space behavior remains as alpha.11 except for a stronger-jump-aware sprint-landing reservation.
+- Outside water, Space behavior remains as alpha.11 except for stronger-jump-aware sprint-landing reservation.
 - In water, Vanilla owns ordinary Space-to-ascend behavior.
 - A gravity turn is requested only on the second rising edge of Space after a release, within 250 ms.
 - The water detector never consumes or rewrites Vanilla input.
 - A detected double-tap gesture consumes its pair even if the gravity attempt is later rejected.
 - Water never recharges Clinging; only real feet-side support on a solid block does.
-- Sprint-jump reservation remains gravity-relative and support-predicted, but its near-landing grace scales upward with effective jump power.
-- Normal jump power must preserve alpha.11's current one-tick behavior exactly.
+- Sprint-jump reservation remains gravity-relative/support-predicted, with near-landing grace scaling upward with effective jump power.
+- Normal jump power preserves alpha.11's one-tick guard exactly.
+- Every Clinging/Reorientation-owned gravity change for mounts/pets uses the same minimal 180/240 ms quadratic snap policy as players; foreign Gravity Changer changes remain untouched.
 
-## A. Underwater input state machine
+## A-E. Underwater input and recharge
 
-- [x] Add a tiny pure helper for underwater double-tap detection.
-- [x] Fixed window: 250 ms measured with a monotonic millisecond clock, not client ticks.
-- [x] Inputs: active-context flag, jump-down flag, monotonic timestamp.
-- [x] On entering context, seed prior key state from current `jumpDown` and clear any partial gesture.
-- [x] First rising edge stores timestamp and returns false.
-- [x] Held key returns false indefinitely.
-- [x] After release, second rising edge within window returns true and clears the stored first edge.
-- [x] A late second edge becomes the first edge of a new pair.
-- [x] Exiting context resets detector state.
-- [x] Scope partial gesture to exact `LocalPlayer` and `ClientLevel` identity.
-- [x] Unit-test first tap, hold, release requirement, in-window double tap, expiry, pair consumption, context reset and enter-while-held.
-
-## B. Water client integration
-
-- [x] Split `ClingingClient.press()` into context-specific entry points plus one shared request sender.
-- [x] Existing air/Elytra hook calls the air entry point.
-- [x] Air entry point refuses `player.isInWater()` so a single underwater Space can never turn gravity through the old mixin path.
-- [x] Existing client end-tick passively observes `options.keyJump.isDown()`.
-- [x] Valid water context requires local player, water, active gameplay window, no screen/overlay, player alive and Clinging/Reorientation effect present.
-- [x] On detected double tap call the water entry point.
-- [x] Water entry point uses current rendered selection look and current pitch-independent navigation heading exactly like air.
-- [x] Do not suppress Vanilla movement when request is sent or rejected.
-- [x] Reset water detector on disconnect and invalid context.
-
-## C. Server/eligibility behavior
-
-- [x] Preserve server-authoritative `attempt(...)` and all current rejection reasons.
-- [x] Do not add `isInWater` as a rejection in `GravityInput.available()`.
-- [x] Keep Elytra precedence behavior unchanged outside water; `elytraWins()` already yields while in water.
-- [x] Keep Clinging one-turn airborne budget unchanged.
-- [x] Reorientation remains unlimited.
-
-## D. Clinging recharge regression coverage
-
-- [x] Add submerged-water GameTest with spent Clinging.
-- [x] Water plus forged `onGround=true`, without solid feet support, does not recharge.
-- [x] Solid side/body contact underwater does not recharge.
-- [x] Add real solid seabed support on the feet-side face; reconcile then recharges.
-- [x] Retain the all-direction landing suite to prove the rule is gravity-relative.
-
-## E. Real-client underwater acceptance coverage
-
-- [x] Build an underwater client fixture with Reorientation.
-- [x] Single Space hold causes upward swimming/movement and sends no gravity request.
-- [x] Release + second press within the window sends exactly one request and changes gravity.
-- [x] Holding the second press does not repeat requests.
-- [x] A new pair can perform another underwater Reorientation turn.
-- [x] Failed/spent-Clinging double tap still leaves Space usable for swimming.
-- [x] Existing airborne client scenarios remain unchanged.
+- [x] Pure 250 ms water double-tap detector with release/hold/context semantics.
+- [x] Scope detector to exact `LocalPlayer` + `ClientLevel` identity.
+- [x] Air path refuses water; underwater path passively observes keyJump without consuming it.
+- [x] Shared request construction retains selection look + navigation heading semantics.
+- [x] Server authority and Clinging/Reorientation charge rules unchanged.
+- [x] Server water/recharge regressions added.
+- [x] Real-client water fixture covers held ascent, double tap, repeated Reorientation and spent-Clinging rejection while ascent remains active.
 
 ## F. Jump-power-aware sprint-landing grace
 
-- [ ] Add package-visible helpers in `GravityInput` for effective jump power / landing grace so policy is directly testable.
-- [ ] Effective jump power:
-  - [ ] use `Attributes.JUMP_STRENGTH` value when the player has that attribute;
-  - [ ] otherwise use vanilla player baseline `0.42`;
-  - [ ] add public `Player.getJumpBoostPower()` so ordinary Leaping contributes exactly as Minecraft defines it;
-  - [ ] reject non-finite/negative derived values back to the safe baseline.
-- [ ] `landingGraceTicks = clamp(effectiveJumpPower / 0.42, 1.0, 3.0)`.
-- [ ] Preserve the existing normal-jump predicate exactly at `h=1`.
-- [ ] Extend predicted gravity-relative travel over fractional horizon `h`:
-  - [ ] `toward*h + acceleration*h*(h+1)/2`;
-  - [ ] clamp minimum travel at `0.10` as today;
-  - [ ] scale maximum travel from `0.60` to `0.60*h`.
-- [ ] Build the complete swept AABB between the current deflated body and its predicted gravity-relative destination and reserve Space if that sweep collides. This prevents longer boosted horizons from tunneling through thin support collision shapes.
-- [ ] Keep all original gates: sprinting, airborne, descending toward floor, current body collision-free, actual support predicted.
-- [ ] Tests:
-  - [ ] baseline player has exactly 1.0 grace tick and retains current near/distant behavior;
-  - [ ] Jump Boost I/II increases grace monotonically;
-  - [ ] construct a gap that baseline does not reserve but Jump Boost II does;
-  - [ ] boosted ascending sprint remains unreserved;
-  - [ ] boosted distant/no-support case remains unreserved;
-  - [ ] sideways gravity uses the same jump-power scaling;
-  - [ ] existing Gravity Changer gravity-strength scaling remains valid alongside jump-power scaling;
-  - [ ] pathological boost levels are capped at 3.0 ticks.
+- [x] Add package-visible helpers in `GravityInput` for effective jump power / landing grace.
+- [x] Effective jump power uses `Attributes.JUMP_STRENGTH` when present, otherwise 0.42, plus `Player.getJumpBoostPower()`.
+- [x] Invalid/non-finite derived values fall back safely.
+- [x] `landingGraceTicks = clamp(effectiveJumpPower / 0.42, 1.0, 3.0)`.
+- [x] Preserve alpha.11 exactly at `h=1`.
+- [x] Extend predicted travel as `toward*h + acceleration*h*(h+1)/2`, clamp max to `0.60*h`.
+- [x] Collision-test the complete swept AABB between current and predicted body.
+- [x] Keep original gates: sprinting, airborne, descending, current body clear, real predicted support.
+- [x] Add tests for baseline, Jump Boost I/II monotonicity, boosted-only reservation, ascending/no-support cases, sideways gravity, gravity-strength interaction and 3-tick cap.
 
-## G. Documentation/version
+## G. Entity visual snap generalization
 
-- [x] Bump development version `0.1.0-alpha.11` -> `0.1.0-alpha.12`.
-- [x] Update README/GUIDE/ARCHITECTURE/VALIDATION/CHANGELOG with underwater control semantics and recharge rule.
-- [x] Keep configuration docs explicit: no key/timing JSON setting; 250 ms is fixed gameplay input semantics for now.
-- [ ] Update docs with jump-power-aware sprint-landing grace and Leaping behavior.
+- [ ] Add `GravityTransition.rebase(physicalPlan, entityHeading)`:
+  - [ ] same previous/target/kind/axis as the physical plan;
+  - [ ] project/normalize the supplied entity heading onto the old gravity plane;
+  - [ ] transport it through the physical plan's axis-angle;
+  - [ ] derive an entity-specific yaw delta from old/target local gauges;
+  - [ ] unit-test multiple headings rebased onto one quarter and one half-turn physical plan.
+- [ ] Add entity-scoped client payload, separate from player `visual_transition_v2`:
+  - [ ] entity id + UUID;
+  - [ ] target direction;
+  - [ ] yaw delta;
+  - [ ] turn kind;
+  - [ ] per-mob monotonic visual sequence.
+- [ ] Extend `MobGravity.State` with `visualSequence`.
+- [ ] Server sender targets `PlayerLookup.tracking(entity)` and explicitly includes all ServerPlayer passengers in the root hierarchy.
+- [ ] Send entity visual payload only for actual direction changes and only after collision preflight succeeds, immediately before physical commit.
+- [ ] Client resolves id+UUID against current `ClientLevel`; stale/id-reused packets fail closed.
+- [ ] `VisualTransitions` keeps current connection-scoped sequence gate for local-player payloads and a separate per-entity-UUID sequence map for tracked entities.
+- [ ] Entity `begin` path captures displayed frame, applies entity yaw gauge, enrolls that entity's Gravity Changer animation, and then reuses the exact existing override/easing code.
+- [ ] `clear()`/disconnect clears both local and tracked sequence state.
 
-## H. Iterative verification
+### Mounted turns
 
-- [x] Initial water plan reviewed twice before implementation.
-- [ ] Because jump-power scaling is a new requirement, re-review this revised plan until two consecutive reviews require no policy change before touching production sprint-landing code.
-- [ ] Implement remaining work on `tm/water-double-space` only.
-- [ ] Review implementation diff adversarially against the revised frozen plan.
+- [ ] Rider creates the existing physical `GravityTransition.Plan` from rider selection heading.
+- [ ] Rebase root mount's own heading onto the rider plan's same axis/kind.
+- [ ] Add `MobGravity.borrow(..., physicalPlan)` overload so the root uses the rebased plan before commit.
+- [ ] Apply root server yaw/body/head gauge delta before/with commit; rider keeps existing player-specific yaw delta.
+- [ ] Assert root and rider share the same physical axis/kind for 180-degree mounted turns.
+- [ ] Mount root receives entity snap for all tracking clients/passenger clients; rider still receives its existing local-player snap.
+
+### Pets / mob-owned changes
+
+- [ ] Pet replay builds an ordinary plan from pet current heading and target, sends entity visual transition, applies yaw gauge, then commits.
+- [ ] Borrow without an explicit rider plan, owned restore/retirement and prior-frame restoration use the mob's own heading as the physical plan.
+- [ ] Same-direction writes do not send a visual transition or mutate yaw.
+- [ ] External/foreign gravity writes never gain Clinging visual ownership.
+
+### Visual tests
+
+- [ ] Add geometry/JUnit coverage for rebase common-axis semantics.
+- [ ] Add real-client or focused client GameTest that enrolls a non-player entity animation and proves quarter turn is incomplete at old upstream timing assumptions but canonical by 180 ms.
+- [ ] Verify foreign/unowned mob Gravity Changer animation still uses upstream timing.
+- [ ] Add server/GameTest coverage that pet replay / mounted borrow increments/sends only owned transition state after successful preflight.
+
+## H. Documentation/version
+
+- [x] Bump development version to `0.1.0-alpha.12`.
+- [x] Update underwater docs/config/validation/changelog.
+- [ ] Update docs for jump-power-aware landing grace / Leaping behavior.
+- [ ] Update docs for mount/pet snap parity and tracked-entity presentation ownership.
+
+## I. Iterative verification
+
+- [x] Initial water plan reviewed twice.
+- [x] Jump-power plan reviewed twice before production changes.
+- [ ] Re-review entity-snap extension until two consecutive reviews require no policy change before production networking/mob changes.
+- [ ] Implement remaining work only on `tm/water-double-space`.
+- [ ] Review complete diff adversarially against this revised frozen plan.
 - [ ] Run build + JUnit + server GameTests.
 - [ ] Run default client GameTests.
 - [ ] Run First Person 2.7.2 lane.
 - [ ] Run optional Scale Brews server compatibility lane.
 - [ ] Run optional Scale Brews client load lane.
 - [ ] Perform second adversarial review after green CI.
-- [ ] Delete both temporary TM documents.
-- [ ] Re-run the complete CI matrix on the exact clean HEAD.
-- [ ] Merge only that exact SHA, then verify post-merge `main` CI.
+- [ ] Delete temporary TM documents.
+- [ ] Re-run complete CI on exact clean HEAD.
+- [ ] Merge only exact validated SHA, then verify post-merge `main` CI.
