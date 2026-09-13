@@ -17,11 +17,11 @@ import net.minecraft.server.level.ServerPlayer;
 public final class GravityFallSync {
     public enum Phase { START, LAND, RESUME, RESET }
 
-    public record Visual(int entity, UUID entityUuid, int phase, int direction, long sequence) implements CustomPacketPayload {
+    public record Visual(int entity, UUID entityUuid, int phase, int direction, float etaTicks, long sequence) implements CustomPacketPayload {
         public static final Type<Visual> TYPE=new Type<>(Identifier.fromNamespaceAndPath(ClingingReoriented.ID,"gravity_fall_visual_v1"));
         public static final StreamCodec<RegistryFriendlyByteBuf,Visual> CODEC=StreamCodec.of(
-            (b,v)->{b.writeVarInt(v.entity);b.writeUUID(v.entityUuid);b.writeVarInt(v.phase);b.writeVarInt(v.direction);b.writeVarLong(v.sequence);},
-            b->new Visual(b.readVarInt(),b.readUUID(),b.readVarInt(),b.readVarInt(),b.readVarLong()));
+            (b,v)->{b.writeVarInt(v.entity);b.writeUUID(v.entityUuid);b.writeVarInt(v.phase);b.writeVarInt(v.direction);b.writeFloat(v.etaTicks);b.writeVarLong(v.sequence);},
+            b->new Visual(b.readVarInt(),b.readUUID(),b.readVarInt(),b.readVarInt(),b.readFloat(),b.readVarLong()));
         @Override public Type<Visual> type(){return TYPE;}
     }
 
@@ -29,14 +29,17 @@ public final class GravityFallSync {
 
     public static void register(){PayloadTypeRegistry.clientboundPlay().register(Visual.TYPE,Visual.CODEC);}
 
-    public static void publish(ServerPlayer player,Phase phase,Direction target){
+    public static void publish(ServerPlayer player,Phase phase,Direction target,double etaTicks){
         var state=ClingingReoriented.data(player);
         long sequence=++state.gravityFallSequence;
-        var packet=new Visual(player.getId(),player.getUUID(),phase.ordinal(),target==null?-1:target.get3DDataValue(),sequence);
+        float eta=phase==Phase.LAND && Double.isFinite(etaTicks)?(float)Math.max(0.0D,etaTicks):0.0F;
+        var packet=new Visual(player.getId(),player.getUUID(),phase.ordinal(),target==null?-1:target.get3DDataValue(),eta,sequence);
         Set<ServerPlayer> recipients=new LinkedHashSet<>(PlayerLookup.tracking(player));
         recipients.add(player);
         for(ServerPlayer recipient:recipients)if(ServerPlayNetworking.canSend(recipient,Visual.TYPE))ServerPlayNetworking.send(recipient,packet);
     }
+
+    public static void publish(ServerPlayer player,Phase phase,Direction target){publish(player,phase,target,0.0D);}
 
     /** A late tracker receives the current semantic phase, not a replay of the original start event. */
     public static void sendSnapshot(ServerPlayer player,ServerPlayer recipient){
@@ -44,6 +47,7 @@ public final class GravityFallSync {
         if(!state.gravityFallActive || !ServerPlayNetworking.canSend(recipient,Visual.TYPE))return;
         Phase phase=state.gravityFallLanding?Phase.LAND:Phase.START;
         Direction target=state.gravityFallLanding?state.gravityFallLandingGravity:null;
-        ServerPlayNetworking.send(recipient,new Visual(player.getId(),player.getUUID(),phase.ordinal(),target==null?-1:target.get3DDataValue(),state.gravityFallSequence));
+        float eta=state.gravityFallLanding?(float)Math.max(0.0D,state.gravityFallLandingEtaTicks):0.0F;
+        ServerPlayNetworking.send(recipient,new Visual(player.getId(),player.getUUID(),phase.ordinal(),target==null?-1:target.get3DDataValue(),eta,state.gravityFallSequence));
     }
 }
