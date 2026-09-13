@@ -16,7 +16,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.entity.Entity;
 import org.joml.Quaternionf;
 
-/** Client-only ownership fence and snap trajectory for transitions initiated by Clinging. */
+/** Client-only ownership fence for held free-flight frames and landing/immediate snaps. */
 public final class VisualTransitions {
     private static final long TARGET_WAIT_NANOS=2_000_000_000L;
     private static final Map<GravityRotationAnimation,Active> ACTIVE=Collections.synchronizedMap(new WeakHashMap<>());
@@ -25,15 +25,54 @@ public final class VisualTransitions {
     private static volatile boolean fieldResolved;
     private static long latestSequence=-1;
 
-    private record Active(Entity entity,Direction target,GravityTransition.TurnKind kind,long sequence,
-                          Quaternionf startVisual,long receivedNanos,long startedNanos,boolean targetSeen) {}
+    private enum Mode { HOLD, LAND, SNAP }
+    private record Active(Entity entity,Direction target,GravityTransition.TurnKind kind,long sequence,Quaternionf startVisual,
+                          long receivedNanos,long startedNanos,boolean targetSeen,Mode mode) {}
 
     private VisualTransitions() {}
 
-    /** Connection-scoped local-player transition. */
+    /** Connection-scoped immediate local-player transition (forced cleanup / legacy mounted presentation). */
     public static void begin(Entity entity,Direction target,float yawDelta,int kindId,long sequence){
         if(sequence<=latestSequence)return;
-        if(enroll(entity,target,yawDelta,kindId,sequence))latestSequence=sequence;
+        if(enrollSnap(entity,target,yawDelta,kindId,sequence))latestSequence=sequence;
+    }
+
+    /** Physical turn with stable rendered world frame. */
+    public static void hold(Entity entity,Direction target,float yawDelta,long sequence){
+        if(sequence<=latestSequence||entity==null||target==null||!Float.isFinite(yawDelta)||sequence<0)return;
+        GravityRotationAnimation animation=animation(entity);if(animation==null)return;
+        long now=System.nanoTime();Direction actual=GravityDirectionUtil.getGravityDirection(entity);
+        Quaternionf current=animation.getRotation(actual,now);
+        Quaternionf held=GravityTransition.compensatedVisualStart(current,yawDelta);
+        GravityTransition.applyYawGauge(entity,yawDelta);
+        animation.forceSet(target,now);
+        synchronized(ACTIVE){ACTIVE.put(animation,new Active(entity,target,null,sequence,held,now,0L,actual==target,Mode.HOLD));}
+        latestSequence=sequence;
+    }
+
+    /** Commit a retained free-flight frame toward its imminent floor; no new yaw gauge is applied. */
+    public static void land(Entity entity,Direction target,int kindId,long sequence){
+        if(sequence<=latestSequence)return;
+        GravityTransition.TurnKind kind=GravityTransition.TurnKind.fromId(kindId);
+        if(entity==null||target==null||kind==null||sequence<0)return;
+        GravityRotationAnimation animation=animation(entity);if(animation==null)return;
+        long now=System.nanoTime();Direction actual=GravityDirectionUtil.getGravityDirection(entity);
+        Quaternionf current=animation.getRotation(actual,now);
+        boolean seen=actual==target;if(seen)animation.forceSet(target,now);
+        synchronized(ACTIVE){ACTIVE.put(animation,new Active(entity,target,kind,sequence,current,now,seen?now:0L,seen,Mode.LAND));}
+        latestSequence=sequence;
+    }
+
+    /** Cancel a landing: either freeze the exact current frame or release presentation ownership completely. */
+    public static void cancel(Entity entity,boolean holdCurrent,long sequence){
+        if(sequence<=latestSequence||entity==null||sequence<0)return;
+        GravityRotationAnimation animation=animation(entity);if(animation==null)return;
+        long now=System.nanoTime();Direction actual=GravityDirectionUtil.getGravityDirection(entity);
+        Quaternionf current=animation.getRotation(actual,now);
+        animation.forceSet(actual,now);
+        if(holdCurrent)synchronized(ACTIVE){ACTIVE.put(animation,new Active(entity,actual,null,sequence,current,now,0L,true,Mode.HOLD));}
+        else clear(animation);
+        latestSequence=sequence;
     }
 
     /** UUID-scoped tracked-entity transition; entity-id reuse cannot steal ownership. */
@@ -41,35 +80,48 @@ public final class VisualTransitions {
         if(entity==null)return;
         UUID uuid=entity.getUUID();
         synchronized(LATEST_ENTITY_SEQUENCE){if(sequence<=LATEST_ENTITY_SEQUENCE.getOrDefault(uuid,-1L))return;}
-        if(enroll(entity,target,yawDelta,kindId,sequence))synchronized(LATEST_ENTITY_SEQUENCE){LATEST_ENTITY_SEQUENCE.put(uuid,sequence);}
+        if(enrollSnap(entity,target,yawDelta,kindId,sequence))synchronized(LATEST_ENTITY_SEQUENCE){LATEST_ENTITY_SEQUENCE.put(uuid,sequence);}
     }
 
-    private static boolean enroll(Entity entity,Direction target,float yawDelta,int kindId,long sequence){
+    private static boolean enrollSnap(Entity entity,Direction target,float yawDelta,int kindId,long sequence){
         GravityTransition.TurnKind kind=GravityTransition.TurnKind.fromId(kindId);
         if(entity==null||target==null||kind==null||!Float.isFinite(yawDelta)||sequence<0)return false;
-        GravityRotationAnimation animation=animation(entity);
-        if(animation==null)return false;
-        long now=System.nanoTime();
-        Direction actual=GravityDirectionUtil.getGravityDirection(entity);
+        GravityRotationAnimation animation=animation(entity);if(animation==null)return false;
+        long now=System.nanoTime();Direction actual=GravityDirectionUtil.getGravityDirection(entity);
         Quaternionf currentVisual=animation.getRotation(actual,now);
         Quaternionf start=GravityTransition.compensatedVisualStart(currentVisual,yawDelta);
         GravityTransition.applyYawGauge(entity,yawDelta);
-        synchronized(ACTIVE){ACTIVE.put(animation,new Active(entity,target,kind,sequence,start,now,0L,false));}
+        synchronized(ACTIVE){ACTIVE.put(animation,new Active(entity,target,kind,sequence,start,now,0L,false,Mode.SNAP));}
         return true;
     }
 
     public static Quaternionf override(GravityRotationAnimation animation,Direction actual,long now){
         if(animation==null||actual==null)return null;
-        Active active;
-        synchronized(ACTIVE){active=ACTIVE.get(animation);}
-        if(active==null)return null;
+        Active active; synchronized(ACTIVE){active=ACTIVE.get(animation);} if(active==null)return null;
+        if(active.mode()==Mode.HOLD)return holdOverride(animation,active,actual,now);
+        return snapOverride(animation,active,actual,now);
+    }
+
+    private static Quaternionf holdOverride(GravityRotationAnimation animation,Active active,Direction actual,long now){
+        if(active.targetSeen()&&actual!=active.target()){clear(animation);return null;}
+        if(!active.targetSeen()){
+            if(actual==active.target()){
+                animation.forceSet(active.target(),now);
+                active=new Active(active.entity(),active.target(),null,active.sequence(),active.startVisual(),active.receivedNanos(),0L,true,Mode.HOLD);
+                synchronized(ACTIVE){ACTIVE.put(animation,active);}
+            }else if(now-active.receivedNanos()>TARGET_WAIT_NANOS){clear(animation);return null;}
+        }
+        return new Quaternionf(active.startVisual());
+    }
+
+    private static Quaternionf snapOverride(GravityRotationAnimation animation,Active active,Direction actual,long now){
         if(actual!=active.target()){
             if(active.targetSeen()||now-active.receivedNanos()>TARGET_WAIT_NANOS){clear(animation);return null;}
             return new Quaternionf(active.startVisual());
         }
         if(!active.targetSeen()){
             animation.forceSet(active.target(),now);
-            active=new Active(active.entity(),active.target(),active.kind(),active.sequence(),active.startVisual(),active.receivedNanos(),now,true);
+            active=new Active(active.entity(),active.target(),active.kind(),active.sequence(),active.startVisual(),active.receivedNanos(),now,true,active.mode());
             synchronized(ACTIVE){ACTIVE.put(animation,active);}
         }
         long elapsed=Math.max(0L,now-active.startedNanos());
@@ -82,12 +134,9 @@ public final class VisualTransitions {
 
     public static boolean owns(GravityRotationAnimation animation){if(animation==null)return false;synchronized(ACTIVE){return ACTIVE.containsKey(animation);}}
     public static boolean owns(Entity entity){GravityRotationAnimation animation=animation(entity);return animation!=null&&owns(animation);}
+    public static boolean holding(Entity entity){GravityRotationAnimation animation=animation(entity);if(animation==null)return false;synchronized(ACTIVE){var active=ACTIVE.get(animation);return active!=null&&active.mode()==Mode.HOLD;}}
 
-    /**
-     * Advance every Clinging-owned animation once per client tick, including tracked
-     * entities that are currently outside the renderer/frustum. Presentation time is
-     * tied to the gravity event, not to the first later frame in which the entity is drawn.
-     */
+    /** Advance every owned animation once per client tick, including tracked entities outside the renderer/frustum. */
     public static void tickAll(){
         java.util.List<Map.Entry<GravityRotationAnimation,Active>> snapshot;
         synchronized(ACTIVE){snapshot=new ArrayList<>(ACTIVE.entrySet());}
