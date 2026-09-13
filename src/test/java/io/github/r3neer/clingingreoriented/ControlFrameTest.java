@@ -11,14 +11,15 @@ import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;
 
 /**
- * FR-GF-060/061: the existing yaw-gauge rebase already transports the whole two-dimensional
- * WASD basis into the new physical walking plane while the compensated visual frame keeps the
- * rendered navigation frame continuous. No second input rotation or new air-steering layer is needed.
+ * Lower-layer control invariant: GravityTransition's yaw-gauge rebase rigidly transports
+ * the physical two-dimensional movement basis into each new gravity plane and preserves
+ * the compensated rendered navigation frame. VisualMovementFrameTest separately covers
+ * the local-player correction from that physical basis to the actually rendered camera.
  */
 final class ControlFrameTest {
     private static final double EPS=3.0E-4D;
 
-    @Test void everyQuarterAndHalfTurnTransportsTheWholeWasdPlaneWithoutChangingMagnitude(){
+    @Test void gravityGaugeTransportsTheWholePhysicalWasdPlaneWithoutChangingMagnitude(){
         for(Direction from:Direction.values())for(Direction to:Direction.values()){
             if(from==to)continue;
             for(float yaw:new float[]{0.0F,37.0F,-91.0F,179.0F}){
@@ -38,8 +39,6 @@ final class ControlFrameTest {
                 assertEquals(1.0D,newSide.length(),EPS);
                 assertEquals(0.0D,newForward.dot(newSide),EPS,"WASD basis lost orthogonality");
 
-                // Because both axes undergo the same rigid rotation, every analogue/diagonal input
-                // keeps exactly its old magnitude instead of gaining a new steering impulse.
                 Vec3 oldDiagonal=oldForward.scale(.8D).add(oldSide.scale(.6D));
                 Vec3 newDiagonal=newForward.scale(.8D).add(newSide.scale(.6D));
                 assertEquals(oldDiagonal.length(),newDiagonal.length(),EPS,"diagonal magnitude changed");
@@ -49,7 +48,7 @@ final class ControlFrameTest {
         }
     }
 
-    @Test void repeatedReorientationTurnsKeepRenderedNavigationFrameContinuousWhilePhysicalWasdPlaneMoves(){
+    @Test void repeatedReorientationTurnsKeepRenderedNavigationFrameContinuousWhilePhysicalPlaneMoves(){
         Direction gravity=Direction.DOWN;
         float yaw=-33.0F;
         Quaternionf visual=RotationUtil.getEntityRotationQuaternion(gravity);
@@ -73,9 +72,7 @@ final class ControlFrameTest {
         }
     }
 
-    @Test void frontWallCaseMapsForwardToScreenUpAlongWallInsteadOfPushingIntoIt(){
-        // DOWN + looking NORTH, then choosing NORTH as gravity. The camera remains looking at
-        // the wall, while vanilla-style forward movement becomes UP along that wall.
+    @Test void frontWallPhysicalGaugeAlreadyMapsForwardToUpAlongWall(){
         float yaw=180.0F;
         Vec3 heading=worldYaw(Direction.DOWN,yaw);
         var plan=GravityTransition.plan(Direction.DOWN,Direction.NORTH,heading);
