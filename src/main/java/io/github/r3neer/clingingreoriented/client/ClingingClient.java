@@ -60,13 +60,25 @@ public final class ClingingClient implements ClientModInitializer {
         net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STARTED.register(client->BeaconPowers.install());
         ClientPlayNetworking.registerGlobalReceiver(Payloads.Reply.TYPE,(reply,context)->{
             if(!PENDING.remove(reply.sequence()) || context.client().player==null) return;
-            if(reply.result()==ClingingReoriented.Result.MOUNT_ACTION.ordinal())return;
+            if(reply.result()==ClingingReoriented.Result.MOUNT_ACTION.ordinal()||reply.result()==ClingingReoriented.Result.LANDING_COMMITTED.ordinal())return;
             var sound=reply.result()==ClingingReoriented.Result.SUCCESS.ordinal()?SoundEvents.AMETHYST_BLOCK_CHIME:SoundEvents.NOTE_BLOCK_BASS.value();
             context.client().player.playSound(sound,.35f,reply.result()==0?1.25f:.8f);
         });
         ClientPlayNetworking.registerGlobalReceiver(Payloads.VisualTransition.TYPE,(transition,context)->{
             if(transition.direction()<0||transition.direction()>5||context.client().player==null||!Float.isFinite(transition.yawDelta()))return;
             VisualTransitions.begin(context.client().player,Direction.from3DDataValue(transition.direction()),transition.yawDelta(),transition.kind(),transition.sequence());
+        });
+        ClientPlayNetworking.registerGlobalReceiver(Payloads.VisualHold.TYPE,(transition,context)->{
+            if(transition.direction()<0||transition.direction()>5||context.client().player==null||!Float.isFinite(transition.yawDelta()))return;
+            VisualTransitions.hold(context.client().player,Direction.from3DDataValue(transition.direction()),transition.yawDelta(),transition.sequence());
+        });
+        ClientPlayNetworking.registerGlobalReceiver(Payloads.LandingVisual.TYPE,(transition,context)->{
+            if(transition.direction()<0||transition.direction()>5||context.client().player==null)return;
+            VisualTransitions.land(context.client().player,Direction.from3DDataValue(transition.direction()),transition.kind(),transition.sequence());
+        });
+        ClientPlayNetworking.registerGlobalReceiver(Payloads.VisualCancel.TYPE,(transition,context)->{
+            if(context.client().player==null)return;
+            VisualTransitions.cancel(context.client().player,transition.holdCurrent(),transition.sequence());
         });
         ClientPlayNetworking.registerGlobalReceiver(Payloads.EntityVisualTransition.TYPE,(transition,context)->{
             if(transition.direction()<0||transition.direction()>5||!Float.isFinite(transition.yawDelta())||context.client().level==null)return;
