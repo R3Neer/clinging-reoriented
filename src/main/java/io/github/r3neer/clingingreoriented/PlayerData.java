@@ -47,10 +47,17 @@ public final class PlayerData {
     public long landingSequence;
     public boolean freeFlightVisualHeld;
 
+    // Gravity Fall is also transient server authority. Continuous orientation stays client-derived.
+    public boolean gravityFallActive;
+    public boolean gravityFallLanding;
+    public Direction gravityFallLandingGravity=Direction.DOWN;
+    public long gravityFallSequence;
+
     public void unbind() {
         support = null; supportId = -1; supportPosition = null; supportBox = null; lastTransport = Vec3.ZERO; groundedOnSurface = false;
         supportHistory.clear();supportSampleSequence=0;lastConsumedSupportSample=-1;pendingMove=null;
     }
     public void clearLandingCommit(){landingCommitted=false;landingContact=null;landingKind=null;landingEtaTicks=0.0D;landingDeadlineTick=0L;}
+    public void clearGravityFall(){gravityFallActive=false;gravityFallLanding=false;gravityFallLandingGravity=Direction.DOWN;}
     public interface Holder { PlayerData clinging$data(); }
 }
