@@ -9,6 +9,8 @@ import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.minecraft.core.Direction;
 import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.LivingEntity;
 
 public final class EntitySnapClientGameTest implements FabricClientGameTest {
@@ -16,12 +18,13 @@ public final class EntitySnapClientGameTest implements FabricClientGameTest {
         var entityId=new AtomicInteger(-1);var entityUuid=new AtomicReference<java.util.UUID>();
         try(var world=context.worldBuilder().create()){
             world.getServer().runOnServer(server->{
-                server.runCommand("summon minecraft:wolf 2 82 0 {NoAI:1b,NoGravity:1b,Tags:[\"clinging_entity_snap_test\"]}");
-                for(var entity:server.overworld().getAllEntities())if(entity.getTags().contains("clinging_entity_snap_test") && entity instanceof LivingEntity living){
-                    living.addEffect(new MobEffectInstance(Reorientation.EFFECT,1200));living.setOnGround(false);living.setYRot(37.0F);living.yRotO=37.0F;
-                    entityId.set(living.getId());entityUuid.set(living.getUUID());break;
-                }
-                if(entityId.get()<0)throw new AssertionError("Could not spawn tracked snap fixture");
+                var level=server.overworld();
+                var wolf=EntityTypes.WOLF.create(level,EntitySpawnReason.COMMAND);
+                if(wolf==null)throw new AssertionError("Could not create tracked snap fixture");
+                wolf.snapTo(2.0,82.0,0.0);wolf.setNoAi(true);wolf.setNoGravity(true);wolf.setOnGround(false);wolf.setYRot(37.0F);wolf.yRotO=37.0F;
+                wolf.addEffect(new MobEffectInstance(Reorientation.EFFECT,1200));
+                if(!level.addFreshEntity(wolf))throw new AssertionError("Could not add tracked snap fixture to server level");
+                entityId.set(wolf.getId());entityUuid.set(wolf.getUUID());
             });
             context.waitFor(mc->mc.level!=null && mc.level.getEntity(entityId.get())!=null && mc.level.getEntity(entityId.get()).getUUID().equals(entityUuid.get()));
             world.getServer().runOnServer(server->{
