@@ -119,7 +119,7 @@ public final class ClingingReoriented implements ModInitializer {
         Vec3 heading=GravityTransition.sanitizeHeading(previous,requestedHeading,p.getYRot());
         GravityTransition.Plan transition=GravityTransition.plan(previous,direction,heading);
         boolean airborne=!AirChanges.grounded(p);
-        Payloads.visual(p,transition);
+        Payloads.hold(p,transition);
         writeTransition(p,direction,placement.position(),transition);
         if(airborne)s.airChangeUsed=true;
         s.owned = true; s.visualFrameOwned=true; s.selected = direction; s.unbind();
