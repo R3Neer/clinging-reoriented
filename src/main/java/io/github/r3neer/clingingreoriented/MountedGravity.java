@@ -28,7 +28,7 @@ public final class MountedGravity {
         if(direction==previous)return ClingingReoriented.Result.UNCHANGED;
         Vec3 heading=GravityTransition.sanitizeHeading(previous,requestedHeading,p.getYRot());
         GravityTransition.Plan transition=GravityTransition.plan(previous,direction,heading);
-        if(!MobGravity.borrow(root,direction))return ClingingReoriented.Result.NO_SPACE;
+        if(!MobGravity.borrow(root,direction,transition))return ClingingReoriented.Result.NO_SPACE;
         MobGravity.state(root).airUsed=true;
         Payloads.visual(p,transition);ClingingReoriented.applyYaw(p,transition);s.visualFrameOwned=true;
         s.airChangeUsed=true;root.positionRider(p);p.setOnGround(false);
