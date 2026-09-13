@@ -4,6 +4,7 @@ import io.github.r3neer.clingingreoriented.api.LandingSurfaceProvider;
 import io.github.r3neer.clingingreoriented.geometry.FaceGeometry;
 import io.github.r3neer.clingingreoriented.geometry.SweptAabb;
 import java.util.Optional;
+import net.minecraft.core.Direction;
 import net.minecraft.world.phys.AABB;
 
 /** Vanilla block-collision support and bounded swept-floor queries. */
@@ -18,7 +19,7 @@ public final class VanillaLandingSurfaceProvider implements LandingSurfaceProvid
         for (var shape : query.entity().level().getBlockCollisions(query.entity(), probe)) {
             for (var box : shape.toAabbs()) {
                 if (FaceGeometry.touching(body, box, query.gravity()))
-                    return Optional.of(contact(box,query));
+                    return Optional.of(contact(box,query.gravity().getOpposite()));
             }
         }
         return Optional.empty();
@@ -27,19 +28,18 @@ public final class VanillaLandingSurfaceProvider implements LandingSurfaceProvid
     @Override public Optional<LocalSweep> sweep(Query query,AABB startBody,AABB endBody){
         AABB swept=new AABB(Math.min(startBody.minX,endBody.minX),Math.min(startBody.minY,endBody.minY),Math.min(startBody.minZ,endBody.minZ),
             Math.max(startBody.maxX,endBody.maxX),Math.max(startBody.maxY,endBody.maxY),Math.max(startBody.maxZ,endBody.maxZ)).inflate(PROBE);
-        double earliestAny=Double.POSITIVE_INFINITY;
-        SweptAabb.Hit bestLanding=null;AABB bestBox=null;
-        var desired=query.gravity().getOpposite();
+        double bestFraction=Double.POSITIVE_INFINITY;AABB bestBox=null;Direction bestNormal=null;boolean bestSupport=false;
+        Direction desired=query.gravity().getOpposite();
         for(var shape:query.entity().level().getBlockCollisions(query.entity(),swept))for(var box:shape.toAabbs()){
-            var any=SweptAabb.hit(startBody,endBody,box);
-            if(any.isPresent())earliestAny=Math.min(earliestAny,any.get().fraction());
-            var landing=SweptAabb.hitForNormal(startBody,endBody,box,desired);
-            if(landing.isPresent()&&(bestLanding==null||landing.get().fraction()<bestLanding.fraction()-TIE)){
-                bestLanding=landing.get();bestBox=box;
+            var any=SweptAabb.hit(startBody,endBody,box);if(any.isEmpty())continue;
+            double fraction=any.get().fraction();
+            boolean supports=SweptAabb.hitForNormal(startBody,endBody,box,desired).filter(h->Math.abs(h.fraction()-fraction)<=TIE).isPresent();
+            if(fraction<bestFraction-TIE || Math.abs(fraction-bestFraction)<=TIE&&supports&&!bestSupport){
+                bestFraction=fraction;bestBox=box;bestNormal=supports?desired:any.get().normal();bestSupport=supports;
             }
         }
-        if(bestLanding==null||bestLanding.fraction()>earliestAny+TIE)return Optional.empty();
-        return Optional.of(new LocalSweep(contact(bestBox,query),bestLanding.fraction()));
+        if(bestBox==null)return Optional.empty();
+        return Optional.of(new LocalSweep(contact(bestBox,bestNormal),bestFraction,bestSupport));
     }
 
     @Override public boolean revalidate(Query query, LocalContact contact) {
@@ -51,7 +51,7 @@ public final class VanillaLandingSurfaceProvider implements LandingSurfaceProvid
         return false;
     }
 
-    private static LocalContact contact(AABB box,Query query){return new LocalContact(identity(box),0L,FaceGeometry.vector(query.gravity().getOpposite()));}
+    private static LocalContact contact(AABB box,Direction normal){return new LocalContact(identity(box),0L,FaceGeometry.vector(normal));}
     private static String identity(AABB box) {
         return Double.toHexString(box.minX) + "," + Double.toHexString(box.minY) + "," + Double.toHexString(box.minZ) + ";"
             + Double.toHexString(box.maxX) + "," + Double.toHexString(box.maxY) + "," + Double.toHexString(box.maxZ);
