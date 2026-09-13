@@ -2,6 +2,7 @@ package io.github.r3neer.clingingreoriented;
 
 import io.github.r3neer.clingingreoriented.api.LandingSurfaceProvider;
 import io.github.r3neer.clingingreoriented.api.LandingSurfaces;
+import io.github.r3neer.clingingreoriented.geometry.FaceGeometry;
 import java.util.Optional;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.Direction;
@@ -14,7 +15,7 @@ public final class LandingSurfaceApiGameTests {
     private static LandingSurfaceProvider provider(String id) {
         return new LandingSurfaceProvider() {
             @Override public Optional<LocalContact> currentSupport(Query query) {
-                return Optional.of(new LocalContact(id, 1L, Vec3.atLowerCornerOf(query.gravity().getOpposite().getUnitVec3i())));
+                return Optional.of(new LocalContact(id, 1L, FaceGeometry.vector(query.gravity().getOpposite())));
             }
             @Override public boolean revalidate(Query query, LocalContact contact) {
                 return contact != null && contact.localId().equals(id) && contact.revision() == 1L;
@@ -32,7 +33,9 @@ public final class LandingSurfaceApiGameTests {
             h.assertTrue(AirChanges.grounded(p),"registered surface provider can define support without forging vanilla onGround");
             var contact=LandingSurfaces.currentSupport(p,Direction.DOWN).orElseThrow();
             h.assertTrue(contact.key().provider().equals(id),"contact preserves provider identity");
+            h.assertTrue(contact.gravity()==Direction.DOWN,"contact preserves the gravity frame that created it");
             h.assertTrue(LandingSurfaces.revalidate(p,Direction.DOWN,contact),"provider contact revalidates in the same gravity frame");
+            h.assertFalse(LandingSurfaces.revalidate(p,Direction.EAST,contact),"stale contact cannot be reused after a gravity-frame change");
         } finally { registration.close(); }
         h.assertFalse(AirChanges.grounded(p),"closing registration removes external support");
         h.succeed();

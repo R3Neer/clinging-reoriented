@@ -33,9 +33,10 @@ public final class LandingSurfaces {
         }
     }
 
-    public record Contact(SurfaceKey key, Vec3 normal) {
+    /** Contact identity is frame-bound: a DOWN contact can never be reused after a gravity change to EAST. */
+    public record Contact(SurfaceKey key, Direction gravity, Vec3 normal) {
         public Contact {
-            if (key == null || normal == null || !Double.isFinite(normal.x + normal.y + normal.z)
+            if (key == null || gravity == null || normal == null || !Double.isFinite(normal.x + normal.y + normal.z)
                 || Math.abs(normal.lengthSqr() - 1.0D) > 1.0E-5D)
                 throw new IllegalArgumentException("Invalid landing contact");
         }
@@ -75,7 +76,7 @@ public final class LandingSurfaces {
         var query = new LandingSurfaceProvider.Query(entity, gravity);
         for (var entry : snapshot()) {
             var local = safeSupport(entry.getKey(), entry.getValue(), query);
-            if (local.isPresent()) return Optional.of(wrap(entry.getKey(), local.get()));
+            if (local.isPresent()) return Optional.of(wrap(entry.getKey(), gravity, local.get()));
         }
         return Optional.empty();
     }
@@ -88,14 +89,14 @@ public final class LandingSurfaces {
         for (var entry : snapshot()) {
             var local = safeSweep(entry.getKey(), entry.getValue(), query, startBody, endBody);
             if (local.isEmpty()) continue;
-            var hit = new SweepHit(wrap(entry.getKey(), local.get().contact()), local.get().fraction());
+            var hit = new SweepHit(wrap(entry.getKey(), gravity, local.get().contact()), local.get().fraction());
             if (best == null || hit.fraction() < best.fraction() - 1.0E-12D) best = hit;
         }
         return Optional.ofNullable(best);
     }
 
     public static boolean revalidate(LivingEntity entity, Direction gravity, Contact contact) {
-        if (entity == null || gravity == null || contact == null) return false;
+        if (entity == null || gravity == null || contact == null || contact.gravity() != gravity) return false;
         LandingSurfaceProvider provider;
         synchronized (LOCK) { provider = PROVIDERS.get(contact.key().provider()); }
         if (provider == null) return false;
@@ -138,8 +139,8 @@ public final class LandingSurfaces {
         }
     }
 
-    private static Contact wrap(Identifier id, LandingSurfaceProvider.LocalContact local) {
-        return new Contact(new SurfaceKey(id, local.localId(), local.revision()), local.normal());
+    private static Contact wrap(Identifier id, Direction gravity, LandingSurfaceProvider.LocalContact local) {
+        return new Contact(new SurfaceKey(id, local.localId(), local.revision()), gravity, local.normal());
     }
 
     private static boolean finite(AABB box) {
