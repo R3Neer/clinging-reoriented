@@ -44,6 +44,37 @@ players keep normal Clinging/Reorientation input.
 The same predicate runs in client precheck and server authority; it is an intent
 filter, not a blanket sprint lockout.
 
+### Underwater Space arbitration
+
+The existing `JumpInputMixin` remains the normal airborne/Elytra-adjacent entry
+point. Its client entry explicitly refuses water so a single aquatic Space can never
+turn gravity through that path.
+
+Underwater input instead uses `WaterDoubleTapDetector`, a tiny passive client state
+machine sampled from `options.keyJump.isDown()` at end-of-client-tick. It never
+calls `consumeClick()`, clears, or rewrites the key state, so Vanilla keeps ordinary
+Space-to-ascend behavior. The detector tracks only rising edges and a monotonic
+millisecond timestamp:
+
+- entering a valid water/gameplay context seeds the previous key state and clears
+  any partial gesture, preventing an already-held Space from becoming a synthetic
+  first tap;
+- the first rising edge records a timestamp and sends nothing;
+- after a real release, a second rising edge within **250 ms** consumes the pair and
+  requests a turn through the same request-building path used in air;
+- holding the key cannot repeat because there is no new rising edge;
+- an expired second edge becomes the first edge of a new pair;
+- leaving water, UI/focus/lifecycle invalidation or disconnect resets the detector.
+
+The pair is consumed before server authority answers. A rejected turn therefore
+cannot make a third rapid press inherit the old first tap. Because the detector is
+purely observational, accepted and rejected requests both leave Vanilla swimming
+input intact.
+
+Server authority is unchanged. `GravityInput.available()` deliberately does not
+reject water; Elytra eligibility already yields while submerged. Clinging keeps its
+one-turn budget and Reorientation remains unlimited.
+
 ## Selection versus navigation heading
 
 `selectionLook` is the actual rendered camera direction and is used only by
@@ -79,6 +110,12 @@ space, so each new direction represents a new fall segment rather than continuin
 the distance accumulated toward the previous floor. The reset happens only after a
 successful direction change. The same rule is applied by `MobGravity` to mounts,
 pet replay and owned mob recovery.
+
+`AirChanges.grounded()` controls Clinging charge restoration and remains independent
+from water input. It requires Minecraft's grounded state plus collision support on
+the feet-side face selected by the current gravity. Fluids have no support collision
+shape, and side/body contact fails the feet-face geometry test, so free swimming or
+brushing a wall cannot recharge Clinging. A real seabed/floor support does.
 
 Forced player retirement first tests DOWN in place, then a deterministic loaded
 search limited to a true Euclidean displacement of four blocks. If every candidate
