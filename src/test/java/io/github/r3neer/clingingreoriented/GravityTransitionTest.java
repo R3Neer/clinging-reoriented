@@ -60,13 +60,15 @@ final class GravityTransitionTest {
         assertVecEquals(riderQuarter.axis(),mountQuarter.axis(),EPS,"quarter turn axis is shared");
         assertVecEquals(new Vec3(0,0,-1),mountQuarter.oldWorldHeading(),EPS,"mount keeps its own source heading");
         assertVecEquals(GravityTransition.rotate(new Vec3(0,0,-1),riderQuarter.axis(),Math.PI*.5D).normalize(),mountQuarter.transportedWorldHeading(),EPS,"mount heading follows rider physical quarter turn");
+        assertGaugeReconstructs(mountQuarter,"rebased quarter yaw gauge reconstructs mount heading");
 
         var riderHalf=GravityTransition.plan(Direction.DOWN,Direction.UP,new Vec3(1,0,0));
         var mountHalf=GravityTransition.rebase(riderHalf,new Vec3(0,0,-1));
         assertEquals(GravityTransition.TurnKind.HALF,mountHalf.kind());
         assertVecEquals(riderHalf.axis(),mountHalf.axis(),EPS,"half turn axis is chosen once by rider");
         assertVecEquals(GravityTransition.rotate(new Vec3(0,0,-1),riderHalf.axis(),Math.PI).normalize(),mountHalf.transportedWorldHeading(),EPS,"mount heading rotates around rider-selected half-turn axis");
-        assertNotEquals(riderHalf.yawDelta(),mountHalf.yawDelta(),1.0E-4F,"different headings may need different yaw gauges");
+        assertGaugeReconstructs(riderHalf,"rider half-turn yaw gauge reconstructs rider heading");
+        assertGaugeReconstructs(mountHalf,"rebased half-turn yaw gauge reconstructs mount heading");
     }
 
     @Test
@@ -150,6 +152,13 @@ final class GravityTransitionTest {
         }
     }
 
+    private static void assertGaugeReconstructs(GravityTransition.Plan plan,String message){
+        Vec3 oldLocal=RotationUtil.vecWorldToPlayer(plan.oldWorldHeading(),plan.previous()).normalize();
+        float oldYaw=RotationUtil.vecToRot(oldLocal).x;
+        float newYaw=Mth.wrapDegrees(oldYaw+plan.yawDelta());
+        Vec3 actual=RotationUtil.vecPlayerToWorld(RotationUtil.rotToVec(newYaw,0.0F),plan.target()).normalize();
+        assertVecEquals(plan.transportedWorldHeading(),actual,EPS,message);
+    }
     private static Vec3 transform(Quaternionf quaternion, Vec3 vector) {
         Vector3f result=new Quaternionf(quaternion).transform(new Vector3f((float)vector.x,(float)vector.y,(float)vector.z));
         return new Vec3(result.x,result.y,result.z);
