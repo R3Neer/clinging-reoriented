@@ -4,6 +4,6 @@
   "compatibilityLevel": "JAVA_25",
   "plugin": "io.github.r3neer.clingingreoriented.mixin.CompatPlugin",
   "mixins": ["ClingingEffectMixin", "PlayerStateMixin", "GravityHelperMixin", "AnchorMixin", "EntityCollisionMixin", "MovementMixin", "ConnectionMixin", "ScalePhysicsMixin", "JumpMixin", "PlayerTransferMixin", "DirectionalFallGraceMixin", "FallTrackerMixin", "MobGravityMixin", "ImpactStateMixin", "MountGravityMixin", "FollowGravityMixin", "BeaconAccess"],
-  "client": ["GravitySnapMixin", "LegacyClientMixin", "JumpInputMixin", "OutgoingMoveMixin", "FirstPersonOffsetMixin", "GravityFallRenderMixin"],
+  "client": ["GravitySnapMixin", "LegacyClientMixin", "JumpInputMixin", "OutgoingMoveMixin", "FirstPersonOffsetMixin", "GravityFallRenderMixin", "VisualMovementMixin"],
   "injectors": { "defaultRequire": 1 }
 }
