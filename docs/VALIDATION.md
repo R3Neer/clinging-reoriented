@@ -1,5 +1,62 @@
 # Validation
 
+## 0.1.0-alpha.12 validation — 2026-09-13
+
+Alpha.12 extends alpha.11 in three independent areas while retaining the same
+server-authoritative gravity contract: underwater input arbitration, stronger-jump
+sprint-landing grace, and Clinging-owned snap presentation for mounts and pets.
+
+Underwater, Vanilla keeps ordinary Space-to-ascend behavior. Clinging/Reorientation
+requests a turn only on a deliberate second Space rising edge after a release and
+within a fixed **250 ms** window. The detector observes the key passively and does
+not consume or rewrite Vanilla input.
+
+Sprint-jump reservation now scales its near-landing prediction horizon with effective
+jump power. Vanilla's normal `0.42` jump keeps alpha.11's exact one-tick guard;
+stronger Jump Boost/Leaping-style jumps widen only that prediction, with a hard cap
+at three ticks. The original sprinting, airborne, descending and real-support gates
+remain mandatory.
+
+Clinging-owned non-player gravity changes now use the same **180 ms** quarter-turn /
+**240 ms** half-turn quadratic snap as players. Entity transitions carry ID + UUID,
+per-mob monotonic sequence, target, yaw delta and turn kind. Mounted half-turns use
+one rider-selected physical axis for the root and rider while rebasing each entity's
+own heading into its own yaw gauge. Pet replay and owned recovery use the mob's own
+heading. Foreign Gravity Changer writes remain outside Clinging presentation
+ownership.
+
+Alpha.12-specific automated coverage includes:
+
+- pure double-tap tests for first press, hold, release, in-window second press,
+  expiry, pair consumption, context reset and enter-while-held behavior;
+- a real-client underwater fixture proving single/held Space ascends without a
+  gravity request, double Space requests exactly once, separate Reorientation pairs
+  can turn repeatedly, and a rejected spent-Clinging request still preserves
+  Vanilla ascent;
+- submerged spent-Clinging, side/body contact and true seabed-support regressions,
+  retaining the pre-existing all-six-directions gravity-relative landing suite;
+- jump-power tests for the alpha.11 baseline, Jump Boost I/II monotonicity,
+  boosted-only near-landing reservation, ascending/no-support cases, sideways
+  gravity, gravity-strength interaction and the three-tick cap;
+- geometry coverage for `GravityTransition.rebase`, including multiple headings on
+  shared quarter- and half-turn physical plans;
+- server GameTests proving successful pet/mount owned turns advance entity visual
+  epochs only after preflight, failed/same-direction attempts do not publish or
+  mutate yaw, foreign writes remain external, and rider/root half-turns share one
+  physical axis while retaining entity-specific yaw deltas;
+- focused real-client non-player snap coverage, including UUID-safe entity
+  resolution, canonical completion and preservation of foreign Gravity Changer
+  animation ownership;
+- an off-screen tracked-entity regression: active owned snaps advance every client
+  tick even when the entity is not rendered, so a stale 180/240 ms transition cannot
+  replay later when the entity re-enters view.
+
+The complete release-candidate matrix passes: build/JUnit plus all **47 required
+server GameTests** without optional Scale Brews, default real-client GameTests,
+First Person 2.7.2 real-client compatibility, isolated Scale Brews beta.5 server
+compatibility, and the optional Scale Brews client-load lane. Production
+`compileClasspath` remains Scale-free.
+
 ## 0.1.0-alpha.11 development validation — 2026-09-12
 
 Alpha.11 is a game-feel/correctness follow-up to alpha.10 playtesting. It keeps the
@@ -31,10 +88,6 @@ Alpha.11-specific automated coverage includes:
   remaining strictly monotonic instead of being discarded by the client as stale;
 - the existing strict one-voluntary-turn Clinging budget, sprint-jump intent guard,
   center-aligned clearance fallback and genuine-obstruction atomicity.
-
-The complete target matrix remains: build/JUnit/server GameTests without optional
-Scale Brews, default real-client GameTests, First Person 2.7.2, then isolated Scale
-Brews beta.5 server and client lanes. Production compileClasspath remains Scale-free.
 
 ## 0.1.0-alpha.10 development validation — 2026-09-12
 
@@ -68,12 +121,15 @@ supersedes its presentation/configuration behavior.
 ## Covered behavior
 
 Automated fixtures exercise six-direction input and landing, held-key deduplication,
-success/failure sounds, obstruction rejection, effect expiry, beacon selection,
-Elytra priority, sprint-jump intent, mounted hierarchy validation, explicit mob
-ownership, prior-frame mount loans, passive mob sources, pet route bounds/lifecycle
-clearing, bounded retirement, center-aligned voluntary clearance, selection/heading
-separation, snap presentation, respawn visual epochs, fall segmentation and moving-
-surface causal replay rejection.
+underwater single/held Space ascent and double-tap selection, rejected underwater
+attempts preserving swimming, success/failure sounds, obstruction rejection, effect
+expiry, beacon selection, Elytra priority, jump-power-aware sprint-jump intent,
+mounted hierarchy validation, explicit mob ownership, prior-frame mount loans,
+entity visual epochs, mounted common-axis transport, pet snap presentation,
+off-screen transition expiry, passive mob sources, pet route bounds/lifecycle
+clearing, bounded retirement, center-aligned voluntary clearance,
+selection/heading separation, snap presentation, respawn visual epochs, fall
+segmentation and moving-surface causal replay rejection.
 
 ## Packaging
 
@@ -86,18 +142,14 @@ than a later merely equivalent rebuild.
 ## Manual QA still required
 
 - Dedicated multiplayer with realistic latency and rapid presses around landing,
-  support, teleport and interrupted-Reorientation boundaries.
-- Human acceptance of the 180/240 ms quadratic snap across all 30 direction pairs,
-  first- and third-person.
-- Repeated DOWN↔UP turns after deliberately looking vertical to select the target,
-  confirming the pre-selection world heading remains intuitive when the camera is
-  levelled again.
-- Death/respawn after several turns, confirming the first post-respawn turn keeps
-  Clinging presentation and heading semantics.
-- Long Reorientation chains with real falls and landings, checking both intended
-  fall damage and the reset at every actual gravity direction change.
-- Repeated sprint-jump chains over slabs, stairs and uneven terrain.
-- Human acceptance of center-aligned sideways turns in irregular caves/tight spaces.
-- Long pet routes and full-pack visual acceptance beyond bounded CI fixtures.
+  water entry/exit, support, teleport and interrupted-Reorientation boundaries.
+- Human underwater feel around the 250 ms boundary and repeated Reorientation pairs.
+- Human sprint-jump feel with normal jumps and high Jump Boost/Leaping on slabs,
+  stairs and uneven terrain.
+- Human acceptance of the 180/240 ms quadratic snap across player, mount and pet
+  transitions in first- and third-person, including entities entering/leaving view.
+- Repeated DOWN↔UP turns after deliberately looking vertical to select the target.
+- Death/respawn after several turns, long Reorientation fall chains and long pet
+  routes/full-pack visual acceptance beyond bounded CI fixtures.
 
 Automated assertions and inspected screenshots are not human gameplay QA.

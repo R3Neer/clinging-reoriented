@@ -6,8 +6,11 @@ import com.moigferdsrte.gravitychanger.util.RotationUtil;
 import io.github.r3neer.clingingreoriented.ClingingReoriented;
 import io.github.r3neer.clingingreoriented.GravityTransition;
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.WeakHashMap;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.Entity;
@@ -17,6 +20,7 @@ import org.joml.Quaternionf;
 public final class VisualTransitions {
     private static final long TARGET_WAIT_NANOS=2_000_000_000L;
     private static final Map<GravityRotationAnimation,Active> ACTIVE=Collections.synchronizedMap(new WeakHashMap<>());
+    private static final Map<UUID,Long> LATEST_ENTITY_SEQUENCE=new HashMap<>();
     private static volatile Field animationField;
     private static volatile boolean fieldResolved;
     private static long latestSequence=-1;
@@ -26,18 +30,32 @@ public final class VisualTransitions {
 
     private VisualTransitions() {}
 
+    /** Connection-scoped local-player transition. */
     public static void begin(Entity entity,Direction target,float yawDelta,int kindId,long sequence){
+        if(sequence<=latestSequence)return;
+        if(enroll(entity,target,yawDelta,kindId,sequence))latestSequence=sequence;
+    }
+
+    /** UUID-scoped tracked-entity transition; entity-id reuse cannot steal ownership. */
+    public static void beginTracked(Entity entity,Direction target,float yawDelta,int kindId,long sequence){
+        if(entity==null)return;
+        UUID uuid=entity.getUUID();
+        synchronized(LATEST_ENTITY_SEQUENCE){if(sequence<=LATEST_ENTITY_SEQUENCE.getOrDefault(uuid,-1L))return;}
+        if(enroll(entity,target,yawDelta,kindId,sequence))synchronized(LATEST_ENTITY_SEQUENCE){LATEST_ENTITY_SEQUENCE.put(uuid,sequence);}
+    }
+
+    private static boolean enroll(Entity entity,Direction target,float yawDelta,int kindId,long sequence){
         GravityTransition.TurnKind kind=GravityTransition.TurnKind.fromId(kindId);
-        if(entity==null||target==null||kind==null||!Float.isFinite(yawDelta)||sequence<=latestSequence)return;
+        if(entity==null||target==null||kind==null||!Float.isFinite(yawDelta)||sequence<0)return false;
         GravityRotationAnimation animation=animation(entity);
-        if(animation==null)return;
+        if(animation==null)return false;
         long now=System.nanoTime();
         Direction actual=GravityDirectionUtil.getGravityDirection(entity);
         Quaternionf currentVisual=animation.getRotation(actual,now);
         Quaternionf start=GravityTransition.compensatedVisualStart(currentVisual,yawDelta);
         GravityTransition.applyYawGauge(entity,yawDelta);
-        latestSequence=sequence;
         synchronized(ACTIVE){ACTIVE.put(animation,new Active(entity,target,kind,sequence,start,now,0L,false));}
+        return true;
     }
 
     public static Quaternionf override(GravityRotationAnimation animation,Direction actual,long now){
@@ -64,9 +82,25 @@ public final class VisualTransitions {
 
     public static boolean owns(GravityRotationAnimation animation){if(animation==null)return false;synchronized(ACTIVE){return ACTIVE.containsKey(animation);}}
     public static boolean owns(Entity entity){GravityRotationAnimation animation=animation(entity);return animation!=null&&owns(animation);}
-    public static void tick(Entity local){if(local==null)return;GravityRotationAnimation animation=animation(local);if(animation!=null&&owns(animation))animation.getRotation(GravityDirectionUtil.getGravityDirection(local),System.nanoTime());}
+
+    /**
+     * Advance every Clinging-owned animation once per client tick, including tracked
+     * entities that are currently outside the renderer/frustum. Presentation time is
+     * tied to the gravity event, not to the first later frame in which the entity is drawn.
+     */
+    public static void tickAll(){
+        java.util.List<Map.Entry<GravityRotationAnimation,Active>> snapshot;
+        synchronized(ACTIVE){snapshot=new ArrayList<>(ACTIVE.entrySet());}
+        long now=System.nanoTime();
+        for(var entry:snapshot){
+            var animation=entry.getKey();var active=entry.getValue();var entity=active.entity();
+            if(animation==null||entity==null||entity.isRemoved()){if(animation!=null)clear(animation);continue;}
+            animation.getRotation(GravityDirectionUtil.getGravityDirection(entity),now);
+        }
+    }
+
     public static Quaternionf current(Entity entity){GravityRotationAnimation animation=animation(entity);return animation==null?RotationUtil.getEntityRotationQuaternion(GravityDirectionUtil.getGravityDirection(entity)):animation.getRotation(GravityDirectionUtil.getGravityDirection(entity),System.nanoTime());}
-    public static void clear(){synchronized(ACTIVE){ACTIVE.clear();}latestSequence=-1;}
+    public static void clear(){synchronized(ACTIVE){ACTIVE.clear();}synchronized(LATEST_ENTITY_SEQUENCE){LATEST_ENTITY_SEQUENCE.clear();}latestSequence=-1;}
     private static void clear(GravityRotationAnimation animation){synchronized(ACTIVE){ACTIVE.remove(animation);}}
 
     private static GravityRotationAnimation animation(Entity entity){

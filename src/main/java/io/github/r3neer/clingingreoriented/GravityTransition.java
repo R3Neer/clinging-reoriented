@@ -86,14 +86,37 @@ public final class GravityTransition {
             axis = axis.normalize();
         }
 
-        Vec3 transportedHeading = rotate(heading, axis, angle).normalize();
+        return build(previous,target,kind,axis,heading,angle);
+    }
+
+    /**
+     * Re-express another entity's heading through an already chosen physical rotation.
+     * Mounted hierarchies use this so rider and mount share one axis/kind while each
+     * receives the yaw-gauge delta required by its own pre-turn heading.
+     */
+    public static Plan rebase(Plan physicalPlan, Vec3 entityHeading) {
+        if (physicalPlan == null) throw new IllegalArgumentException("Physical plan is required");
+        Direction previous=physicalPlan.previous();
+        Direction target=physicalPlan.target();
+        Vec3 oldGravity=direction(previous);
+        if(entityHeading==null || !Double.isFinite(entityHeading.x+entityHeading.y+entityHeading.z))
+            throw new IllegalArgumentException("Entity heading must be finite");
+        Vec3 heading=entityHeading.subtract(oldGravity.scale(entityHeading.dot(oldGravity)));
+        if(heading.lengthSqr()<=EPSILON)throw new IllegalArgumentException("Entity heading must lie in the old gravity plane");
+        heading=heading.normalize();
+        double angle=physicalPlan.kind()==TurnKind.HALF?Math.PI:Math.PI*0.5D;
+        return build(previous,target,physicalPlan.kind(),physicalPlan.axis(),heading,angle);
+    }
+
+    private static Plan build(Direction previous,Direction target,TurnKind kind,Vec3 axis,Vec3 heading,double angle){
+        Vec3 normalizedAxis=axis.normalize();
+        Vec3 transportedHeading = rotate(heading, normalizedAxis, angle).normalize();
         Vec3 oldLocalHeading = RotationUtil.vecWorldToPlayer(heading, previous).normalize();
         Vec3 targetLocalHeading = RotationUtil.vecWorldToPlayer(transportedHeading, target).normalize();
         float oldYaw = RotationUtil.vecToRot(oldLocalHeading).x;
         float targetYaw = RotationUtil.vecToRot(targetLocalHeading).x;
         float yawDelta = Mth.wrapDegrees(targetYaw - oldYaw);
-
-        return new Plan(previous, target, kind, axis, heading, transportedHeading, yawDelta);
+        return new Plan(previous, target, kind, normalizedAxis, heading, transportedHeading, yawDelta);
     }
 
     /**

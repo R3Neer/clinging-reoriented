@@ -32,8 +32,29 @@ repeats a turn.
 Usable Elytra always take priority: Space deploys the Elytra instead of changing
 gravity, and no turns are accepted while gliding. A queued sprint-jump also keeps
 Space when the player is sprinting downward and predicted to touch the current
-local floor on the next simulation step, preventing a near-landing double tap from
-being mistaken for Clinging/Reorientation.
+local floor soon, preventing a near-landing double tap from being mistaken for
+Clinging/Reorientation. Normal jump power preserves the original one-tick guard;
+stronger effective jump power, including Jump Boost/Leaping and compatible
+`JUMP_STRENGTH` modifiers, expands only that near-landing prediction up to a hard
+three-tick cap.
+
+## Underwater controls
+
+Water keeps Vanilla's normal Space-to-ascend control. A single press or held Space
+only swims upward; Clinging/Reorientation observes the key without consuming it.
+To request a gravity turn while in water, release Space and press it a second time
+within **250 ms**. The second press still reaches Vanilla, so swimming input remains
+live even if the gravity request succeeds or is rejected.
+
+The double-tap detector is edge-based: holding never repeats, entering the water
+while Space is already held cannot synthesize a tap, and leaving the water or other
+input-context changes discard a partial pair. A detected pair is consumed as one
+gesture, so a third rapid press begins a new pair rather than firing again.
+
+Water itself never restores Clinging's one-turn charge. The player must genuinely
+stand on a solid block with the feet-side face supported according to the current
+gravity. Merely being submerged or touching a block with the torso/side does not
+count; standing on the seabed does.
 
 ## Gravity snap presentation
 
@@ -56,14 +77,26 @@ rather than snapping back or queueing old rotations. Each successful gravity cha
 also starts a fresh vanilla fall-distance segment, so chaining legitimate
 Reorientation turns does not accumulate one artificial mega-fall.
 
+Clinging-owned mount and pet changes use the same **180/240 ms quadratic snap**.
+For a mounted turn, rider and root mount share one physical rotation; on an opposite
+180-degree change the rider's navigation heading chooses the axis, while the mount's
+own heading is transported through that same axis to derive its own yaw gauge.
+Standalone pet replay instead derives the physical plan from the pet's own heading.
+Owned restoration/retirement keeps the same presentation. Unrelated or foreign
+Gravity Changer writes never gain Clinging visual ownership and keep Gravity
+Changer's ordinary animation.
+
 These timings are gameplay/presentation semantics and are not configurable.
 Clinging creates no client JSON configuration file; old
 `config/clinging-reoriented-client.json` files from earlier alphas are ignored.
-Unrelated Gravity Changer changes keep Gravity Changer's own animation behavior.
 
 ## Things to try
 
 - Jump into open air, look toward a wall and press Space again.
+- Swim with Space held, then use a deliberate double Space tap to reorient without
+  giving up Vanilla ascent control.
+- Spend Clinging underwater and verify that free swimming/body contact does not
+  restore it, while actually standing on the seabed does.
 - Land sideways, jump relative to your new floor and spend Clinging's restored
   charge.
 - Spend Clinging's turn and verify that even DOWN now waits for a real landing.
@@ -71,13 +104,15 @@ Unrelated Gravity Changer changes keep Gravity Changer's own animation behavior.
   camera again: your world heading should still be north.
 - Chain rapid Reorientation turns and watch each snap continue from the current
   displayed frame without accumulating fall damage from earlier segments.
-- Sprint-jump repeatedly across flat ground without accidental gravity changes.
+- Sprint-jump repeatedly across flat ground, then repeat with Jump Boost/Leaping;
+  the queued landing jump should remain protected without blocking Space while
+  ascending or far from support.
 - Die and respawn after several turns; the first new turn must still use the same
   Clinging snap presentation rather than Gravity Changer's old interpolation.
 - Give a tamed animal its own gravity effect and let it replay turns along the
-  route where it follows you.
+  route where it follows you; its body should now use the same short snap.
 - Use Reorientation while riding to turn any compatible airborne living mount
-  and its complete passenger hierarchy through the same generic mount path.
+  and its complete passenger hierarchy through one shared physical rotation.
 
 When an owned gravity effect expires, the mod first restores DOWN in place. If
 that is obstructed it may relocate locally by at most four blocks; if no safe
@@ -128,19 +163,22 @@ when the installed Scale API is absent or incompatible.
 
 ## Project status
 
-**0.1.0-alpha.11** is the current development version. It keeps alpha.10's minimal
-snap-style gravity transport while separating target selection from navigation
-heading, preserving heading through vertical DOWN↔UP selection, making visual
-transition epochs survive death/respawn, resetting fall distance on actual
-Clinging-owned gravity changes and slowing the snap just enough to make its axis
-readable. It retains the sprint-jump intent guard, strict one-turn Clinging budget,
-center-aligned clearance fallback and earlier ownership/recovery hardening.
+**0.1.0-alpha.12** is the current development version. It adds passive underwater
+Space arbitration, jump-power-aware sprint-landing protection and snap-presentation
+parity for Clinging-owned mounts and pets. Ordinary Space remains Vanilla swimming;
+a deliberate 250 ms double tap requests a submerged turn without consuming ascent.
+Clinging recharge remains tied to real gravity-relative feet support. Stronger jump
+power widens only the near-landing sprint-jump reservation, from alpha.11's exact
+one-tick baseline up to three ticks. Mounts and pets now use the same 180/240 ms
+quadratic visual transport as players while foreign Gravity Changer changes remain
+upstream-owned.
 
-CI covers dedicated server GameTests, JUnit geometry tests, the real default client
-suites, a separate real-client First Person 2.7.2 lane and optional Scale Brews
-runtime compatibility lanes. Full-pack human playtesting, dedicated multiplayer
-latency and long pet routes remain manual checks; automated success is not presented
-as human gameplay QA.
+CI covers dedicated server GameTests, JUnit geometry/input tests, the real default
+client suites including underwater controls and tracked-entity snap ownership, a
+separate real-client First Person 2.7.2 lane and optional Scale Brews runtime
+compatibility lanes. Full-pack human playtesting, dedicated multiplayer latency and
+long pet routes remain manual checks; automated success is not presented as human
+gameplay QA.
 
 ## Build and contribute
 

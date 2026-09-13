@@ -56,3 +56,6 @@ jobs:
             build/libs/*.jar
             build/run/*/logs/latest.log
             build/run/clientGameTest/screenshots/*.png
+            build/test-results/**/*.xml
+            build/reports/tests/**
+            build/reports/problems/**

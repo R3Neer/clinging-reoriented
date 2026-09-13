@@ -1,11 +1,15 @@
 package io.github.r3neer.clingingreoriented;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
 import net.fabricmc.fabric.api.networking.v1.*;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 
 public final class Payloads {
     public record MoveReference(int support,int revision,net.minecraft.world.phys.Vec3 absolute,net.minecraft.world.phys.Vec3 origin) implements CustomPacketPayload {
@@ -42,6 +46,14 @@ public final class Payloads {
             b->new VisualTransition(b.readVarInt(),b.readFloat(),b.readVarInt(),b.readVarLong()));
         @Override public Type<VisualTransition> type(){return TYPE;}
     }
+    /** Clinging-owned snap presentation for a tracked non-player entity. */
+    public record EntityVisualTransition(int entity,java.util.UUID entityUuid,int direction,float yawDelta,int kind,long sequence) implements CustomPacketPayload {
+        public static final Type<EntityVisualTransition> TYPE=Payloads.type("entity_visual_transition");
+        public static final StreamCodec<RegistryFriendlyByteBuf,EntityVisualTransition> CODEC=StreamCodec.of(
+            (b,v)->{b.writeVarInt(v.entity);b.writeUUID(v.entityUuid);b.writeVarInt(v.direction);b.writeFloat(v.yawDelta);b.writeVarInt(v.kind);b.writeVarLong(v.sequence);},
+            b->new EntityVisualTransition(b.readVarInt(),b.readUUID(),b.readVarInt(),b.readFloat(),b.readVarInt(),b.readVarLong()));
+        @Override public Type<EntityVisualTransition> type(){return TYPE;}
+    }
     public record State(int player,int direction,boolean owned,boolean visualOwned,int support,java.util.UUID supportUuid,int revision) implements CustomPacketPayload {
         public static final Type<State> TYPE=Payloads.type("state_v2");
         public static final StreamCodec<RegistryFriendlyByteBuf,State> CODEC=StreamCodec.of((b,v)->{b.writeVarInt(v.player);b.writeVarInt(v.direction);b.writeBoolean(v.owned);b.writeBoolean(v.visualOwned);b.writeVarInt(v.support);b.writeUUID(v.supportUuid);b.writeVarInt(v.revision);},b->new State(b.readVarInt(),b.readVarInt(),b.readBoolean(),b.readBoolean(),b.readVarInt(),b.readUUID(),b.readVarInt()));
@@ -56,6 +68,7 @@ public final class Payloads {
         PayloadTypeRegistry.serverboundPlay().register(Request.TYPE,Request.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(Reply.TYPE,Reply.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(VisualTransition.TYPE,VisualTransition.CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(EntityVisualTransition.TYPE,EntityVisualTransition.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(State.TYPE,State.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(Request.TYPE,(request,context)-> {
             var p=context.player(); var s=ClingingReoriented.data(p);
@@ -79,6 +92,19 @@ public final class Payloads {
         var previous=com.moigferdsrte.gravitychanger.util.GravityDirectionUtil.getGravityDirection(p);
         if(previous==direction)return;
         visual(p,GravityTransition.plan(previous,direction,GravityTransition.headingFromYaw(previous,p.getYRot())));
+    }
+    public static void visual(LivingEntity entity,GravityTransition.Plan plan){
+        var s=MobGravity.state(entity);long sequence=++s.visualSequence;
+        var packet=new EntityVisualTransition(entity.getId(),entity.getUUID(),plan.target().get3DDataValue(),plan.yawDelta(),plan.kind().ordinal(),sequence);
+        Set<ServerPlayer> recipients=new LinkedHashSet<>(PlayerLookup.tracking(entity));
+        collectPlayerPassengers(entity,recipients);
+        for(ServerPlayer recipient:recipients)if(ServerPlayNetworking.canSend(recipient,EntityVisualTransition.TYPE))ServerPlayNetworking.send(recipient,packet);
+    }
+    private static void collectPlayerPassengers(Entity entity,Set<ServerPlayer> recipients){
+        for(Entity passenger:entity.getPassengers()){
+            if(passenger instanceof ServerPlayer player)recipients.add(player);
+            collectPlayerPassengers(passenger,recipients);
+        }
     }
     public static void sendState(ServerPlayer p,ServerPlayer recipient) {
         if(!ServerPlayNetworking.canSend(recipient,State.TYPE)) return;

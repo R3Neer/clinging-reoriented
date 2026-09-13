@@ -23,6 +23,7 @@ public final class MobGravity {
         public long breadcrumb;
         public java.util.UUID breadcrumbOwner;
         public long retryAt;
+        public long visualSequence;
         public void clearBorrow(){borrowedPreviousOwnership=Ownership.NONE;borrowedPreviousDirection=Direction.DOWN;}
     }
     public interface Holder { State clinging$mobGravity(); }
@@ -34,14 +35,14 @@ public final class MobGravity {
 
     private static boolean restore(LivingEntity e,Direction direction){
         var s=state(e);if(e.level().getGameTime()<s.retryAt)return false;
-        if(turn(e,direction,true)){s.retryAt=0;return true;}
+        if(ownedTurn(e,direction,true,null)){s.retryAt=0;return true;}
         var origin=e.position();
         double maxDistanceSqr=RECOVERY_RADIUS*RECOVERY_RADIUS+1.0E-9;
         for(int radius=1;radius<=8;radius++)for(int x=-radius;x<=radius;x++)for(int y=-radius;y<=radius;y++)for(int z=-radius;z<=radius;z++){
             if(Math.max(Math.abs(x),Math.max(Math.abs(y),Math.abs(z)))!=radius)continue;
             var target=origin.add(x*.5,y*.5,z*.5);
             if(target.distanceToSqr(origin)>maxDistanceSqr)continue;
-            if(relocateTree(e,direction,target)){s.retryAt=0;return true;}
+            if(ownedRelocateTree(e,direction,target,null)){s.retryAt=0;return true;}
         }
         s.retryAt=e.level().getGameTime()+20;return false;
     }
@@ -100,6 +101,34 @@ public final class MobGravity {
         return true;
     }
 
+    private static GravityTransition.Plan ownedPlan(LivingEntity e,Direction direction,GravityTransition.Plan physicalPlan){
+        Direction previous=GravityDirectionUtil.getOwnGravityDirection(e);
+        if(previous==direction)return null;
+        Vec3 heading=GravityTransition.headingFromYaw(previous,e.getYRot());
+        if(physicalPlan==null)return GravityTransition.plan(previous,direction,heading);
+        if(physicalPlan.previous()!=previous||physicalPlan.target()!=direction)return null;
+        return GravityTransition.rebase(physicalPlan,heading);
+    }
+    private static boolean ownedRelocateTree(LivingEntity e,Direction direction,Vec3 position,GravityTransition.Plan physicalPlan){
+        if(!treeFits(e,direction,position))return false;
+        Direction previous=GravityDirectionUtil.getOwnGravityDirection(e);
+        GravityTransition.Plan transition=ownedPlan(e,direction,physicalPlan);
+        if(previous!=direction&&transition==null)return false;
+        if(transition!=null){Payloads.visual(e,transition);GravityTransition.applyYawGauge(e,transition.yawDelta());}
+        commitTurn(e,direction,position,!e.position().equals(position));
+        return true;
+    }
+    static boolean ownedTurn(LivingEntity e,Direction direction,boolean checkSpace,GravityTransition.Plan physicalPlan){
+        var attribute=e.getAttribute(ModAttributes.GRAVITY_DIRECTION);
+        if(attribute==null || !attribute.getModifiers().isEmpty())return false;
+        if(checkSpace)return ownedRelocateTree(e,direction,e.position(),physicalPlan);
+        Direction previous=GravityDirectionUtil.getOwnGravityDirection(e);
+        GravityTransition.Plan transition=ownedPlan(e,direction,physicalPlan);
+        if(previous!=direction&&transition==null)return false;
+        if(transition!=null){Payloads.visual(e,transition);GravityTransition.applyYawGauge(e,transition.yawDelta());}
+        commitTurn(e,direction,e.position(),false);return true;
+    }
+
     private static void relinquishToExternal(LivingEntity e,Direction direction){
         var s=state(e);s.ownership=Ownership.EXTERNAL;s.ownedDirection=direction;s.clearBorrow();s.retryAt=0;
     }
@@ -117,7 +146,8 @@ public final class MobGravity {
     private static void finishBorrow(State s,Ownership ownership,Direction direction){
         s.ownership=ownership;s.ownedDirection=direction;s.clearBorrow();s.retryAt=0;
     }
-    public static boolean borrow(LivingEntity e,Direction direction){
+    public static boolean borrow(LivingEntity e,Direction direction){return borrow(e,direction,null);}
+    public static boolean borrow(LivingEntity e,Direction direction,GravityTransition.Plan physicalPlan){
         if(!supported(e)||!e.isAlive())return false;
         var s=state(e);ownershipStillMatches(e,s);
         Direction current=GravityDirectionUtil.getOwnGravityDirection(e);
@@ -128,7 +158,7 @@ public final class MobGravity {
             s.borrowedPreviousOwnership=previous;
             s.borrowedPreviousDirection=current;
         }
-        if(!turn(e,direction,true))return false;
+        if(!ownedTurn(e,direction,true,physicalPlan))return false;
         s.ownership=Ownership.BORROWED_RIDER;s.ownedDirection=direction;s.airUsed=true;s.retryAt=0;
         return true;
     }
@@ -179,7 +209,7 @@ public final class MobGravity {
         if((s.ownership==Ownership.EXTERNAL||s.ownership==Ownership.NONE)&&current!=Direction.DOWN)return false;
         if(s.airUsed && !pet.hasEffect(Reorientation.EFFECT))return false;
         boolean airborne=!AirChanges.grounded(pet);
-        if(!turn(pet,direction,true))return false;
+        if(!ownedTurn(pet,direction,true,null))return false;
         s.airUsed|=airborne;s.ownership=Ownership.OWNED_EFFECT;s.ownedDirection=direction;s.clearBorrow();s.retryAt=0;return true;
     }
 }
