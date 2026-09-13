@@ -69,7 +69,8 @@ public final class GravityFallStateGameTests {
         s.gravityFallActive=true;s.gravityFallLanding=false;s.landingCommitted=false;
         // Camera is already canonical DOWN, so S02/S03 have no reason to lock or rotate it.
         s.visualBaseKnown=true;s.visualBaseDirection=Direction.DOWN;
-        var valid=new AtomicBoolean(true),supportNow=new AtomicBoolean(false);
+        var valid=new AtomicBoolean(true);
+        var supportNow=new AtomicBoolean(false);
         var reg=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","gravity_fall_body_land"),fixture(p,valid,supportNow,.4D));
         try{
             GravityFallState.tick(p);
@@ -85,7 +86,8 @@ public final class GravityFallStateGameTests {
     public void invalidatedBodyLandingResumesFromCurrentPresentation(GameTestHelper h){
         var p=managed(h,GravityFallState.START_AIRBORNE_TICKS+3);var s=ClingingReoriented.data(p);
         s.gravityFallActive=true;
-        var valid=new AtomicBoolean(true),supportNow=new AtomicBoolean(false);
+        var valid=new AtomicBoolean(true);
+        var supportNow=new AtomicBoolean(false);
         var reg=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","gravity_fall_resume"),fixture(p,valid,supportNow,.35D));
         try{
             GravityFallState.tick(p);
@@ -103,7 +105,8 @@ public final class GravityFallStateGameTests {
     public void realSupportResetsActiveGravityFall(GameTestHelper h){
         var p=managed(h,GravityFallState.START_AIRBORNE_TICKS+3);var s=ClingingReoriented.data(p);
         s.gravityFallActive=true;s.gravityFallLanding=true;s.gravityFallLandingGravity=Direction.DOWN;s.gravityFallLandingEtaTicks=.2D;
-        var valid=new AtomicBoolean(true),supportNow=new AtomicBoolean(true);
+        var valid=new AtomicBoolean(true);
+        var supportNow=new AtomicBoolean(true);
         var reg=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","gravity_fall_touchdown"),fixture(p,valid,supportNow,.2D));
         try{
             GravityFallState.tick(p);
@@ -117,7 +120,8 @@ public final class GravityFallStateGameTests {
     @GameTest(padding=16)
     public void imminentSupportAtThresholdDoesNotFlashStart(GameTestHelper h){
         var p=managed(h,GravityFallState.START_AIRBORNE_TICKS);var s=ClingingReoriented.data(p);
-        var valid=new AtomicBoolean(true),supportNow=new AtomicBoolean(false);
+        var valid=new AtomicBoolean(true);
+        var supportNow=new AtomicBoolean(false);
         var reg=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","gravity_fall_no_flash"),fixture(p,valid,supportNow,.25D));
         try{
             GravityFallState.tick(p);
