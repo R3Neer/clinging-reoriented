@@ -79,7 +79,7 @@ Temporary working document. Delete before merge.
   - [ ] `toward*h + acceleration*h*(h+1)/2`;
   - [ ] clamp minimum travel at `0.10` as today;
   - [ ] scale maximum travel from `0.60` to `0.60*h`.
-- [ ] Probe the swept path toward the active gravity floor in bounded increments so boosted grace cannot tunnel through support.
+- [ ] Build the complete swept AABB between the current deflated body and its predicted gravity-relative destination and reserve Space if that sweep collides. This prevents longer boosted horizons from tunneling through thin support collision shapes.
 - [ ] Keep all original gates: sprinting, airborne, descending toward floor, current body collision-free, actual support predicted.
 - [ ] Tests:
   - [ ] baseline player has exactly 1.0 grace tick and retains current near/distant behavior;
