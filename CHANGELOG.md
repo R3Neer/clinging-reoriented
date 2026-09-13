@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+### Underwater controls
+
+- Keep Vanilla Space-to-ascend behavior intact in water: single presses and held
+  Space never request Clinging/Reorientation.
+- Add a passive **250 ms** double-Space gesture. After a real release, the second
+  rising edge requests a gravity turn without consuming or rewriting Vanilla input.
+- Consume each detected pair as one gesture, prevent held-key repeats, and reset
+  partial pairs when the water/gameplay context is lost or entered while already
+  holding Space.
+- Route underwater requests through the same server-authoritative target selection,
+  heading transport, charge, collision and response path used by airborne turns.
+
+### Clinging recharge
+
+- Keep water itself from restoring the one-turn Clinging budget.
+- Lock recharge to genuine gravity-relative solid support on the player's feet-side
+  face: body/side contact does not count, while actually standing on a seabed/floor
+  block does.
+
+### Validation
+
+- Add pure detector tests for edge timing, release, expiry, pair consumption and
+  context reset.
+- Add a real-client water fixture proving single/held Space ascends without requests,
+  double Space turns exactly once, repeated Reorientation pairs work, and a rejected
+  spent-Clinging double tap still preserves Vanilla ascent.
+- Add server GameTests for water/side-contact non-recharge and seabed recharge.
+
+## [0.1.0-alpha.11] - 2026-09-13
+
 ### Heading and snap feel
 
 - Separate the rendered `selectionLook` used to choose the gravity target from a
