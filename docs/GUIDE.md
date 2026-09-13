@@ -17,9 +17,17 @@ repeated turns.
 Grounded Space keeps normal jump or mount behavior. Creative flight, spectator
 mode, sleeping, gliding, held Gravity Anchors, pending forced retirement and foreign
 gravity ownership block voluntary selection. While sprinting downward toward the
-current local floor, Space is also reserved when the next simulation step predicts
-landing contact; this lets normal sprint-jump chains queue the next jump without
+current local floor, Space is also reserved when a bounded prediction reaches real
+landing support; this lets normal sprint-jump chains queue the next jump without
 accidentally triggering gravity.
+
+Normal effective jump power (`0.42`) keeps alpha.11's exact one-tick landing guard.
+Stronger jump power expands only that near-landing prediction in proportion to the
+effective value, with a hard **three-tick** cap. The calculation uses the player's
+`JUMP_STRENGTH` attribute when present plus Vanilla Jump Boost power, so Leaping and
+compatible modifiers participate without potion-specific exceptions. Ascending,
+non-sprinting or still-distant players remain available to Clinging/Reorientation;
+stronger jumps do not create a blanket input lockout.
 
 ### Water
 
@@ -83,6 +91,12 @@ person does not manufacture an extra lateral twist. Rapid Reorientation inputs d
 not queue camera turns: a new snap starts from the frame actually being displayed at
 that instant. Mouse input remains live during the transition.
 
+The same short snap belongs to Clinging-owned mount and pet gravity changes. It is
+not merely a player-camera effect. The mob's body/head yaw is transported on the
+server and its tracked client animation is enrolled into the same visual ownership
+path. Foreign Gravity Changer changes remain foreign and keep Gravity Changer's own
+presentation.
+
 ## Momentum, falling, collision and recovery
 
 A voluntary turn preserves world momentum and validates the complete rotated
@@ -110,7 +124,9 @@ charge does not prevent it. If no safe local DOWN placement exists, the current
 frame remains temporarily and retirement becomes pending. The mod retries
 periodically; ordinary movement can help the entity leave the obstruction, but new
 voluntary gravity turns are blocked until retirement succeeds or a lifecycle
-discontinuity invalidates the pending state.
+discontinuity invalidates the pending state. Clinging-owned mob retirement and
+rider-loan restoration use the same short entity snap when they actually change a
+mob's gravity frame.
 
 Death/respawn replaces the Minecraft player entity but not the visual network epoch
 for that connection. The first turn after respawn therefore keeps the same Clinging
@@ -134,12 +150,22 @@ rider's captured navigation heading uses the same gravity-transport policy as an
 ordinary player turn. A failed candidate is atomic: neither root nor passengers are
 moved first and checked later.
 
+Rider and root mount now share **one physical rotation** for a mounted turn. A
+perpendicular turn already has a unique axis. For an opposite 180-degree turn, the
+rider's navigation heading chooses the common axis; the mount does not independently
+invent another one from its own facing. The mount's own heading is instead rebased
+through that shared physical plan to calculate its own yaw-gauge delta. Rider and
+mount therefore follow the same 90/180-degree motion while each preserves its own
+facing semantics and both use the 180/240 ms quadratic snap.
+
 Mounted gravity uses the same generic contract for every compatible non-player
 `LivingEntity` root vehicle. Tiny Mounts are not a separate Clinging concept.
 
 Mounting with Reorientation can temporarily lend the rider's non-DOWN frame to the
 root mount. Clinging instead adopts the mount's frame. When that loan ends, the
-mount returns to the frame it had before the loan.
+mount returns to the frame it had before the loan. A loan/restoration performed by
+Clinging is presentation-owned; a direction written by another Gravity Changer
+source is not.
 
 ## Pets and passive mobs
 
@@ -148,6 +174,11 @@ follow-owner goal can replay the owner's turns when it reaches the recorded plac
 where each turn occurred. The pet needs its own Clinging or Reorientation effect,
 and Clinging still permits only one arbitrary turn per airborne stretch. A replayed
 mob gravity change also starts a new fall-distance segment.
+
+A pet replay derives its physical turn from the pet's own gravity-relative heading,
+including the axis for an opposite 180-degree change. Successful owned replays use
+the same 180/240 ms quadratic snap as players. Failed collision preflight and
+same-direction replay produce no visual transition and do not mutate the pet's yaw.
 
 Sitting pets do not replay routes. Trails retain at most 64 turns for one minute
 and are cleared when the owner teleports, changes dimension, dies or logs out.
