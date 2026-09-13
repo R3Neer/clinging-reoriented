@@ -35,6 +35,24 @@ Space when the player is sprinting downward and predicted to touch the current
 local floor on the next simulation step, preventing a near-landing double tap from
 being mistaken for Clinging/Reorientation.
 
+## Underwater controls
+
+Water keeps Vanilla's normal Space-to-ascend control. A single press or held Space
+only swims upward; Clinging/Reorientation observes the key without consuming it.
+To request a gravity turn while in water, release Space and press it a second time
+within **250 ms**. The second press still reaches Vanilla, so swimming input remains
+live even if the gravity request succeeds or is rejected.
+
+The double-tap detector is edge-based: holding never repeats, entering the water
+while Space is already held cannot synthesize a tap, and leaving the water or other
+input-context changes discard a partial pair. A detected pair is consumed as one
+gesture, so a third rapid press begins a new pair rather than firing again.
+
+Water itself never restores Clinging's one-turn charge. The player must genuinely
+stand on a solid block with the feet-side face supported according to the current
+gravity. Merely being submerged or touching a block with the torso/side does not
+count; standing on the seabed does.
+
 ## Gravity snap presentation
 
 Clinging/Reorientation gravity is physical immediately, but the camera and body use
@@ -64,6 +82,10 @@ Unrelated Gravity Changer changes keep Gravity Changer's own animation behavior.
 ## Things to try
 
 - Jump into open air, look toward a wall and press Space again.
+- Swim with Space held, then use a deliberate double Space tap to reorient without
+  giving up Vanilla ascent control.
+- Spend Clinging underwater and verify that free swimming/body contact does not
+  restore it, while actually standing on the seabed does.
 - Land sideways, jump relative to your new floor and spend Clinging's restored
   charge.
 - Spend Clinging's turn and verify that even DOWN now waits for a real landing.
@@ -128,19 +150,19 @@ when the installed Scale API is absent or incompatible.
 
 ## Project status
 
-**0.1.0-alpha.11** is the current development version. It keeps alpha.10's minimal
-snap-style gravity transport while separating target selection from navigation
-heading, preserving heading through vertical DOWN↔UP selection, making visual
-transition epochs survive death/respawn, resetting fall distance on actual
-Clinging-owned gravity changes and slowing the snap just enough to make its axis
-readable. It retains the sprint-jump intent guard, strict one-turn Clinging budget,
-center-aligned clearance fallback and earlier ownership/recovery hardening.
+**0.1.0-alpha.12** is the current development version. It adds passive underwater
+Space arbitration: ordinary press/hold remains Vanilla swimming, while a deliberate
+250 ms double tap requests Clinging/Reorientation without consuming the swim input.
+It explicitly locks Clinging recharge to real gravity-relative feet support, so
+water and body contact never refill the one-turn budget. It retains alpha.11's
+heading-preserving snap transport, respawn-safe visual epochs, fall segmentation,
+sprint-jump guard, strict one-turn Clinging budget and center-aligned clearance.
 
-CI covers dedicated server GameTests, JUnit geometry tests, the real default client
-suites, a separate real-client First Person 2.7.2 lane and optional Scale Brews
-runtime compatibility lanes. Full-pack human playtesting, dedicated multiplayer
-latency and long pet routes remain manual checks; automated success is not presented
-as human gameplay QA.
+CI covers dedicated server GameTests, JUnit geometry/input tests, the real default
+client suites including underwater swimming/double-tap behavior, a separate
+real-client First Person 2.7.2 lane and optional Scale Brews runtime compatibility
+lanes. Full-pack human playtesting, dedicated multiplayer latency and long pet routes
+remain manual checks; automated success is not presented as human gameplay QA.
 
 ## Build and contribute
 
