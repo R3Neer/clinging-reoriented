@@ -51,6 +51,7 @@ public final class PlayerData {
     public boolean gravityFallActive;
     public boolean gravityFallLanding;
     public Direction gravityFallLandingGravity=Direction.DOWN;
+    public double gravityFallLandingEtaTicks;
     public long gravityFallSequence;
 
     public void unbind() {
@@ -58,6 +59,6 @@ public final class PlayerData {
         supportHistory.clear();supportSampleSequence=0;lastConsumedSupportSample=-1;pendingMove=null;
     }
     public void clearLandingCommit(){landingCommitted=false;landingContact=null;landingKind=null;landingEtaTicks=0.0D;landingDeadlineTick=0L;}
-    public void clearGravityFall(){gravityFallActive=false;gravityFallLanding=false;gravityFallLandingGravity=Direction.DOWN;}
+    public void clearGravityFall(){gravityFallActive=false;gravityFallLanding=false;gravityFallLandingGravity=Direction.DOWN;gravityFallLandingEtaTicks=0.0D;}
     public interface Holder { PlayerData clinging$data(); }
 }
