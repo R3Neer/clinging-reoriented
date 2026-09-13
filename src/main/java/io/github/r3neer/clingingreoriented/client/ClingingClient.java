@@ -99,7 +99,8 @@ public final class ClingingClient implements ClientModInitializer {
                 if(snapshot.support()<0) {s.unbind();it.remove();}
                 else if(client.level.getEntity(snapshot.support()) instanceof net.minecraft.world.entity.LivingEntity support && support.getUUID().equals(snapshot.supportUuid())) {MovingSurface.bind(p,support);it.remove();}
             }
-            if(client.player!=null){VisualTransitions.tick(client.player);MovingSurface.carry(client.player);}
+            VisualTransitions.tickAll();
+            if(client.player!=null)MovingSurface.carry(client.player);
         });
     }
 }
