@@ -45,6 +45,7 @@ public final class PlayerData {
     public Direction visualBaseDirection=Direction.DOWN;
     public boolean visualBaseKnown;
     public long landingSequence;
+    public boolean freeFlightVisualHeld;
 
     public void unbind() {
         support = null; supportId = -1; supportPosition = null; supportBox = null; lastTransport = Vec3.ZERO; groundedOnSurface = false;
