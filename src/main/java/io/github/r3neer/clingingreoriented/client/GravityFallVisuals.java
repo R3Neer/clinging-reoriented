@@ -11,6 +11,7 @@ import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import org.joml.Quaternionf;
 
 /**
@@ -132,7 +133,7 @@ public final class GravityFallVisuals {
                 if(entity==null){if(++active.unresolvedTicks>UNRESOLVED_TTL_TICKS)it.remove();continue;}
                 active.unresolvedTicks=0;
                 // Defensive local fence: server normally sends RESET first, but visual ownership must never outlive Elytra/removal.
-                if(entity.isRemoved()||entity.isFallFlying()){it.remove();continue;}
+                if(entity.isRemoved()||(entity instanceof LivingEntity living&&living.isFallFlying())){it.remove();continue;}
                 ensureInitialized(active,entity);
                 if(active.mode==Mode.SUSTAIN){
                     active.transport=BodyOrientation.transport(active.transport,entity.getDeltaMovement());
