@@ -1,5 +1,35 @@
 # Validation
 
+## 0.1.0-alpha.12 development validation — 2026-09-13
+
+Alpha.12 adds underwater Space arbitration without changing the gravity-turn rules
+established by alpha.11. Vanilla retains ordinary Space-to-ascend behavior in water;
+Clinging/Reorientation requests a turn only on a deliberate second Space rising
+edge after a release and within a fixed 250 ms window.
+
+Alpha.12-specific automated coverage includes:
+
+- a pure double-tap detector proving first press, hold, release, in-window second
+  press, expired windows, pair consumption, context reset and enter-while-held
+  behavior;
+- a real-client underwater fixture proving a single/held Space causes upward
+  swimming and sends no gravity request;
+- the same fixture proving a second rising edge within the window sends exactly one
+  gravity request, that holding the second press does not repeat, and that a fresh
+  pair can perform another Reorientation turn;
+- a spent-Clinging underwater double tap reaching server authority, being rejected
+  without changing gravity, while Vanilla upward swimming remains active;
+- submerged spent Clinging not recharging from water alone even with a forged
+  grounded flag;
+- underwater side/body contact with a solid block not recharging the spent charge;
+- true solid seabed support on the feet-side face restoring the charge;
+- the pre-existing all-six-directions landing suite continuing to prove that support
+  and charge restoration are gravity-relative rather than world-DOWN-specific.
+
+The complete target matrix remains: build/JUnit/server GameTests without optional
+Scale Brews, default real-client GameTests, First Person 2.7.2, then isolated Scale
+Brews beta.5 server and client lanes. Production compileClasspath remains Scale-free.
+
 ## 0.1.0-alpha.11 development validation — 2026-09-12
 
 Alpha.11 is a game-feel/correctness follow-up to alpha.10 playtesting. It keeps the
@@ -31,10 +61,6 @@ Alpha.11-specific automated coverage includes:
   remaining strictly monotonic instead of being discarded by the client as stale;
 - the existing strict one-voluntary-turn Clinging budget, sprint-jump intent guard,
   center-aligned clearance fallback and genuine-obstruction atomicity.
-
-The complete target matrix remains: build/JUnit/server GameTests without optional
-Scale Brews, default real-client GameTests, First Person 2.7.2, then isolated Scale
-Brews beta.5 server and client lanes. Production compileClasspath remains Scale-free.
 
 ## 0.1.0-alpha.10 development validation — 2026-09-12
 
@@ -68,12 +94,13 @@ supersedes its presentation/configuration behavior.
 ## Covered behavior
 
 Automated fixtures exercise six-direction input and landing, held-key deduplication,
-success/failure sounds, obstruction rejection, effect expiry, beacon selection,
-Elytra priority, sprint-jump intent, mounted hierarchy validation, explicit mob
-ownership, prior-frame mount loans, passive mob sources, pet route bounds/lifecycle
-clearing, bounded retirement, center-aligned voluntary clearance, selection/heading
-separation, snap presentation, respawn visual epochs, fall segmentation and moving-
-surface causal replay rejection.
+underwater single/held Space ascent, underwater double-tap selection, rejected
+underwater attempts preserving swimming, success/failure sounds, obstruction
+rejection, effect expiry, beacon selection, Elytra priority, sprint-jump intent,
+mounted hierarchy validation, explicit mob ownership, prior-frame mount loans,
+passive mob sources, pet route bounds/lifecycle clearing, bounded retirement,
+center-aligned voluntary clearance, selection/heading separation, snap presentation,
+respawn visual epochs, fall segmentation and moving-surface causal replay rejection.
 
 ## Packaging
 
@@ -86,7 +113,10 @@ than a later merely equivalent rebuild.
 ## Manual QA still required
 
 - Dedicated multiplayer with realistic latency and rapid presses around landing,
-  support, teleport and interrupted-Reorientation boundaries.
+  water entry/exit, support, teleport and interrupted-Reorientation boundaries.
+- Human underwater feel: ordinary swim holds, deliberate double taps near the
+  250 ms boundary, repeated Reorientation pairs and spent-Clinging rejection while
+  rising normally.
 - Human acceptance of the 180/240 ms quadratic snap across all 30 direction pairs,
   first- and third-person.
 - Repeated DOWN↔UP turns after deliberately looking vertical to select the target,
