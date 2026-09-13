@@ -64,11 +64,12 @@ public final class ClingingReoriented implements ModInitializer {
             GravityBreadcrumbs.prune(server);
             for (ServerPlayer p : server.getPlayerList().getPlayers()) {
                 reconcile(p);
+                LandingState.tick(p);
                 MovingSurface.carry(p);
             }
         });
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> { reconcile(handler.player); Payloads.publish(handler.player); });
-        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {data(handler.player).unbind();GravityBreadcrumbs.clear(handler.player.getUUID());});
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {LandingState.lifecycleClear(handler.player);data(handler.player).unbind();GravityBreadcrumbs.clear(handler.player.getUUID());});
         ServerPlayerEvents.COPY_FROM.register(ClingingReoriented::copyPlayerState);
         ServerPlayerEvents.AFTER_RESPAWN.register((oldPlayer,newPlayer,alive)->Payloads.publish(newPlayer));
         EntityTrackingEvents.START_TRACKING.register((entity, observer) -> { if (entity instanceof ServerPlayer p) Payloads.sendState(p, observer); });
@@ -88,7 +89,7 @@ public final class ClingingReoriented implements ModInitializer {
         }
     }
 
-    public enum Result { SUCCESS, NO_SURFACE, AMBIGUOUS, NO_SPACE, BLOCKED, FOREIGN_GRAVITY, UNCHANGED, AIR_CHANGE_USED, MOUNT_ACTION }
+    public enum Result { SUCCESS, NO_SURFACE, AMBIGUOUS, NO_SPACE, BLOCKED, FOREIGN_GRAVITY, UNCHANGED, AIR_CHANGE_USED, MOUNT_ACTION, LANDING_COMMITTED }
     public static Result attempt(ServerPlayer p) {
         Direction gravity=GravityDirectionUtil.getGravityDirection(p);
         return attempt(p,p.getLookAngle(),GravityTransition.headingFromYaw(gravity,p.getYRot()));
@@ -99,6 +100,7 @@ public final class ClingingReoriented implements ModInitializer {
     }
     public static Result attempt(ServerPlayer p, Vec3 selectionLook, Vec3 requestedHeading) {
         reconcile(p);
+        if(LandingState.committed(p))return Result.LANDING_COMMITTED;
         var s = data(p);
         if (!hasEffect(p) || !p.isAlive() || p.isSpectator() || p.isSleeping() || p.isFallFlying() || p.getAbilities().flying || anchor(p) || s.retirementPending) return Result.BLOCKED;
         if(selectionLook==null || !Double.isFinite(selectionLook.x+selectionLook.y+selectionLook.z) || selectionLook.lengthSqr()<1.0E-10D)return Result.AMBIGUOUS;
