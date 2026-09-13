@@ -38,13 +38,36 @@ public final class Payloads {
         public static final StreamCodec<RegistryFriendlyByteBuf,Reply> CODEC=StreamCodec.of((b,v)->{b.writeVarLong(v.sequence);b.writeVarInt(v.result);},b->new Reply(b.readVarLong(),b.readVarInt()));
         @Override public Type<Reply> type(){return TYPE;}
     }
-    /** Sent only to the affected player for a transition initiated by Clinging/Reorientation. */
+    /** Immediate legacy/forced local-player transition. */
     public record VisualTransition(int direction,float yawDelta,int kind,long sequence) implements CustomPacketPayload {
         public static final Type<VisualTransition> TYPE=Payloads.type("visual_transition_v2");
         public static final StreamCodec<RegistryFriendlyByteBuf,VisualTransition> CODEC=StreamCodec.of(
             (b,v)->{b.writeVarInt(v.direction);b.writeFloat(v.yawDelta);b.writeVarInt(v.kind);b.writeVarLong(v.sequence);},
             b->new VisualTransition(b.readVarInt(),b.readFloat(),b.readVarInt(),b.readVarLong()));
         @Override public Type<VisualTransition> type(){return TYPE;}
+    }
+    /** Physical gravity/yaw changed, but keep the rendered world frame stable. */
+    public record VisualHold(int direction,float yawDelta,long sequence) implements CustomPacketPayload {
+        public static final Type<VisualHold> TYPE=Payloads.type("visual_hold_v1");
+        public static final StreamCodec<RegistryFriendlyByteBuf,VisualHold> CODEC=StreamCodec.of(
+            (b,v)->{b.writeVarInt(v.direction);b.writeFloat(v.yawDelta);b.writeVarLong(v.sequence);},
+            b->new VisualHold(b.readVarInt(),b.readFloat(),b.readVarLong()));
+        @Override public Type<VisualHold> type(){return TYPE;}
+    }
+    /** Commit the retained local-player frame toward the imminent gravity-relative floor. */
+    public record LandingVisual(int direction,int kind,long sequence) implements CustomPacketPayload {
+        public static final Type<LandingVisual> TYPE=Payloads.type("visual_land_v1");
+        public static final StreamCodec<RegistryFriendlyByteBuf,LandingVisual> CODEC=StreamCodec.of(
+            (b,v)->{b.writeVarInt(v.direction);b.writeVarInt(v.kind);b.writeVarLong(v.sequence);},
+            b->new LandingVisual(b.readVarInt(),b.readVarInt(),b.readVarLong()));
+        @Override public Type<LandingVisual> type(){return TYPE;}
+    }
+    /** Cancel a landing trajectory. holdCurrent=true freezes the exact currently displayed frame. */
+    public record VisualCancel(boolean holdCurrent,long sequence) implements CustomPacketPayload {
+        public static final Type<VisualCancel> TYPE=Payloads.type("visual_cancel_v1");
+        public static final StreamCodec<RegistryFriendlyByteBuf,VisualCancel> CODEC=StreamCodec.of(
+            (b,v)->{b.writeBoolean(v.holdCurrent);b.writeVarLong(v.sequence);},b->new VisualCancel(b.readBoolean(),b.readVarLong()));
+        @Override public Type<VisualCancel> type(){return TYPE;}
     }
     /** Clinging-owned snap presentation for a tracked non-player entity. */
     public record EntityVisualTransition(int entity,java.util.UUID entityUuid,int direction,float yawDelta,int kind,long sequence) implements CustomPacketPayload {
@@ -68,6 +91,9 @@ public final class Payloads {
         PayloadTypeRegistry.serverboundPlay().register(Request.TYPE,Request.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(Reply.TYPE,Reply.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(VisualTransition.TYPE,VisualTransition.CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(VisualHold.TYPE,VisualHold.CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(LandingVisual.TYPE,LandingVisual.CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(VisualCancel.TYPE,VisualCancel.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(EntityVisualTransition.TYPE,EntityVisualTransition.CODEC);
         PayloadTypeRegistry.clientboundPlay().register(State.TYPE,State.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(Request.TYPE,(request,context)-> {
@@ -82,8 +108,21 @@ public final class Payloads {
             ServerPlayNetworking.send(p,new Reply(request.sequence,result.ordinal()));
         });
     }
+    private static long nextVisualSequence(ServerPlayer p){return ++ClingingReoriented.data(p).visualSequence;}
+    public static void hold(ServerPlayer p,GravityTransition.Plan plan){
+        var s=ClingingReoriented.data(p);s.freeFlightVisualHeld=true;long sequence=nextVisualSequence(p);
+        if(ServerPlayNetworking.canSend(p,VisualHold.TYPE))ServerPlayNetworking.send(p,new VisualHold(plan.target().get3DDataValue(),plan.yawDelta(),sequence));
+    }
+    public static void land(ServerPlayer p,net.minecraft.core.Direction direction,GravityTransition.TurnKind kind){
+        long sequence=nextVisualSequence(p);
+        if(ServerPlayNetworking.canSend(p,LandingVisual.TYPE))ServerPlayNetworking.send(p,new LandingVisual(direction.get3DDataValue(),kind.ordinal(),sequence));
+    }
+    public static void cancelLanding(ServerPlayer p,boolean holdCurrent){
+        var s=ClingingReoriented.data(p);if(!holdCurrent)s.freeFlightVisualHeld=false;long sequence=nextVisualSequence(p);
+        if(ServerPlayNetworking.canSend(p,VisualCancel.TYPE))ServerPlayNetworking.send(p,new VisualCancel(holdCurrent,sequence));
+    }
     public static void visual(ServerPlayer p,GravityTransition.Plan plan){
-        var s=ClingingReoriented.data(p);long sequence=++s.visualSequence;
+        var s=ClingingReoriented.data(p);s.freeFlightVisualHeld=false;long sequence=nextVisualSequence(p);
         if(ServerPlayNetworking.canSend(p,VisualTransition.TYPE))ServerPlayNetworking.send(p,new VisualTransition(
             plan.target().get3DDataValue(),plan.yawDelta(),plan.kind().ordinal(),sequence));
     }
