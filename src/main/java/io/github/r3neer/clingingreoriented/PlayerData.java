@@ -1,5 +1,6 @@
 package io.github.r3neer.clingingreoriented;
 
+import io.github.r3neer.clingingreoriented.api.LandingSurfaces;
 import net.minecraft.core.Direction;
 import net.minecraft.world.phys.Vec3;
 import java.util.UUID;
@@ -32,9 +33,23 @@ public final class PlayerData {
     public long lastConsumedSupportSample=-1;
     public final java.util.ArrayDeque<SupportSample> supportHistory = new java.util.ArrayDeque<>();
     public Payloads.MoveReference pendingMove;
+
+    // Gamefeel update: server-side short-horizon landing state. Not persisted across lifecycle replacement.
+    public int airborneTicks;
+    public boolean landingCommitted;
+    public LandingSurfaces.Contact landingContact;
+    public Direction landingGravity=Direction.DOWN;
+    public GravityTransition.TurnKind landingKind;
+    public double landingEtaTicks;
+    public long landingDeadlineTick;
+    public Direction visualBaseDirection=Direction.DOWN;
+    public boolean visualBaseKnown;
+    public long landingSequence;
+
     public void unbind() {
         support = null; supportId = -1; supportPosition = null; supportBox = null; lastTransport = Vec3.ZERO; groundedOnSurface = false;
         supportHistory.clear();supportSampleSequence=0;lastConsumedSupportSample=-1;pendingMove=null;
     }
+    public void clearLandingCommit(){landingCommitted=false;landingContact=null;landingKind=null;landingEtaTicks=0.0D;landingDeadlineTick=0L;}
     public interface Holder { PlayerData clinging$data(); }
 }
