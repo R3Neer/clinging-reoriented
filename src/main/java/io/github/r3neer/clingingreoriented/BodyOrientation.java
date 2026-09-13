@@ -13,8 +13,8 @@ import org.joml.Vector3f;
  */
 public final class BodyOrientation {
     public static final double DIRECTION_EPSILON_SQR=1.0E-6D;
-    private static final double PARALLEL_EPSILON=1.0E-6D;
-    private static final double OPPOSITE_EPSILON=1.0E-10D;
+    private static final double PARALLEL_EPSILON=1.0E-12D;
+    private static final double OPPOSITE_CROSS_EPSILON_SQR=1.0E-20D;
 
     public record State(Quaternionf orientation,Vec3 direction) {
         public State {
@@ -55,19 +55,22 @@ public final class BodyOrientation {
         return new Quaternionf(delta).mul(new Quaternionf(frame).normalize()).normalize();
     }
 
-    /** World-space shortest arc, with a deterministic twist-preserving axis only for the truly degenerate 180-degree case. */
+    /**
+     * World-space shortest arc. The regular path uses the numerically stable from-to
+     * quaternion q ∝ (from × to, 1 + from·to); only a truly degenerate 180-degree
+     * opposition needs a deterministic twist-preserving fallback axis.
+     */
     public static Quaternionf shortestArc(Vec3 fromDirection,Vec3 toDirection,Quaternionf frame){
         Vec3 from=normalized(fromDirection,"from");
         Vec3 to=normalized(toDirection,"to");
         double dot=Math.max(-1.0D,Math.min(1.0D,from.dot(to)));
         if(dot>=1.0D-PARALLEL_EPSILON)return new Quaternionf();
-        if(dot<=-1.0D+OPPOSITE_EPSILON){
+        Vec3 cross=from.cross(to);
+        if(dot<0.0D && cross.lengthSqr()<=OPPOSITE_CROSS_EPSILON_SQR){
             Vec3 axis=oppositeAxis(from,frame);
             return new Quaternionf().rotateAxis((float)Math.PI,(float)axis.x,(float)axis.y,(float)axis.z).normalize();
         }
-        Vec3 axis=from.cross(to).normalize();
-        float angle=(float)Math.acos(dot);
-        return new Quaternionf().rotateAxis(angle,(float)axis.x,(float)axis.y,(float)axis.z).normalize();
+        return new Quaternionf((float)cross.x,(float)cross.y,(float)cross.z,(float)(1.0D+dot)).normalize();
     }
 
     public static Vec3 bodyUp(Quaternionf frame){return transform(frame,new Vec3(0,1,0)).normalize();}
