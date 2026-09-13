@@ -68,6 +68,12 @@ public final class ClingingClient implements ClientModInitializer {
             if(transition.direction()<0||transition.direction()>5||context.client().player==null||!Float.isFinite(transition.yawDelta()))return;
             VisualTransitions.begin(context.client().player,Direction.from3DDataValue(transition.direction()),transition.yawDelta(),transition.kind(),transition.sequence());
         });
+        ClientPlayNetworking.registerGlobalReceiver(Payloads.EntityVisualTransition.TYPE,(transition,context)->{
+            if(transition.direction()<0||transition.direction()>5||!Float.isFinite(transition.yawDelta())||context.client().level==null)return;
+            var entity=context.client().level.getEntity(transition.entity());
+            if(entity==null||!entity.getUUID().equals(transition.entityUuid()))return;
+            VisualTransitions.beginTracked(entity,Direction.from3DDataValue(transition.direction()),transition.yawDelta(),transition.kind(),transition.sequence());
+        });
         ClientPlayNetworking.registerGlobalReceiver(Payloads.State.TYPE,(state,context)->{
             if(state.direction()<0 || state.direction()>5) return;
             if(context.client().level!=null && context.client().level.getEntity(state.player()) instanceof Player p && state.revision()>=ClingingReoriented.data(p).revision)ClingingReoriented.data(p).revision=state.revision();
