@@ -26,8 +26,13 @@ public interface LandingSurfaceProvider {
         }
     }
 
-    /** Earliest contact fraction inside one caller-owned swept segment. */
-    record LocalSweep(LocalContact contact, double fraction) {
+    /**
+     * Earliest geometric contact inside one caller-owned swept segment. `support`
+     * states whether that contact may be a gravity-relative feet surface. Returning
+     * non-support contacts lets the core stop prediction at a wall instead of seeing
+     * a valid floor through it.
+     */
+    record LocalSweep(LocalContact contact, double fraction, boolean support) {
         public LocalSweep {
             if (contact == null || !Double.isFinite(fraction) || fraction < 0.0D || fraction > 1.0D)
                 throw new IllegalArgumentException("Invalid landing sweep");
