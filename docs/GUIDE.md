@@ -1,7 +1,7 @@
 # Player guide
 
 This guide contains the exact controls and less-obvious interactions for
-Clinging: Reoriented 0.1.0-alpha.11 development builds.
+Clinging: Reoriented 0.1.0-alpha.12 development builds.
 
 ## Controls
 
@@ -10,9 +10,9 @@ Clinging: Reoriented 0.1.0-alpha.11 development builds.
 3. Look toward the cardinal surface that should become your new floor.
 4. Press the configured jump key again while airborne.
 
-The nearest cardinal direction to the rendered look wins. No wall, double tap or
-previous jump is required; being genuinely airborne is the criterion. The same held
-press cannot produce repeated turns.
+The nearest cardinal direction to the rendered look wins. No wall or prior jump is
+required beyond being genuinely airborne. The same held press cannot produce
+repeated turns.
 
 Grounded Space keeps normal jump or mount behavior. Creative flight, spectator
 mode, sleeping, gliding, held Gravity Anchors, pending forced retirement and foreign
@@ -20,6 +20,28 @@ gravity ownership block voluntary selection. While sprinting downward toward the
 current local floor, Space is also reserved when the next simulation step predicts
 landing contact; this lets normal sprint-jump chains queue the next jump without
 accidentally triggering gravity.
+
+### Water
+
+Water keeps Vanilla's ordinary Space-to-ascend control. A single press or held
+Space is only swimming input; Clinging/Reorientation watches the key passively and
+does not consume or rewrite it.
+
+To request a gravity turn while in water, press Space, release it, then press Space
+again within **250 ms**. Only that second rising edge requests the turn. The second
+press still remains available to Vanilla, so upward swimming continues even when
+the gravity request is accepted or rejected. Holding the second press does not
+repeat requests.
+
+The double-tap pair is consumed as one gesture. A third rapid press starts a new
+pair instead of becoming another immediate turn. Entering the water while Space is
+already held cannot synthesize a tap, and leaving the water, losing gameplay focus,
+opening a UI, dying/respawning or disconnecting clears any partial pair.
+
+Clinging's charge policy does not change underwater. Water itself never restores a
+spent turn. Recharge requires a genuine gravity-relative landing: the feet-side face
+of the player's body must be supported by a solid collision surface. Touching a
+block with the torso/side does not count. Standing on the seabed does.
 
 ## Effects and brewing
 
@@ -99,7 +121,9 @@ interpolation.
 
 An equipped, usable Elytra owns Space while airborne. It deploys normally instead
 of turning gravity. Space cannot reorient an entity that is already gliding, and
-gliding retains the gravity frame that existed at deployment.
+gliding retains the gravity frame that existed at deployment. While the player is
+in water, the Elytra eligibility path yields to Vanilla swimming and the dedicated
+underwater double-tap rule described above.
 
 ## Mounts
 
@@ -132,7 +156,8 @@ This is positional replay, not new three-dimensional pathfinding.
 ## Sounds and feedback
 
 A successful turn and a rejected attempt use different sounds. When nothing
-happens, check that the entity is airborne, the jump key was released, the desired
-direction differs from the current one, the effect still exists, the Clinging
-airborne charge is not already spent, retirement is not pending and the complete
-destination hierarchy has enough room.
+happens, check that the entity is airborne (or that an underwater double tap was
+completed), the jump key was released, the desired direction differs from the
+current one, the effect still exists, the Clinging airborne charge is not already
+spent, retirement is not pending and the complete destination hierarchy has enough
+room.
