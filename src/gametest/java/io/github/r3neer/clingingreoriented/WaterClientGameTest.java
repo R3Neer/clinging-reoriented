@@ -6,6 +6,8 @@ import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
@@ -46,12 +48,10 @@ public final class WaterClientGameTest implements FabricClientGameTest {
             long afterSingle=world.getServer().computeOnServer(server->ClingingReoriented.data(server.getPlayerList().getPlayers().getFirst()).lastRequest);
             if(afterSingle!=baseline)throw new AssertionError("Single/held underwater Space sent a gravity request");
 
-            // First quick tap arms the gesture but still belongs only to Vanilla swimming.
             quickTap(context);
             long afterFirst=world.getServer().computeOnServer(server->ClingingReoriented.data(server.getPlayerList().getPlayers().getFirst()).lastRequest);
             if(afterFirst!=baseline)throw new AssertionError("First underwater tap sent a gravity request");
 
-            // Second rising edge within 250 ms requests exactly one EAST turn while Space stays held.
             context.getInput().holdKey(options->options.keyJump);
             context.waitFor(mc->GravityDirectionUtil.getOwnGravityDirection(mc.player)==Direction.EAST);
             long firstTurn=world.getServer().computeOnServer(server->ClingingReoriented.data(server.getPlayerList().getPlayers().getFirst()).lastRequest);
@@ -61,7 +61,6 @@ public final class WaterClientGameTest implements FabricClientGameTest {
             if(held!=firstTurn)throw new AssertionError("Holding second underwater tap repeated gravity requests");
             context.getInput().releaseKey(options->options.keyJump);context.waitTicks(2);
 
-            // The pair was consumed. A fresh pair can drive another unlimited Reorientation turn.
             world.getServer().runOnServer(server->{
                 var p=server.getPlayerList().getPlayers().getFirst();var r=localRotationFor(Direction.EAST,new Vec3(0,0,1));
                 p.teleport(new TeleportTransition(server.overworld(),p.position(),Vec3.ZERO,r[0],r[1],TeleportTransition.DO_NOTHING));
@@ -72,6 +71,30 @@ public final class WaterClientGameTest implements FabricClientGameTest {
             if(newPairFirst!=firstTurn)throw new AssertionError("First tap of a new underwater pair should not request");
             context.getInput().holdKey(options->options.keyJump);
             context.waitFor(mc->GravityDirectionUtil.getOwnGravityDirection(mc.player)==Direction.SOUTH);
+            context.getInput().releaseKey(options->options.keyJump);context.waitTicks(2);
+
+            // A rejected spent-Clinging double tap still leaves Vanilla swim ascent untouched.
+            world.getServer().runOnServer(server->{
+                var p=server.getPlayerList().getPlayers().getFirst();
+                ClingingReoriented.write(p,Direction.DOWN);p.removeAllEffects();
+                var clinging=BuiltInRegistries.MOB_EFFECT.get(Identifier.parse("alexsmobs:clinging")).orElseThrow();
+                p.addEffect(new MobEffectInstance(clinging,1200));
+                var s=ClingingReoriented.data(p);s.owned=true;s.visualFrameOwned=true;s.selected=Direction.DOWN;s.airChangeUsed=true;
+                p.teleport(new TeleportTransition(server.overworld(),new Vec3(.5,82,.5),Vec3.ZERO,-90,0,TeleportTransition.DO_NOTHING));
+                p.setNoGravity(true);p.setDeltaMovement(Vec3.ZERO);
+            });
+            context.waitFor(mc->mc.player.isInWater()&&GravityDirectionUtil.getOwnGravityDirection(mc.player)==Direction.DOWN
+                &&ClingingReoriented.hasEffect(mc.player)&&!mc.player.hasEffect(Reorientation.EFFECT));
+            context.waitTicks(3);
+            long beforeRejected=world.getServer().computeOnServer(server->ClingingReoriented.data(server.getPlayerList().getPlayers().getFirst()).lastRequest);
+            double rejectedStartY=world.getServer().computeOnServer(server->server.getPlayerList().getPlayers().getFirst().getY());
+            quickTap(context);context.getInput().holdKey(options->options.keyJump);context.waitTicks(4);
+            long rejected=world.getServer().computeOnServer(server->ClingingReoriented.data(server.getPlayerList().getPlayers().getFirst()).lastRequest);
+            if(rejected<=beforeRejected)throw new AssertionError("Spent-Clinging double tap never reached server authority");
+            context.runOnClient(mc->{
+                if(GravityDirectionUtil.getOwnGravityDirection(mc.player)!=Direction.DOWN)throw new AssertionError("Spent underwater Clinging changed gravity");
+                if(mc.player.getY()<=rejectedStartY+.02)throw new AssertionError("Rejected underwater turn stole Vanilla ascent");
+            });
             context.getInput().releaseKey(options->options.keyJump);context.waitTicks(2);
         }
     }
