@@ -27,7 +27,10 @@ public final class LandingPrediction {
         for(int tick=0;tick<horizon;tick++){
             AABB next=body.move(velocity);
             var hit=LandingSurfaces.sweep(entity,gravity,body,next);
-            if(hit.isPresent())return Optional.of(new Candidate(hit.get().contact(),gravity,tick+hit.get().fraction()));
+            if(hit.isPresent()){
+                if(!hit.get().support())return Optional.empty();
+                return Optional.of(new Candidate(hit.get().contact(),gravity,tick+hit.get().fraction()));
+            }
             body=next;
             velocity=nextAirVelocity(entity,gravity,velocity);
             if(!ImpactPhysics.finite(velocity))return Optional.empty();
