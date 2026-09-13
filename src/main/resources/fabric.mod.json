@@ -13,7 +13,10 @@
   "license": "GPL-3.0-or-later",
   "environment": "*",
   "entrypoints": {
-    "main": ["io.github.r3neer.clingingreoriented.ClingingReoriented"],
+    "main": [
+      "io.github.r3neer.clingingreoriented.ClingingReoriented",
+      "io.github.r3neer.clingingreoriented.GravityFallInitializer"
+    ],
     "client": ["io.github.r3neer.clingingreoriented.client.ClingingClient"]
   },
   "mixins": ["clinging_reoriented.mixins.json"],
