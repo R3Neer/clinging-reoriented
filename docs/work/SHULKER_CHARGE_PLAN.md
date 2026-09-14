@@ -1,14 +1,14 @@
 # Shulker Charge — plan global
 
-Estado global: **S00 EN CURSO**.
+Estado global: **S00 CERRADO · S01 EN CURSO**.
 
 Baseline: `v0.1.0-alpha.13` / `be3b47284a71fbf4fcacb2ab2b2cb3776af290d3`.
 
 ## S00 — Investigación y arquitectura
-- [ ] Auditar registro de items/entities/renderers/dispenser del mod y APIs Fabric 26.2.
-- [ ] Auditar comportamiento real de `ShulkerBullet`: hurt, owner, target, navegación, impacto y duplicación de shulkers.
-- [ ] Auditar `WindCharge`/`FireCharge`/dispenser y `TargetBlock` actuales.
-- [ ] Fijar arquitectura de item, projectile, targeting y recaptura sin textura final.
+- [x] Auditar registro de items/entities/renderers/dispenser del mod y APIs Fabric 26.2.
+- [x] Auditar comportamiento real de `ShulkerBullet`: hurt, owner, target, navegación, impacto y duplicación de shulkers.
+- [x] Auditar `WindCharge`/`FireCharge`/dispenser y `TargetBlock` actuales.
+- [x] Fijar arquitectura de item, projectile, targeting y recaptura sin textura final.
 
 ## S01 — Item, captura y brewing
 - [ ] Registrar Shulker Charge stack 64 con placeholder técnico no final.
@@ -18,9 +18,9 @@ Baseline: `v0.1.0-alpha.13` / `be3b47284a71fbf4fcacb2ab2b2cb3776af290d3`.
 - [ ] Unit + GameTests del dominio.
 
 ## S02 — Lanzamiento, dispenser y adquisición
-- [ ] Uso manual con cooldown inicial 10 ticks y consumo exacto.
+- [ ] Uso manual con cooldown inicial 0,5 s y consumo exacto.
 - [ ] Dispenser con mismo proyectil y facing como intent.
-- [ ] Selección por ray/cone, Target Block directo prioritario y entity LOS inicial.
+- [ ] Selección por ray/cone, Target Block directo prioritario y entity LOS en cada nueva adquisición.
 - [ ] Vuelo sin target y readquisición sólo al quedar sin target válido.
 - [ ] Tests de ranking, no-target y lifecycle de target.
 
