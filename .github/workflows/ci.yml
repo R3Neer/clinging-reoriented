@@ -29,9 +29,9 @@ jobs:
       - name: Fetch optional First Person fixtures
         run: |
           mkdir -p test-libs
-          curl --fail --location --output test-libs/firstperson-fabric-2.7.2-mc26.2.jar \
+          curl --fail --location --retry 4 --retry-all-errors --retry-delay 2 --connect-timeout 20 --output test-libs/firstperson-fabric-2.7.2-mc26.2.jar \
             https://api.modrinth.com/maven/maven/modrinth/H5XMjpHi/6sgz2HEq/H5XMjpHi-6sgz2HEq.jar
-          curl --fail --location --output test-libs/notenoughanimations-fabric-1.12.4-mc26.2.jar \
+          curl --fail --location --retry 4 --retry-all-errors --retry-delay 2 --connect-timeout 20 --output test-libs/notenoughanimations-fabric-1.12.4-mc26.2.jar \
             https://api.modrinth.com/maven/maven/modrinth/MPCX6s5C/67xQnLDS/MPCX6s5C-67xQnLDS.jar
       - name: Run First Person ownership GameTests
         run: xvfb-run -a ./gradlew runClientGameTest -PwithFirstPerson --no-daemon --console=plain
@@ -39,7 +39,7 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: '1'
       - name: Fetch optional Scale Brews runtime fixture
         run: |
-          curl --fail --location --output test-libs/scalebrews-0.1.0-beta.5.jar \
+          curl --fail --location --retry 4 --retry-all-errors --retry-delay 2 --connect-timeout 20 --output test-libs/scalebrews-0.1.0-beta.5.jar \
             https://github.com/R3Neer/scale-brews/releases/download/v0.1.0-beta.5/scalebrews-0.1.0-beta.5.jar
       - name: Run optional Scale Brews compatibility GameTests
         run: ./gradlew runGameTest -PwithScaleBrews --no-daemon --console=plain
@@ -50,13 +50,13 @@ jobs:
       - name: Fetch exact VanillaPlus Fresh Animations fixtures
         run: |
           mkdir -p test-libs test-resourcepacks
-          curl --fail --location --output test-libs/entity_model_features-3.3.5-26.2-fabric.jar \
+          curl --fail --location --retry 4 --retry-all-errors --retry-delay 2 --connect-timeout 20 --output test-libs/entity_model_features-3.3.5-26.2-fabric.jar \
             https://cdn.modrinth.com/data/4I1XuqiY/versions/p8M0c1vN/entity_model_features-3.3.5-26.2-fabric.jar
-          curl --fail --location --output test-libs/entity_texture_features-7.2-26.2-fabric.jar \
+          curl --fail --location --retry 4 --retry-all-errors --retry-delay 2 --connect-timeout 20 --output test-libs/entity_texture_features-7.2-26.2-fabric.jar \
             https://cdn.modrinth.com/data/BVzZfTc1/versions/URB7DuXS/entity_texture_features-7.2-26.2-fabric.jar
-          curl --fail --location --output test-resourcepacks/FreshAnimations_v1.10.5.zip \
+          curl --fail --location --retry 4 --retry-all-errors --retry-delay 2 --connect-timeout 20 --output test-resourcepacks/FreshAnimations_v1.10.5.zip \
             https://cdn.modrinth.com/data/50dA9Sha/versions/RGIzA5em/FreshAnimations_v1.10.5.zip
-          curl --fail --location --output 'test-resourcepacks/FA+Player-v1.1.zip' \
+          curl --fail --location --retry 4 --retry-all-errors --retry-delay 2 --connect-timeout 20 --output 'test-resourcepacks/FA+Player-v1.1.zip' \
             'https://cdn.modrinth.com/data/TAIMVZCL/versions/Wj7NeGjP/FA%2BPlayer-v1.1.zip'
           echo 'ee598e0703cb15166ed35f93e2d19e69d5bee160721c50ccde2001afecee24470744bd2efe9125e908211e58f60a54074e915f2b726cb6ee70dc3e98f4698c7b  test-libs/entity_model_features-3.3.5-26.2-fabric.jar' | sha512sum -c -
           echo '58da97a72614a41c28d8639fa63a98f775d6a5f101ac30c33213ee63a25b5d41e50c77fc24e269a19e2a54f2dfb4083a8d4e51411eac2ee6efe099e7bf93fa88  test-libs/entity_texture_features-7.2-26.2-fabric.jar' | sha512sum -c -
