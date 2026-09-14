@@ -5,6 +5,7 @@ import com.moigferdsrte.gravitychanger.util.GravityDirectionUtil;
 import com.moigferdsrte.gravitychanger.util.RotationUtil;
 import io.github.r3neer.clingingreoriented.ClingingReoriented;
 import io.github.r3neer.clingingreoriented.GravityTransition;
+import io.github.r3neer.clingingreoriented.LandingTiming;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -125,7 +126,8 @@ public final class VisualTransitions {
             synchronized(ACTIVE){ACTIVE.put(animation,active);}
         }
         long elapsed=Math.max(0L,now-active.startedNanos());
-        float progress=(float)Math.min(1.0D,elapsed/(double)active.kind().durationNanos());
+        long duration=active.mode()==Mode.LAND?LandingTiming.PRESENTATION_NANOS:active.kind().durationNanos();
+        float progress=(float)Math.min(1.0D,elapsed/(double)duration);
         Quaternionf target=RotationUtil.getEntityRotationQuaternion(active.target());
         Quaternionf result=new Quaternionf(active.startVisual()).slerp(target,GravityTransition.easeOutQuadratic(progress));
         if(progress>=1.0F){clear(animation);return target;}
