@@ -26,7 +26,7 @@ No unreleased changes yet.
 ### Brewing and presentation
 
 - Replace Shulker Shell with Shulker Charge as the Clinging -> Reorientation brewing ingredient for normal and long variants.
-- Integrate the approved original 16x16 GUI icon and project-authored 3D held model; the latter references Minecraft's shulker spark texture only at runtime.
+- Integrate the approved original 16x16 GUI icon and project-authored 3D held model using the project's own `shulker_charge` texture; the launched projectile remains the exact vanilla ShulkerBullet and therefore keeps Minecraft's normal renderer/resources.
 - Add semantic snapshots for inventory, first-person held, third-person held, projectile renderer and fixed 3D presentation.
 
 ### Pet breadcrumb pursuit
