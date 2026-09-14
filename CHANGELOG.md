@@ -4,7 +4,7 @@
 
 No unreleased changes yet.
 
-## [0.1.0-alpha.15] - 2026-09-14
+## [0.1.0-alpha.16] - 2026-09-14
 
 ### Shulker Charge
 
@@ -29,18 +29,25 @@ No unreleased changes yet.
 - Integrate the approved original 16x16 GUI icon and project-authored 3D held model using the project's own `shulker_charge` texture; the launched projectile remains the exact vanilla ShulkerBullet and therefore keeps Minecraft's normal renderer/resources.
 - Add semantic snapshots for inventory, first-person held, third-person held, projectile renderer and fixed 3D presentation.
 
-### Pet breadcrumb pursuit
-
-- Make affected tame pets acquire `FollowOwnerGoal` for nearby gravity breadcrumbs even inside vanilla's owner-follow dead zone.
-- Navigate to each breadcrumb projected onto the pet's current gravity-relative movement plane, then replay the owner's turn and release navigation while unsupported.
-- Refresh Gravity Changer's replaced navigation instance, preserve queued breadcrumbs across the bounded internal turn placement, and keep external teleports, sitting, missing effects and foreign gravity ownership fail-closed.
-
 ### Validation and release
 
 - Add adversarial Shulker Charge holdouts for real dispenser/redstone semantics, sticky locks, late acquisition, dimension invalidation/reacquisition, mixed arrow/melee races, concurrent Charges and repeated targetless retries.
 - Harden the adversarial fixture so the complete 32-block flight corridor remains `ENTITY_TICKING`; no Scale-specific production workaround is used.
-- Revalidate the combined alpha.14 + Shulker Charge tree across required server tests, default client, First Person, Scale Brews server/client, Fresh Animations and semantic snapshot validation.
-- Publish alpha.15 only from the exact successful `main` CI artifact rather than rebuilding for release.
+- Revalidate Shulker Charge on top of the published alpha.15 pet-pursuit tree across required server tests, default client, First Person, Scale Brews server/client, Fresh Animations and semantic snapshot validation.
+- Publish alpha.16 only from the exact successful `main` CI artifact rather than rebuilding for release.
+
+## [0.1.0-alpha.15] - 2026-09-14
+
+### Pet gravity-breadcrumb pursuit
+
+- Make tame pets with their own compatible Clinging/Reorientation effect pursue pending owner gravity breadcrumbs through vanilla `FollowOwnerGoal`, including while the owner is inside vanilla's ten-block follow start dead zone.
+- Project each airborne breadcrumb onto the pet's **current gravity-relative movement plane** instead of asking ordinary pathfinding to reach an impossible 3D point through the air.
+- Use the follow goal's own bounded stopping semantics for arrival, then replay the recorded gravity turn only when the pet actually reaches that projected place.
+- After replay, release navigation while the pet is unsupported so real gravity physics owns the fall; once the pet finds support in the new frame, the still-pending breadcrumb queue can resume.
+- Refresh `FollowOwnerGoal`'s cached `PathNavigation` across its lifecycle because Gravity Changer replaces the navigation instance after a gravity change.
+- Permit one center-aligned, collision-preflighted internal relocation when rotating at the current feet position would intersect the old support; this internal placement preserves the breadcrumb transaction and later queued turns.
+- Keep the system fail-closed: sitting pauses pursuit without consuming the step, an external pet teleport invalidates the route, stale/foreign-dimension breadcrumbs are skipped, effect-free pets retain vanilla following, and foreign gravity ownership is never stolen.
+- Add projection/unit coverage plus GameTests for the vanilla dead zone, real scheduled wolf traversal, bounded arrival, grounded replay, ballistic goal release, navigation replacement, ordered queue preservation, sitting pause/resume and external teleport invalidation.
 
 ## [0.1.0-alpha.14] - 2026-09-14
 
