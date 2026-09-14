@@ -54,8 +54,10 @@ public final class ShulkerChargeClientGameTest implements FabricClientGameTest {
             });
             context.waitTicks(2);
             context.runOnClient(mc->{
-                if(mc.level==null||mc.level.getEntities().getAll().stream().noneMatch(e->e instanceof net.minecraft.world.entity.projectile.ShulkerBullet))
-                    throw new AssertionError("Shulker Charge projectile is not present on client for renderer evidence");
+                if(mc.level==null)throw new AssertionError("Client level missing during projectile renderer evidence");
+                boolean found=false;
+                for(var entity:mc.level.entitiesForRendering())if(entity instanceof net.minecraft.world.entity.projectile.ShulkerBullet){found=true;break;}
+                if(!found)throw new AssertionError("Shulker Charge projectile is not present on client for renderer evidence");
             });
             context.takeScreenshot("shulker-charge-projectile-renderer");
         }
