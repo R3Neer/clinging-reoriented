@@ -41,13 +41,20 @@ public final class GravityFallSync {
 
     public static void publish(ServerPlayer player,Phase phase,Direction target){publish(player,phase,target,0.0D);}
 
-    /** A late tracker receives the current semantic phase, not a replay of the original start event. */
+    /**
+     * A late/re-entering tracker receives the current semantic phase, not a replay of the original
+     * start event. The snapshot gets a fresh global epoch even if the phase did not change: clients
+     * deliberately retain their latest UUID-scoped sequence after dropping unresolved render state,
+     * so replaying the old START/LAND sequence would be rejected after a long tracking gap.
+     */
     public static void sendSnapshot(ServerPlayer player,ServerPlayer recipient){
         var state=ClingingReoriented.data(player);
-        if(!state.gravityFallActive || !ServerPlayNetworking.canSend(recipient,Visual.TYPE))return;
+        if(!state.gravityFallActive)return;
+        long sequence=++state.gravityFallSequence;
+        if(!ServerPlayNetworking.canSend(recipient,Visual.TYPE))return;
         Phase phase=state.gravityFallLanding?Phase.LAND:Phase.START;
         Direction target=state.gravityFallLanding?state.gravityFallLandingGravity:null;
         float eta=state.gravityFallLanding?(float)Math.max(0.0D,state.gravityFallLandingEtaTicks):0.0F;
-        ServerPlayNetworking.send(recipient,new Visual(player.getId(),player.getUUID(),phase.ordinal(),target==null?-1:target.get3DDataValue(),eta,state.gravityFallSequence));
+        ServerPlayNetworking.send(recipient,new Visual(player.getId(),player.getUUID(),phase.ordinal(),target==null?-1:target.get3DDataValue(),eta,sequence));
     }
 }
