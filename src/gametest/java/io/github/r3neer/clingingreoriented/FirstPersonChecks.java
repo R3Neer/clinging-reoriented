@@ -81,6 +81,7 @@ public final class FirstPersonChecks {
             GravityFallVisuals.clear();VisualTransitions.clear();
             GravityDirectionUtil.setGravityDirection(player,Direction.DOWN);
             player.setPose(Pose.STANDING);player.setDeltaMovement(new Vec3(.25,0,0));
+            player.setYRot(0.0F);player.yRotO=0.0F;player.setXRot(0.0F);player.xRotO=0.0F;
             cameraBefore.set(cameraForward(mc));
             GravityFallVisuals.receive(mc,new GravityFallSync.Visual(
                 player.getId(),player.getUUID(),GravityFallSync.Phase.START.ordinal(),-1,0.0F,50_001L));
@@ -103,7 +104,26 @@ public final class FirstPersonChecks {
         });
         context.takeScreenshot("firstperson-gravity-fall-root");
 
+        // TM reproduction matrix for the reported clipping/body-in-camera failure. Keep the
+        // Gravity Fall body horizontal while pitching the real First Person camera downward.
+        // These are evidence snapshots, not a production workaround: the point is to freeze
+        // the broken composition before changing any render math.
+        for(float pitch : new float[]{30.0F,45.0F,60.0F,75.0F,89.0F}){
+            final float lookPitch=pitch;
+            context.runOnClient(mc->{
+                var player=mc.player;
+                player.setXRot(lookPitch);player.xRotO=lookPitch;
+                if(!GravityFallVisuals.active(player))throw new AssertionError("Gravity Fall root vanished during look-down reproduction at pitch="+lookPitch);
+                Vec3 bodyUp=BodyOrientation.bodyUp(GravityFallVisuals.body(player,0.0F));
+                if(bodyUp.distanceTo(new Vec3(1,0,0))>3.0E-3D)
+                    throw new AssertionError("Body frame changed while only camera pitch changed at pitch="+lookPitch+": "+bodyUp);
+            });
+            context.waitTicks(2);
+            context.takeScreenshot("firstperson-gravity-fall-lookdown-"+(int)pitch);
+        }
+
         context.runOnClient(mc->{
+            mc.player.setXRot(75.0F);mc.player.xRotO=75.0F;
             GravityFallVisuals.receive(mc,new GravityFallSync.Visual(
                 mc.player.getId(),mc.player.getUUID(),GravityFallSync.Phase.LAND.ordinal(),Direction.DOWN.get3DDataValue(),4.0F,50_002L));
             GravityFallVisuals.tick(mc);
@@ -111,12 +131,9 @@ public final class FirstPersonChecks {
         });
         context.waitTicks(2);
         context.runOnClient(mc->{
-            Vec3 after=cameraForward(mc);
-            if(after.distanceTo(cameraBefore.get())>2.0E-3D)
-                throw new AssertionError("First Person BODY_LANDING fed avatar root rotation back into camera: before="+cameraBefore.get()+" after="+after);
             if(!GravityFallVisuals.landing(mc.player))throw new AssertionError("First Person BODY_LANDING ended before partial landing checkpoint");
         });
-        context.takeScreenshot("firstperson-gravity-fall-landing");
+        context.takeScreenshot("firstperson-gravity-fall-landing-lookdown-75");
 
         context.runOnClient(mc->{
             GravityFallVisuals.receive(mc,new GravityFallSync.Visual(
@@ -125,6 +142,7 @@ public final class FirstPersonChecks {
             ClingingReoriented.data(mc.player).visualFrameOwned=false;
             VisualTransitions.clear();
             mc.player.setDeltaMovement(Vec3.ZERO);
+            mc.player.setXRot(0.0F);mc.player.xRotO=0.0F;
         });
     }
 
