@@ -27,7 +27,6 @@ public final class GravityFallClientGameTest implements FabricClientGameTest {
         AtomicReference<Vec3> cameraStart=new AtomicReference<>();
         AtomicReference<Quaternionf> eastBody=new AtomicReference<>();
         AtomicReference<Quaternionf> westBody=new AtomicReference<>();
-        AtomicReference<Quaternionf> partialLanding=new AtomicReference<>();
 
         try(var world=context.worldBuilder().create()){
             world.getServer().runOnServer(server->{
@@ -113,18 +112,21 @@ public final class GravityFallClientGameTest implements FabricClientGameTest {
             context.takeScreenshot("gravity-fall-landing-begin");
             context.runOnClient(mc->{
                 advance(mc,2,Vec3.ZERO);
-                Quaternionf mid=body(mc);partialLanding.set(new Quaternionf(mid));
+                Quaternionf mid=body(mc);
                 Quaternionf target=RotationUtil.getEntityRotationQuaternion(Direction.DOWN);
                 if(equivalent(mid,target)||equivalent(mid,westBody.get()))throw new AssertionError("BODY_LANDING midpoint collapsed to an endpoint");
             });
             context.takeScreenshot("gravity-fall-landing-mid");
 
-            // Invalidation resumes from the body quaternion currently visible, with no snap-back.
+            // Invalidation resumes from the body quaternion visible at the instant RESUME arrives.
+            // A screenshot/render between the midpoint assertion and this event may legitimately
+            // advance LAND, so comparing against an older sample would manufacture a discontinuity.
             context.runOnClient(mc->{
+                Quaternionf beforeResume=body(mc);
                 mc.player.setDeltaMovement(new Vec3(-.20,0,0));
                 send(mc,sequence,GravityFallSync.Phase.RESUME,null,0.0F);
                 if(GravityFallVisuals.landing(mc.player))throw new AssertionError("RESUME left BODY_LANDING active");
-                assertQuat(partialLanding.get(),body(mc),"RESUME snapped instead of continuing from current presentation");
+                assertQuat(beforeResume,body(mc),"RESUME snapped instead of continuing from current presentation");
                 advance(mc,8,new Vec3(-.20,0,0));
                 assertVec(new Vec3(-1,0,0),BodyOrientation.bodyUp(body(mc)),"RESUME did not return to velocity transport");
             });
