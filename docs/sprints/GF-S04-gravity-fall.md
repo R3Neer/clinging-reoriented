@@ -1,6 +1,6 @@
 # GF-S04 — Sustained Gravity Fall, body frame y controles
 
-Estado: **PLAN CONVERGIDO / ESPERA DE GATE S03**.
+Estado: **CERRADO / GATE VERDE**.
 
 ## Tesis
 
@@ -94,6 +94,8 @@ Se aplica un quaternion extra calculado con la convención de JOML validada por 
 
 El mixin sólo actúa para jugadores en una fase Gravity Fall activa. Sin FA funciona con el modelo vanilla; con FA, las animaciones internas permanecen intactas.
 
+La revisión visual descubrió además que aplicar ese root alrededor del origen del renderer hacía orbitar el avatar alrededor de los pies. El root final se aplica alrededor del centro lógico del avatar (`boundingBoxHeight / 2`), conservando el mismo centro visual en DOWN/EAST/WEST y durante BODY_LANDING.
+
 ## Controles W/A/S/D
 
 Regla de diseño: **no se añade air steering; sólo se corrige el frame direccional de un control que ya existe**.
@@ -113,19 +115,20 @@ La corrección se aplica sólo al jugador local porque el servidor recibe el mov
 - El root extra se aplica por fuera del modelo animado.
 - First Person puede mostrar el cuerpo transformado, pero la cámara no consume el root de Gravity Fall.
 - Elytra real cancela/impide Gravity Fall y conserva su lenguaje propio.
+- First Person 2.7.2 + Not Enough Animations queda cubierto por lane real de CI. El fixture Fresh Animations/EMF/ETF queda deliberadamente para la campaña S05, donde se identificará la versión exacta compatible del entorno objetivo antes de añadir una lane.
 
 ## Plan
 
-- [ ] I1 kernel puro de transporte mínimo de orientación y zero-speed hold + tests quaternion/vector.
-- [ ] I2 estado server/player y payload discreto `GravityFallVisual` con START/LAND/RESUME/RESET + tracking snapshot.
-- [ ] I3 detección START a 12 ticks y BODY_LANDING usando `LandingPrediction`, separada de camera commitment.
-- [ ] I4 estado cliente derivado por UUID y actualización desde velocity sincronizada.
-- [ ] I5 mixin root en `EntityRenderDispatcher.submit`, después del visual gravity transform y antes del avatar renderer.
-- [ ] I6 blend 6 ticks, landing body blend, cancel/resume, touchdown/reset.
-- [ ] I7 corregir frame de `moveRelative` del LocalPlayer sin cambiar magnitud de control.
-- [ ] I8 client tests + snapshots de pre-12, blend, sustained, 90° curve, 180° zero crossing/reverse, body landing y touchdown.
-- [ ] I9 lane First Person; preparar lane Fresh Animations/EMF para S05 si no cabe limpiamente aquí.
-- [ ] I10 holdout adversarial y revisión cero-cambios.
+- [x] I1 kernel puro de transporte mínimo de orientación y zero-speed hold + tests quaternion/vector.
+- [x] I2 estado server/player y payload discreto `GravityFallVisual` con START/LAND/RESUME/RESET + tracking snapshot.
+- [x] I3 detección START a 12 ticks y BODY_LANDING usando `LandingPrediction`, separada de camera commitment.
+- [x] I4 estado cliente derivado por UUID y actualización desde velocity sincronizada.
+- [x] I5 mixin root en `EntityRenderDispatcher.submit`, después del visual gravity transform y antes del avatar renderer.
+- [x] I6 blend 6 ticks, landing body blend, cancel/resume, touchdown/reset.
+- [x] I7 corregir frame de `moveRelative` del LocalPlayer sin cambiar magnitud de control.
+- [x] I8 client tests + snapshots de pre-12, blend, sustained, 90° curve, 180° zero crossing/reverse, body landing y touchdown.
+- [x] I9 lane First Person; fixture Fresh Animations/EMF explicitado como trabajo de S05.
+- [x] I10 holdout adversarial y revisión cero-cambios.
 
 ## Modelo adversarial previo
 
@@ -147,3 +150,22 @@ La corrección se aplica sólo al jugador local porque el servidor recibe el mov
 ### Holdout reservado
 
 `EAST velocity → gravedad WEST → frenado hasta |v|≈0 → inversión WEST`: el cuerpo debe conservar twist/orientación estable en el cruce por cero y sólo iniciar el giro cuando vuelva a existir una dirección WEST fiable. La cámara permanece exactamente en su frame retenido durante toda la maniobra.
+
+## Evidencia de cierre
+
+Commit de cierre lógico/visual: `e2b394710e50fa58253cbd69d55c927996832936`.
+
+GitHub Actions run 427 pasó todas las lanes: 73/73 server GameTests, client GameTests, First Person 2.7.2 + Not Enough Animations, Scale Brews optional server y Scale Brews optional client load.
+
+La campaña cliente produjo checkpoints estables de pre-start, blend start/mid, sustained DOWN, curva EAST, zero hold, reverse WEST, BODY_LANDING begin/mid/final, RESUME y touchdown/reset. Los asserts verifican quaternion/body axis y forward de cámara junto a las imágenes.
+
+Revisión visual manual de los artefactos del run 427:
+
+- `gravity-fall-sustained-down`: cabeza hacia la velocidad DOWN, centro corporal estable;
+- `gravity-fall-curve-east`: giro corporal 90° sin desplazamiento orbital;
+- `gravity-fall-reverse-west`: inversión 180° coherente tras zero hold;
+- `gravity-fall-landing-begin`: conserva el frame WEST visible al entrar;
+- `gravity-fall-landing-mid`: pose intermedia real, no endpoint anticipado;
+- `gravity-fall-landing-final`: frame canónico DOWN y cámara sin feedback del root.
+
+El holdout EAST→zero→WEST pasó numéricamente y visualmente. La última corrección afectó sólo al harness para separar el tiempo de presentación de los ticks consumidos por screenshots; la ejecución posterior quedó completamente verde y la revisión de sus snapshots no exigió cambios de producción.
