@@ -79,10 +79,20 @@ public final class FirstPersonChecks {
         context.runOnClient(mc->{
             var player=mc.player;
             GravityFallVisuals.clear();VisualTransitions.clear();
+            ClingingReoriented.data(player).visualFrameOwned=false;
             GravityDirectionUtil.setGravityDirection(player,Direction.DOWN);
             player.setPose(Pose.STANDING);player.setDeltaMovement(new Vec3(.25,0,0));
-            player.setYRot(0.0F);player.yRotO=0.0F;player.setXRot(0.0F);player.xRotO=0.0F;
+            player.setYRot(0.0F);player.yRotO=0.0F;player.setXRot(75.0F);player.xRotO=75.0F;
         });
+        // Control snapshots: distinguish First Person's ordinary look-down body framing from
+        // geometry introduced by Gravity Fall itself. A compatibility fix should remove only the
+        // latter, not erase the body that First Person intentionally shows when looking down.
+        context.waitTicks(1);
+        context.takeScreenshot("firstperson-baseline-lookdown-75");
+        context.runOnClient(mc->{mc.player.setXRot(89.0F);mc.player.xRotO=89.0F;});
+        context.waitTicks(1);
+        context.takeScreenshot("firstperson-baseline-lookdown-89");
+        context.runOnClient(mc->{mc.player.setXRot(0.0F);mc.player.xRotO=0.0F;});
         // mainCamera consumes entity rotation during the render/tick pipeline. Give it one tick
         // before taking the baseline or the harness compares a stale previous pitch to the new one.
         context.waitTicks(1);
