@@ -3,7 +3,9 @@ package io.github.r3neer.clingingreoriented;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import net.minecraft.world.phys.Vec3;
 import org.joml.Quaternionf;
+import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;
 
 final class BodyRenderMathTest {
@@ -26,14 +28,28 @@ final class BodyRenderMathTest {
         assertEquivalent(new Quaternionf(),extra);
     }
 
-    @Test void firstPersonPivotsAtEyeWhileWorldRenderingPivotsAtBodyCentre(){
-        assertEquals(1.62F,BodyRenderMath.pivotHeight(1.8F,1.62F,true),1.0E-6F);
-        assertEquals(0.9F,BodyRenderMath.pivotHeight(1.8F,1.62F,false),1.0E-6F);
+    @Test void thirdPersonStillPivotsAtBodyCentre(){
+        assertEquals(0.9F,BodyRenderMath.bodyCenterPivot(1.8F),1.0E-6F);
+        assertEquals(0.0F,BodyRenderMath.bodyCenterPivot(Float.NaN),0.0F);
+        assertEquals(0.0F,BodyRenderMath.bodyCenterPivot(-2.0F),0.0F);
     }
 
-    @Test void invalidPivotInputsFailClosedToFiniteNonNegativeValues(){
-        assertEquals(0.0F,BodyRenderMath.pivotHeight(Float.NaN,Float.NaN,true),0.0F);
-        assertEquals(0.0F,BodyRenderMath.pivotHeight(-2.0F,-1.0F,false),0.0F);
+    @Test void firstPersonCameraPivotExactlyCancelsRenderedTranslationInVisualFrame(){
+        Quaternionf visual=new Quaternionf().rotateZ((float)(Math.PI/2.0)).rotateY(.31F).normalize();
+        Vec3 translated=new Vec3(.23D,-.11D,.37D);
+        Vec3 pivot=BodyRenderMath.localCameraPivot(translated.x,translated.y,translated.z,visual);
+        Vector3f world=new Quaternionf(visual).transform(new Vector3f((float)pivot.x,(float)pivot.y,(float)pivot.z));
+        Vec3 residual=translated.add(world.x,world.y,world.z);
+        assertTrue(residual.length()<2.0E-6D,"camera anchor residual="+residual+" pivot="+pivot);
+    }
+
+    @Test void identityVisualPivotIsJustVectorBackToCamera(){
+        Vec3 pivot=BodyRenderMath.localCameraPivot(.25D,.0D,-.4D,new Quaternionf());
+        assertTrue(pivot.distanceTo(new Vec3(-.25D,.0D,.4D))<1.0E-6D,"unexpected identity pivot "+pivot);
+    }
+
+    @Test void nonFiniteCameraTranslationFailsClosed(){
+        assertEquals(Vec3.ZERO,BodyRenderMath.localCameraPivot(Double.NaN,0,0,new Quaternionf()));
     }
 
     private static void assertEquivalent(Quaternionf expected,Quaternionf actual){
