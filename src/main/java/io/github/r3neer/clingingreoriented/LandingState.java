@@ -42,8 +42,7 @@ public final class LandingState {
 
         GravityTransition.TurnKind kind=kindFor(state,gravity);
         if(kind==null||predicted.isEmpty())return;
-        int neededTicks=kind==GravityTransition.TurnKind.HALF?5:4;
-        if(predicted.get().etaTicks()<=neededTicks+1.0E-6D)commit(player,predicted.get(),kind);
+        if(predicted.get().etaTicks()<=LandingTiming.PRESENTATION_TICKS+1.0E-6D)commit(player,predicted.get(),kind);
     }
 
     /** Input-side check closes the one-tick gap between real touchdown and END_SERVER_TICK. */
