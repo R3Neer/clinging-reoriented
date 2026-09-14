@@ -82,6 +82,12 @@ public final class FirstPersonChecks {
             GravityDirectionUtil.setGravityDirection(player,Direction.DOWN);
             player.setPose(Pose.STANDING);player.setDeltaMovement(new Vec3(.25,0,0));
             player.setYRot(0.0F);player.yRotO=0.0F;player.setXRot(0.0F);player.xRotO=0.0F;
+        });
+        // mainCamera consumes entity rotation during the render/tick pipeline. Give it one tick
+        // before taking the baseline or the harness compares a stale previous pitch to the new one.
+        context.waitTicks(1);
+        context.runOnClient(mc->{
+            var player=mc.player;
             cameraBefore.set(cameraForward(mc));
             GravityFallVisuals.receive(mc,new GravityFallSync.Visual(
                 player.getId(),player.getUUID(),GravityFallSync.Phase.START.ordinal(),-1,0.0F,50_001L));
@@ -122,8 +128,9 @@ public final class FirstPersonChecks {
             context.takeScreenshot("firstperson-gravity-fall-lookdown-"+(int)pitch);
         }
 
+        context.runOnClient(mc->{mc.player.setXRot(0.0F);mc.player.xRotO=0.0F;});
+        context.waitTicks(1);
         context.runOnClient(mc->{
-            mc.player.setXRot(0.0F);mc.player.xRotO=0.0F;
             GravityFallVisuals.receive(mc,new GravityFallSync.Visual(
                 mc.player.getId(),mc.player.getUUID(),GravityFallSync.Phase.LAND.ordinal(),Direction.DOWN.get3DDataValue(),4.0F,50_002L));
             GravityFallVisuals.tick(mc);
