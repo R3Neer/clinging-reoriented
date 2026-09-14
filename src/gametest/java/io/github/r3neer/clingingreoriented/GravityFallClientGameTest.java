@@ -50,6 +50,13 @@ public final class GravityFallClientGameTest implements FabricClientGameTest {
                 GravityFallVisuals.clear();
                 mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
                 mc.player.setDeltaMovement(Vec3.ZERO);
+
+                // Entity ids are reusable. A packet for the old UUID must never attach to the new
+                // entity merely because its numerical id now matches.
+                GravityFallVisuals.receive(mc,new GravityFallSync.Visual(
+                    mc.player.getId(),java.util.UUID.randomUUID(),GravityFallSync.Phase.START.ordinal(),-1,0.0F,999L));
+                if(GravityFallVisuals.active(mc.player))throw new AssertionError("stale UUID attached Gravity Fall to a reused entity id");
+                GravityFallVisuals.clear();
             });
             context.waitTicks(2);
             context.runOnClient(mc->{
@@ -65,6 +72,11 @@ public final class GravityFallClientGameTest implements FabricClientGameTest {
                 send(mc,sequence,GravityFallSync.Phase.START,null,0.0F);
                 Quaternionf start=body(mc);
                 assertQuat(VisualTransitionsForTest.visual(mc),start,"START did not capture displayed body frame");
+                // A delayed packet from the same UUID but an older connection epoch must not undo
+                // the new START. Sequence ordering is the second half of the respawn/tracking fence.
+                GravityFallVisuals.receive(mc,new GravityFallSync.Visual(
+                    mc.player.getId(),mc.player.getUUID(),GravityFallSync.Phase.RESET.ordinal(),-1,0.0F,sequence.get()-1));
+                if(!GravityFallVisuals.active(mc.player))throw new AssertionError("stale RESET overrode a newer Gravity Fall START");
                 mc.player.setDeltaMovement(Vec3.ZERO);
             });
             context.takeScreenshot("gravity-fall-blend-start");
