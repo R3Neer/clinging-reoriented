@@ -1,1 +1,1 @@
-{"required":true,"package":"io.github.r3neer.clingingreoriented.testmixin","compatibilityLevel":"JAVA_25","mixins":["EntityTestAccessor","ShulkerTestAccessor"],"client":["SoundProbeMixin"],"injectors":{"defaultRequire":1}}
+{"required":true,"package":"io.github.r3neer.clingingreoriented.testmixin","compatibilityLevel":"JAVA_25","mixins":["EntityTestAccessor","ShulkerDuplicationProbeMixin","ShulkerTestAccessor"],"client":["SoundProbeMixin"],"injectors":{"defaultRequire":1}}
