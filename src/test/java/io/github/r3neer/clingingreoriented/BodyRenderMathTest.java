@@ -1,5 +1,6 @@
 package io.github.r3neer.clingingreoriented;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.joml.Quaternionf;
@@ -23,6 +24,16 @@ final class BodyRenderMathTest {
         Quaternionf visual=new Quaternionf().rotateY(.3f).rotateZ(-.9f).normalize();
         Quaternionf extra=BodyRenderMath.extraRoot(visual,visual);
         assertEquivalent(new Quaternionf(),extra);
+    }
+
+    @Test void firstPersonPivotsAtEyeWhileWorldRenderingPivotsAtBodyCentre(){
+        assertEquals(1.62F,BodyRenderMath.pivotHeight(1.8F,1.62F,true),1.0E-6F);
+        assertEquals(0.9F,BodyRenderMath.pivotHeight(1.8F,1.62F,false),1.0E-6F);
+    }
+
+    @Test void invalidPivotInputsFailClosedToFiniteNonNegativeValues(){
+        assertEquals(0.0F,BodyRenderMath.pivotHeight(Float.NaN,Float.NaN,true),0.0F);
+        assertEquals(0.0F,BodyRenderMath.pivotHeight(-2.0F,-1.0F,false),0.0F);
     }
 
     private static void assertEquivalent(Quaternionf expected,Quaternionf actual){
