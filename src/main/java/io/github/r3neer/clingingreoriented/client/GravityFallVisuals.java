@@ -57,12 +57,12 @@ public final class GravityFallVisuals {
         GravityFallSync.Phase[] phases=GravityFallSync.Phase.values();
         if(packet.phase()<0||packet.phase()>=phases.length)return;
         GravityFallSync.Phase phase=phases[packet.phase()];
+        if(phase==GravityFallSync.Phase.LAND && (packet.direction()<0||packet.direction()>5||!Float.isFinite(packet.etaTicks())||packet.etaTicks()<0.0F))return;
         synchronized(ACTIVE){
             long latest=LATEST_SEQUENCE.getOrDefault(packet.entityUuid(),-1L);
             if(packet.sequence()<=latest)return;
             LATEST_SEQUENCE.put(packet.entityUuid(),packet.sequence());
             if(phase==GravityFallSync.Phase.RESET){ACTIVE.remove(packet.entityUuid());return;}
-            if(phase==GravityFallSync.Phase.LAND && (packet.direction()<0||packet.direction()>5||!Float.isFinite(packet.etaTicks())||packet.etaTicks()<0.0F))return;
 
             Active active=ACTIVE.get(packet.entityUuid());
             if(active==null){active=new Active(packet.entityUuid(),packet.entity(),packet.sequence());ACTIVE.put(packet.entityUuid(),active);}
@@ -85,10 +85,16 @@ public final class GravityFallVisuals {
     }
 
     private static void beginLand(Active active,Entity entity,Direction target,float etaTicks){
+        // Capture the body that is actually visible *before* changing modes. If SUSTAIN has
+        // already tilted the avatar head-first, LAND must continue from there rather than
+        // snapping back to the held camera/gravity frame for one render.
+        Quaternionf current=null;
+        if(entity!=null){
+            ensureInitialized(active,entity);
+            current=currentBody(active,entity,0.0F);
+        }
         active.mode=Mode.LAND;active.landGravity=target;active.requestedEtaTicks=etaTicks;active.landTicks=0.0F;
         if(entity==null){active.initialized=false;active.landStart=null;active.landTarget=null;return;}
-        ensureInitialized(active,entity);
-        Quaternionf current=currentBody(active,entity,0.0F);
         if(current==null)current=VisualTransitions.current(entity);
         active.landStart=new Quaternionf(current).normalize();
         active.landTarget=RotationUtil.getEntityRotationQuaternion(target);
