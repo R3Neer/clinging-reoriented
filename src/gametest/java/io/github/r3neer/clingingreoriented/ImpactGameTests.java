@@ -6,12 +6,17 @@ import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.MoverType;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 
 public final class ImpactGameTests {
     private static net.minecraft.server.level.ServerPlayer owned(GameTestHelper h,Vec3 pos,Direction gravity){
-        var p=h.makeMockServerPlayerInLevel();p.snapTo(pos);p.addEffect(new MobEffectInstance(Reorientation.EFFECT,400));
+        var p=h.makeMockServerPlayerInLevel();
+        // Mojang's connected mock is hard-coded CREATIVE. Keep the real connection but
+        // explicitly give the fixture survival abilities so health loss is observable.
+        GameType.SURVIVAL.updatePlayerAbilities(p.getAbilities());
+        p.snapTo(pos);p.addEffect(new MobEffectInstance(Reorientation.EFFECT,400));
         ClingingReoriented.write(p,gravity);var s=ClingingReoriented.data(p);s.owned=true;s.selected=gravity;s.visualFrameOwned=true;
         p.setOnGround(false);p.fallDistance=0;p.setHealth(20);return p;
     }
