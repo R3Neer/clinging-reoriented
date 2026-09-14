@@ -112,16 +112,17 @@ public final class ShulkerChargeProjectileGameTests {
     }
 
     @GameTest(maxTicks=180,padding=60) public void launchedChargePreservesVanillaShulkerDuplication(GameTestHelper h){
-        ServerLevel level=h.getLevel();Vec3 parentPos=h.absoluteVec(new Vec3(18.5,7,14.5));Vec3 destination=parentPos.add(12,0,0);keepSimulated(h,parentPos,destination);
+        ServerLevel level=h.getLevel();Vec3 parentPos=h.absoluteVec(new Vec3(18.5,7,14.5));Vec3 destination=parentPos.add(12,0,0);Vec3 observerPos=parentPos.add(0,0,20);keepSimulated(h,parentPos,destination,observerPos);
+        var observer=h.makeMockServerPlayerInLevel();observer.setGameMode(GameType.SURVIVAL);observer.snapTo(observerPos);observer.setNoGravity(true);observer.setDeltaMovement(Vec3.ZERO);
         var shulker=new DeterministicTeleportShulker(level,destination);shulker.snapTo(parentPos);shulker.setNoAi(true);((ShulkerTestAccessor)(Object)shulker).clinging$setRawPeekAmount(100);h.assertTrue(level.addFreshEntity(shulker),"deterministic vanilla-duplication Shulker enters world");float before=shulker.getHealth();
         Vec3 origin=parentPos.add(-2,0.5,0);keepSimulated(h,origin,parentPos);var bullet=chargeAbsolute(h,origin,shulker.getBoundingBox().getCenter().subtract(origin));Vec3 oldPosition=shulker.position();AABB oldArea=new AABB(oldPosition,oldPosition).inflate(8.0D);
-        h.assertTrue(bullet.getType()==EntityTypes.SHULKER_BULLET,"launched Charge keeps exact vanilla type required by Shulker duplication");h.assertTrue(((ShulkerChargeProjectile)(Object)bullet).clinging$targetEntity()==shulker,"duplication fixture owns shulker target");
+        h.assertTrue(bullet.getType()==EntityTypes.SHULKER_BULLET,"launched Charge keeps exact vanilla type required by Shulker duplication");h.assertTrue(((ShulkerChargeProjectile)(Object)bullet).clinging$targetEntity()==shulker,"duplication fixture owns shulker target while nearby observer stays outside acquisition cone");
         h.startSequence()
             .thenExecuteAfter(1,()->h.assertTrue(bullet.tickCount>0,"duplication Charge must enter entity ticking"))
             .thenWaitUntil(()->h.assertTrue(!bullet.isAlive(),"Charge physically reaches and is consumed by shulker interaction; ticks="+bullet.tickCount+" pos="+bullet.position()+" vel="+bullet.getDeltaMovement()))
             .thenExecute(()->h.assertTrue(shulker.getHealth()<before,"vanilla shulker damage path was reached before duplication assertion"))
             .thenExecute(()->h.assertTrue(shulker.position().distanceToSqr(oldPosition)>1.0D,"vanilla shulker-bullet duplication branch must invoke teleport; old="+oldPosition+" current="+shulker.position()+" health="+shulker.getHealth()))
-            .thenWaitUntil(()->{List<Shulker> all=level.getEntities(EntityTypes.SHULKER,oldArea,Shulker::isAlive);h.assertTrue(all.size()>=1,"vanilla hitByShulkerBullet path creates a second shulker at the old position; parent="+shulker.position()+" old="+oldPosition+" count="+all.size()+" health="+shulker.getHealth());})
+            .thenWaitUntil(()->{List<Shulker> all=level.getEntities(EntityTypes.SHULKER,oldArea,Shulker::isAlive);h.assertTrue(all.size()>=1,"vanilla hitByShulkerBullet path creates a second shulker at the old position; parent="+shulker.position()+" old="+oldPosition+" count="+all.size()+" health="+shulker.getHealth()+" observer="+observer.position());})
             .thenSucceed();
     }
 }
