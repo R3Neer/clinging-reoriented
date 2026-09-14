@@ -12,9 +12,9 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 public abstract class DirectionalMaceMixin {
     @Redirect(
         method={"hurtEnemy","getAttackDamageBonus","getKnockbackPower","canSmashAttack"},
-        at=@At(value="FIELD",target="Lnet/minecraft/world/entity/Entity;fallDistance:F")
+        at=@At(value="FIELD",target="Lnet/minecraft/world/entity/Entity;fallDistance:D")
     )
-    private static float clinging$directionalMaceHeight(Entity entity){
+    private static double clinging$directionalMaceHeight(Entity entity){
         return DirectionalMaceFall.value(entity,entity.fallDistance);
     }
 }
