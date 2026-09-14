@@ -2,6 +2,45 @@
 
 ## Unreleased
 
+## [0.1.0-alpha.14] - 2026-09-14
+
+### Gravity Fall control and camera
+
+- Add full-sphere local camera pitch during sustained Gravity Fall, including pole crossing and full 360-degree vertical loops.
+- Canonicalize full-sphere look back to an equivalent vanilla yaw/pitch pair on Gravity Fall exit without changing the viewing direction.
+- Add bounded macro-body look-follow outside a 35-degree neck deadzone, capped at 7.5 degrees per tick while preserving velocity as the primary body frame.
+- Add posture-dependent aerodynamic drag: no extra drag when streamlined and at most 1.3% additional drag per tick when perfectly broadside.
+- Add W air-diving that bends existing momentum toward gaze by at most 6 degrees per tick, gated by the positive velocity/look dot product and preserving speed before drag. No free thrust or lift is added.
+- Add Elytra-style fast-air feedback during Gravity Fall at >=0.75 blocks/tick, with a 10-tick fade-in plus vanilla speed-squared volume/high-speed pitch behaviour.
+
+### Landing and presentation
+
+- Expand local landing prediction/presentation to a shared 10-tick / 500 ms manoeuvre for camera LAND and BODY_LANDING.
+- Keep ordinary tracked non-player SNAP timing separate at the existing shorter turn-kind durations.
+- Harden First Person look-down by rotating the Gravity Fall avatar root around a blended camera/body pivot, avoiding clipping while keeping the body intentionally visible and the real camera independent.
+
+### World context and controls
+
+- Add a generic `FluidContext` fence: any intersecting non-empty fluid volume suspends Clinging support, landing and Gravity Fall semantics, including modded fluids.
+- Stop submerged seabed/body contact from restoring Clinging charge or triggering gravity-relative landing while the player is still inside fluid.
+- Keep underwater double-Space gravity selection, but make owned water movement world-vertical: Space = +Y and Shift = -Y regardless of gravity.
+- Define world-vertical climbable policy: DOWN vanilla, lateral gravity ignores climbables, UP mirrors vanilla Y climbing/sliding semantics.
+
+### Safety, impact and mace
+
+- Add server-authoritative 3.92 blocks/tick world-speed cap during eligible Clinging flight while preserving velocity direction.
+- Add loaded-chunk frontier holding/resume and hard world/build-border recovery; safety corrections clear armed impact state.
+- Add directional mace fall accounting from literal geometric distance along the current gravity axis. Gravity turns begin a fresh segment and gravity strength no longer scales mace height.
+- Redirect all relevant Minecraft 26.2 mace fall-distance reads using their actual `LivingEntity`/`Entity` bytecode owners.
+
+### Compatibility and validation
+
+- Extend First Person 2.7.2 + Not Enough Animations 1.12.4 holdouts with steep look-down Gravity Fall/body-landing snapshots.
+- Preserve Fresh Animations 1.10.5 + FA Player Extension 1.1 + EMF 3.3.5 + ETF 7.2 internal animation ownership under the new macro body/aerodynamics layer.
+- Keep Scale Brews beta.5 in isolated optional server/client lanes with no production compile dependency.
+- Add dedicated full-sphere +120/-120/360 and canonical-exit client holdouts, directional mace GameTests, generic-fluid GameTests and aerodynamics/air-diving unit tests.
+- Require the prerelease to be created from the exact successful `main` CI artifact rather than a second build.
+
 ## [0.1.0-alpha.13] - 2026-09-14
 
 ### Free-flight camera and landing
