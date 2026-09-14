@@ -1,14 +1,14 @@
 # SC-S03 — Navegación, impacto, redstone y recaptura
 
-Estado: **REABIERTO / REVALIDACIÓN FINAL DE FIXTURES**.
+Estado: **REABIERTO / REVALIDACIÓN DE IMPACTOS AISLADOS**.
 
-La batería #495 dejó sólo dos holdouts fallando tras la corrección real del Target Block:
+La batería real de 105 GameTests descubrió primero un bug de producción: el propio Target Block se trataba como obstáculo. Esa corrección ya está aplicada y los dos holdouts de Target Block pasan.
 
-- Target Block recto y desalineado: **verdes**; la corrección de no tratar el propio target como obstáculo funciona.
-- Shield: **verde** con lock explícito y Survival.
-- Entity damage: el fixture había eliminado el suelo bajo la vaca sin desactivar gravedad; el objetivo podía caer fuera de la trayectoria. Se fija `noGravity` y se afirma el lock inicial.
-- Shulker duplication: se separa reproducción de navegación larga; el disparo empieza a ~2 bloques, el shulker queda abierto/sin IA y el test prueba en secuencia impacto físico → daño vanilla → segundo shulker.
+Los fallos restantes mezclaban impactos simples con navegación larga o estado del fixture. Se aíslan ahora:
 
-Clasificación TM actual: un bug de producción ya corregido + fixtures físicos corregidos. No se cambia semántica de usuario.
+- daño/Levitation: vaca inmóvil a corta distancia, lock inicial obligatorio;
+- bloque ordinario: pared a corta distancia y vector de intención transformado a coordenadas mundo;
+- duplicación: shulker abierto con IA normal (vanilla `teleportSomewhere()` devuelve false si `isNoAi()`), disparo cercano y secuencia impacto → daño → segundo shulker;
+- los tests de routing largo quedan en los holdouts específicos de Target Block ya verdes.
 
-Gate pendiente: 105/105 y CI completa verde.
+No se modifica producción en esta iteración. Si alguno de estos impactos aislados sigue fallando, se clasifica como bug de implementación/arquitectura y no se amplía el timeout como sustituto de diagnóstico.

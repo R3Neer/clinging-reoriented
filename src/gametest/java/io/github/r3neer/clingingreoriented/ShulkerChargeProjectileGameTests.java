@@ -41,10 +41,10 @@ public final class ShulkerChargeProjectileGameTests {
         h.startSequence().thenExecuteAfter(1,()->{Vec3 movement=bullet.getDeltaMovement();int axes=(Math.abs(movement.x)>1.0E-4?1:0)+(Math.abs(movement.y)>1.0E-4?1:0)+(Math.abs(movement.z)>1.0E-4?1:0);h.assertTrue(axes==1,"active Shulker route segment is cardinal after first steering tick");}).thenWaitUntil(()->h.assertTrue(h.getBlockState(target).getValue(BlockStateProperties.POWER)>0,"multi-axis Target Block route reaches real block")).thenSucceed();
     }
 
-    @GameTest(maxTicks=180,padding=40) public void entityImpactKeepsVanillaDamageAndLevitation(GameTestHelper h){
-        clear(h,3,7,6,19,11,10);var cow=h.spawn(EntityTypes.COW,new BlockPos(15,8,8));cow.setNoAi(true);cow.setNoGravity(true);float before=cow.getHealth();Vec3 origin=new Vec3(5.5,8.8,8.5);var bullet=charge(h,origin,cow.getBoundingBox().getCenter().subtract(h.absoluteVec(origin)));
+    @GameTest(maxTicks=100,padding=40) public void entityImpactKeepsVanillaDamageAndLevitation(GameTestHelper h){
+        clear(h,10,7,6,18,11,10);var cow=h.spawn(EntityTypes.COW,new BlockPos(15,8,8));cow.setNoAi(true);cow.setNoGravity(true);float before=cow.getHealth();Vec3 origin=new Vec3(12.5,8.8,8.5);var bullet=charge(h,origin,cow.getBoundingBox().getCenter().subtract(h.absoluteVec(origin)));
         h.assertTrue(((ShulkerChargeProjectile)(Object)bullet).clinging$targetEntity()==cow,"damage fixture owns cow target before flight");
-        h.startSequence().thenWaitUntil(()->{h.assertTrue(cow.getHealth()<before,"Charge damages stationary entity through vanilla hit path");h.assertTrue(cow.hasEffect(MobEffects.LEVITATION),"Charge applies vanilla Levitation");}).thenExecute(()->h.assertTrue(Math.abs((before-cow.getHealth())-4.0F)<0.01F,"unarmored target receives vanilla 4 damage")).thenExecute(()->h.assertTrue(!bullet.isAlive(),"entity impact consumes projectile")).thenSucceed();
+        h.startSequence().thenWaitUntil(()->{h.assertTrue(cow.getHealth()<before,"Charge damages stationary entity through vanilla hit path; pos="+bullet.position()+" vel="+bullet.getDeltaMovement());h.assertTrue(cow.hasEffect(MobEffects.LEVITATION),"Charge applies vanilla Levitation");}).thenExecute(()->h.assertTrue(Math.abs((before-cow.getHealth())-4.0F)<0.01F,"unarmored target receives vanilla 4 damage")).thenExecute(()->h.assertTrue(!bullet.isAlive(),"entity impact consumes projectile")).thenSucceed();
     }
 
     @GameTest(padding=30) public void launchedChargeCanBeRecapturedExactlyOnceByMeleeOrArrow(GameTestHelper h){
@@ -53,9 +53,9 @@ public final class ShulkerChargeProjectileGameTests {
         var arrowEntity=new Arrow(h.getLevel(),player,new ItemStack(Items.ARROW),null);var ranged=charge(h,b,new Vec3(0,1,0));ranged.hurtServer(h.getLevel(),h.getLevel().damageSources().arrow(arrowEntity,player),1.0F);h.assertTrue(drops(h,b)==1,"arrow recaptures launched Charge");h.succeed();
     }
 
-    @GameTest(maxTicks=100,padding=30) public void blockImpactAndPlainDiscardReturnNoItem(GameTestHelper h){
-        clear(h,5,7,6,14,13,10);BlockPos wall=new BlockPos(11,8,8);h.setBlock(wall,Blocks.STONE);Vec3 origin=new Vec3(7.5,8.5,8.5);var bullet=charge(h,origin,new Vec3(1,0,0));
-        h.startSequence().thenWaitUntil(()->h.assertTrue(!bullet.isAlive(),"Charge reaches ordinary block and is consumed")).thenExecute(()->h.assertTrue(drops(h,new Vec3(9,8,8))==0,"ordinary block impact never returns Charge item")).thenExecute(()->{var discarded=charge(h,new Vec3(7,12,8),new Vec3(0,1,0));discarded.discard();h.assertTrue(drops(h,new Vec3(7,12,8))==0,"plain expiry/discard path returns no item");}).thenSucceed();
+    @GameTest(maxTicks=80,padding=30) public void blockImpactAndPlainDiscardReturnNoItem(GameTestHelper h){
+        clear(h,8,7,6,13,13,10);BlockPos wall=new BlockPos(11,8,8);h.setBlock(wall,Blocks.STONE);Vec3 origin=new Vec3(9.5,8.5,8.5);Vec3 intent=h.absoluteVec(Vec3.atCenterOf(wall)).subtract(h.absoluteVec(origin));var bullet=charge(h,origin,intent);
+        h.startSequence().thenWaitUntil(()->h.assertTrue(!bullet.isAlive(),"Charge reaches ordinary block and is consumed; pos="+bullet.position()+" vel="+bullet.getDeltaMovement())).thenExecute(()->h.assertTrue(drops(h,new Vec3(10,8,8))==0,"ordinary block impact never returns Charge item")).thenExecute(()->{var discarded=charge(h,new Vec3(9,12,8),new Vec3(0,1,0));discarded.discard();h.assertTrue(drops(h,new Vec3(9,12,8))==0,"plain expiry/discard path returns no item");}).thenSucceed();
     }
 
     @GameTest(maxTicks=120,padding=50) public void shieldedPlayerNeutralizesChargeWithoutDrop(GameTestHelper h){
@@ -65,11 +65,11 @@ public final class ShulkerChargeProjectileGameTests {
         h.startSequence().thenWaitUntil(()->h.assertTrue(!bullet.isAlive(),"shield encounter consumes Shulker Charge projectile")).thenExecute(()->{h.assertTrue(drops(h,new Vec3(14,8,8))==0,"shield never converts projectile back to item");h.assertTrue(player.getHealth()==before,"shield blocks Shulker Charge damage");}).thenSucceed();
     }
 
-    @GameTest(maxTicks=120,padding=60) public void launchedChargePreservesVanillaShulkerDuplication(GameTestHelper h){
+    @GameTest(maxTicks=100,padding=60) public void launchedChargePreservesVanillaShulkerDuplication(GameTestHelper h){
         clear(h,1,7,1,30,20,30);for(int x=2;x<=28;x++)for(int z=2;z<=28;z++)h.setBlock(new BlockPos(x,6,z),Blocks.STONE);
-        Shulker shulker=h.spawn(EntityTypes.SHULKER,new BlockPos(18,7,14));shulker.setNoAi(true);((ShulkerTestAccessor)(Object)shulker).clinging$setRawPeekAmount(100);float before=shulker.getHealth();
+        Shulker shulker=h.spawn(EntityTypes.SHULKER,new BlockPos(18,7,14));((ShulkerTestAccessor)(Object)shulker).clinging$setRawPeekAmount(100);float before=shulker.getHealth();
         Vec3 origin=new Vec3(16.5,7.5,14.5);var bullet=charge(h,origin,shulker.getBoundingBox().getCenter().subtract(h.absoluteVec(origin)));
         h.assertTrue(bullet.getType()==EntityTypes.SHULKER_BULLET,"launched Charge keeps exact vanilla type required by Shulker duplication");h.assertTrue(((ShulkerChargeProjectile)(Object)bullet).clinging$targetEntity()==shulker,"duplication fixture owns shulker target");
-        h.startSequence().thenWaitUntil(()->h.assertTrue(!bullet.isAlive(),"Charge physically reaches and is consumed by shulker interaction")).thenExecute(()->h.assertTrue(shulker.getHealth()<before,"vanilla shulker damage path was reached before duplication assertion")).thenWaitUntil(()->{List<Shulker> all=h.getLevel().getEntitiesOfClass(Shulker.class,new AABB(h.absoluteVec(new Vec3(1,5,1)),h.absoluteVec(new Vec3(30,20,30))),Shulker::isAlive);h.assertTrue(all.size()>=2,"vanilla hitByShulkerBullet path creates a second shulker");}).thenSucceed();
+        h.startSequence().thenWaitUntil(()->h.assertTrue(!bullet.isAlive(),"Charge physically reaches and is consumed by shulker interaction; pos="+bullet.position()+" vel="+bullet.getDeltaMovement())).thenExecute(()->h.assertTrue(shulker.getHealth()<before,"vanilla shulker damage path was reached before duplication assertion")).thenWaitUntil(()->{List<Shulker> all=h.getLevel().getEntitiesOfClass(Shulker.class,new AABB(h.absoluteVec(new Vec3(1,5,1)),h.absoluteVec(new Vec3(30,20,30))),Shulker::isAlive);h.assertTrue(all.size()>=2,"vanilla hitByShulkerBullet path creates a second shulker");}).thenSucceed();
     }
 }
