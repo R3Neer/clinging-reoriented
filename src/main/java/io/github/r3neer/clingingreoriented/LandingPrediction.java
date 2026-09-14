@@ -12,7 +12,7 @@ import net.minecraft.world.phys.Vec3;
 
 /** Short-horizon, recomputed-every-tick landing forecast. It predicts no more than one visual snap window. */
 public final class LandingPrediction {
-    public static final int MAX_TICKS=5;
+    public static final int MAX_TICKS=LandingTiming.PRESENTATION_TICKS;
     private static final double AIR_HORIZONTAL_DRAG=.91D;
     private static final double AIR_VERTICAL_DRAG=.98D;
     public record Candidate(LandingSurfaces.Contact contact,Direction gravity,double etaTicks) {}
