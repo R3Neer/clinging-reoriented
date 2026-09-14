@@ -12,9 +12,11 @@ public final class GravityFallClientInitializer implements ClientModInitializer 
         ClientPlayNetworking.registerGlobalReceiver(GravityFallSync.Visual.TYPE,(packet,context)->GravityFallVisuals.receive(context.client(),packet));
         ClientTickEvents.END_CLIENT_TICK.register(client->{
             GravityFallVisuals.tick(client);
+            GravityFallLookState.tick(client);
             GravityFallAirSound.tick(client);
         });
         ClientPlayConnectionEvents.DISCONNECT.register((handler,client)->{
+            GravityFallLookState.clear();
             GravityFallAirSound.clear();
             GravityFallVisuals.clear();
         });
