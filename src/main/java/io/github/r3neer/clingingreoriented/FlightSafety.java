@@ -35,10 +35,12 @@ public final class FlightSafety {
 
     private FlightSafety() {}
 
-    /** Snapshot the last unquestionably valid position before entity movement for this server tick. */
+    /** Snapshot the last unquestionably valid position and cap speed before entity movement. */
     public static void capture(ServerPlayer player){
         PlayerData state=ClingingReoriented.data(player);
         if(!eligible(player)||!ClingingReoriented.controlsPhysics(player))return;
+        Vec3 capped=clampVelocity(player.getDeltaMovement());
+        if(!capped.equals(player.getDeltaMovement()))player.setDeltaMovement(capped);
         Direction gravity=GravityDirectionUtil.getGravityDirection(player);
         if(readyAt(player,player.position(),gravity))state.flightSafePosition=player.position();
     }
@@ -74,6 +76,9 @@ public final class FlightSafety {
             }
         }
 
+        // Re-clamp after movement/other modifiers too. START_SERVER_TICK prevents one huge
+        // overshoot; this second fence prevents any same-tick modifier from exporting excess
+        // velocity into the following tick.
         Vec3 velocity=clampVelocity(player.getDeltaMovement());
         if(!velocity.equals(player.getDeltaMovement()))player.setDeltaMovement(velocity);
 
