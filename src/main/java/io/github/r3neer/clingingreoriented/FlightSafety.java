@@ -35,6 +35,14 @@ public final class FlightSafety {
 
     private FlightSafety() {}
 
+    /** Snapshot the last unquestionably valid position before entity movement for this server tick. */
+    public static void capture(ServerPlayer player){
+        PlayerData state=ClingingReoriented.data(player);
+        if(!eligible(player)||!ClingingReoriented.controlsPhysics(player))return;
+        Direction gravity=GravityDirectionUtil.getGravityDirection(player);
+        if(readyAt(player,player.position(),gravity))state.flightSafePosition=player.position();
+    }
+
     public static void tick(ServerPlayer player){
         PlayerData state=ClingingReoriented.data(player);
         if(!eligible(player)||!ClingingReoriented.controlsPhysics(player)){
@@ -75,20 +83,34 @@ public final class FlightSafety {
             return;
         }
 
+        boolean hardBreach=!withinHardBounds(player,current,gravity);
         Vec3 safe=state.flightSafePosition;
         if(safe==null||!readyAt(player,safe,gravity)){
-            // Normally the previous END_SERVER_TICK supplied this anchor. Recover conservatively
-            // from a lifecycle/teleport edge by trying one capped movement step backwards.
+            // START_SERVER_TICK normally guarantees a safe anchor. The fallback covers activation
+            // or lifecycle races: first try the previous one-tick location, then project a hard
+            // out-of-world position back inside the legal border/build volume.
             Vec3 previous=current.subtract(velocity);
             if(readyAt(player,previous,gravity))safe=previous;
-            else{
+            else if(hardBreach){
+                Vec3 clamped=insideHardBounds(player,current,gravity);
+                teleport(player,clamped,Vec3.ZERO);
+                state.flightSafePosition=clamped;
+                state.clearFlightSafetyHold();
+                ImpactState.clear(player);
+                return;
+            }else{
+                // We are already in an unavailable chunk with no prior sample. Hold this position;
+                // the player's own chunk ticket can finish loading it, after which capture/tick
+                // will establish a normal anchor again.
+                state.flightSafePosition=current;
+                state.flightSafetyHolding=true;
+                state.flightHeldVelocity=velocity;
                 player.setDeltaMovement(Vec3.ZERO);
                 ImpactState.clear(player);
                 return;
             }
         }
 
-        boolean hardBreach=!withinHardBounds(player,current,gravity);
         Predicate<Vec3> accepted=hardBreach
             ? pos->withinHardBounds(player,pos,gravity)
             : pos->readyAt(player,pos,gravity);
@@ -143,6 +165,21 @@ public final class FlightSafety {
         return box.minY>=player.level().getMinY()
             && box.maxY<=player.level().getMaxY()+1
             && player.level().getWorldBorder().isWithinBounds(box);
+    }
+
+    private static Vec3 insideHardBounds(ServerPlayer player,Vec3 position,Direction gravity){
+        AABB box=boxAt(player,position,gravity);
+        var border=player.level().getWorldBorder();
+        double dx=0.0D,dy=0.0D,dz=0.0D;
+        double epsilon=1.0E-4D;
+        if(box.minX<border.getMinX()+epsilon)dx=(border.getMinX()+epsilon)-box.minX;
+        else if(box.maxX>border.getMaxX()-epsilon)dx=(border.getMaxX()-epsilon)-box.maxX;
+        if(box.minZ<border.getMinZ()+epsilon)dz=(border.getMinZ()+epsilon)-box.minZ;
+        else if(box.maxZ>border.getMaxZ()-epsilon)dz=(border.getMaxZ()-epsilon)-box.maxZ;
+        double minY=player.level().getMinY()+epsilon,maxY=player.level().getMaxY()+1.0D-epsilon;
+        if(box.minY<minY)dy=minY-box.minY;
+        else if(box.maxY>maxY)dy=maxY-box.maxY;
+        return position.add(dx,dy,dz);
     }
 
     private static boolean chunksReady(ServerPlayer player,Vec3 position,Direction gravity){
