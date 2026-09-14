@@ -30,9 +30,21 @@ public final class ShulkerChargeAdversarialGameTests {
         for(int x=minX;x<=maxX;x++)for(int y=minY;y<=maxY;y++)for(int z=minZ;z<=maxZ;z++)h.setBlock(new BlockPos(x,y,z),Blocks.AIR);
     }
 
-    private static void keepSimulated(GameTestHelper h,Vec3 point){
-        ChunkPos chunk=ChunkPos.containing(BlockPos.containing(point));
-        h.getLevel().getChunkSource().addTicketWithRadius(TicketType.PORTAL,chunk,2);
+    /** Keep the small adversarial flight corridor at ENTITY_TICKING level. */
+    private static void keepSimulated(GameTestHelper h,Vec3... points){
+        if(points.length==0)return;
+        int minX=Integer.MAX_VALUE,minZ=Integer.MAX_VALUE,maxX=Integer.MIN_VALUE,maxZ=Integer.MIN_VALUE;
+        for(Vec3 point:points){
+            ChunkPos chunk=ChunkPos.containing(BlockPos.containing(point));
+            minX=Math.min(minX,chunk.x());maxX=Math.max(maxX,chunk.x());
+            minZ=Math.min(minZ,chunk.z());maxZ=Math.max(maxZ,chunk.z());
+        }
+        // Match the stable routing fixtures: radius 2 maps to ENTITY_TICKING in 26.2,
+        // and one extra chunk protects a cardinal step across an arbitrary GameTest boundary.
+        minX--;minZ--;maxX++;maxZ++;
+        var source=h.getLevel().getChunkSource();
+        for(int x=minX;x<=maxX;x++)for(int z=minZ;z<=maxZ;z++)
+            source.addTicketWithRadius(TicketType.PORTAL,new ChunkPos(x,z),2);
     }
 
     private static ShulkerBullet launched(GameTestHelper h,Vec3 relative,Vec3 intent){
