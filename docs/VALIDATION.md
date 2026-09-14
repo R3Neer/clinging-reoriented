@@ -1,5 +1,11 @@
 # Validation
 
+## Unreleased pet breadcrumb pursuit — local validation 2026-09-14
+
+The rebased alpha.14 tree passes locally on Java 25 and Minecraft 26.2: **75/75 JUnit tests** and **95/95 required server GameTests**. New coverage exercises all six movement-plane projections, the vanilla close-distance dead zone, real scheduled wolf traversal to an airborne breadcrumb, bounded arrival, center-aligned grounded replay, ballistic goal release, Gravity Changer navigation replacement, ordered-queue preservation, sitting pause/resume, effect-free behavior and external teleport invalidation.
+
+This evidence validates deterministic server logic and integration in the GameTest environment. It does not replace live multiplayer/gameplay observation of a naturally equipped pet following a player through several gravity changes.
+
 ## 0.1.0-alpha.14 release-candidate validation — 2026-09-14
 
 Alpha.14 is the Gravity Fall control/compatibility campaign. It preserves alpha.13's world-momentum and absorbed-collision foundations while adding a 500 ms landing manoeuvre, full-sphere camera look, bounded body aerodynamics/W air-diving, Elytra-style airflow audio, generic fluid context, world-vertical water/climbable policies, First Person look-down hardening, directional mace height and server flight-safety fences.

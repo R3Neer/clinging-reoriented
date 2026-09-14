@@ -15,7 +15,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.ai.goal.FollowOwnerGoal;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
@@ -129,9 +128,6 @@ public final class GameFeelAdversarialGameTests {
         wolf.addEffect(new MobEffectInstance(Reorientation.EFFECT,1200));
         wolf.setPos(p.getX()+8.0D,p.getY(),p.getZ()+8.0D);
         h.assertTrue(p.startRiding(horse,true,true),"fixture could not mount rider");
-        var follow=new FollowOwnerGoal(wolf,1.0D,10.0F,2.0F);
-        h.assertTrue(follow.canUse(),"real follow-owner goal did not acquire mounted owner");
-        follow.start();
         Vec3 momentum=new Vec3(.24,-.36,.18);horse.setDeltaMovement(momentum);
 
         var east=ClingingReoriented.attempt(p,direction(Direction.EAST),GravityTransition.headingFromYaw(Direction.DOWN,p.getYRot()));
@@ -141,7 +137,7 @@ public final class GameFeelAdversarialGameTests {
         h.assertTrue(MobGravity.state(horse).ownership==MobGravity.Ownership.BORROWED_RIDER,"mount did not record rider loan ownership");
         Vec3 eastStep=p.position();
         horse.teleportTo(eastStep.x+4.0D,eastStep.y,eastStep.z);horse.positionRider(p);
-        wolf.setPos(eastStep);follow.tick();
+        wolf.setPos(eastStep);h.assertTrue(MobGravity.replay(wolf,Direction.EAST),"pet owned replay missed first mounted turn");
         h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.EAST,"pet did not replay first mounted breadcrumb");
         h.assertTrue(MobGravity.state(wolf).ownership==MobGravity.Ownership.OWNED_EFFECT,"pet incorrectly inherited rider-loan ownership");
 
@@ -151,7 +147,7 @@ public final class GameFeelAdversarialGameTests {
         h.assertTrue(horse.getDeltaMovement().equals(momentum),"mounted NORTH turn changed root momentum");
         Vec3 northStep=p.position();
         horse.teleportTo(northStep.x+4.0D,northStep.y,northStep.z);horse.positionRider(p);
-        wolf.setPos(northStep);follow.tick();
+        wolf.setPos(northStep);h.assertTrue(MobGravity.replay(wolf,Direction.NORTH),"pet owned replay missed second mounted turn");
         h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.NORTH,"pet did not replay second mounted breadcrumb");
 
         p.stopRiding();MobGravity.tick(horse);
@@ -159,7 +155,7 @@ public final class GameFeelAdversarialGameTests {
         h.assertTrue(MobGravity.state(horse).ownership==MobGravity.Ownership.NONE,"dismount left mount ownership borrowed/stale");
         h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.NORTH,"retiring mount loan dragged independent pet gravity with it");
         h.assertTrue(MobGravity.state(wolf).ownership==MobGravity.Ownership.OWNED_EFFECT,"retiring mount loan changed pet ownership");
-        follow.stop();GravityBreadcrumbs.clear(p.getUUID());
+        GravityBreadcrumbs.clear(p.getUUID());
         h.succeed();
     }
 

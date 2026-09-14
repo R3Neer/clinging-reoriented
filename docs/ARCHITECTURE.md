@@ -115,7 +115,7 @@ Remote Gravity Fall uses discrete semantic epochs rather than per-tick quaternio
 
 Mounted gravity remains transactional over the root/passenger hierarchy. Non-player `MobGravity` presentation remains tracked SNAP rather than local HOLD/LAND/full-sphere camera behaviour. Entity ID + UUID + monotonic sequence fences presentation, and `VisualTransitions.tickAll()` advances owned animations off-screen.
 
-`GravityBreadcrumbs` keeps bounded pet replay and lifecycle cleanup.
+`GravityBreadcrumbs` keeps bounded pet route replay and lifecycle clearing. While a valid step is pending, the existing vanilla `FollowOwnerGoal` temporarily targets that step projected onto the pet's current gravity-relative movement plane. Arrival uses that goal's bounded stop distance (capped at two blocks), so a path that vanilla considers complete cannot stall just outside a narrower body-width trigger. The pet then replays the turn; if rotating at the current feet position intersects the old support, replay may use the same single center-aligned, collision-preflighted placement allowed to players. That internal placement preserves the breadcrumb transaction, while external teleports still invalidate old steps. The pet releases navigation while unsupported and resumes with Gravity Changer's current directional navigation after landing. With no eligible step, vanilla owner following remains unchanged.
 
 ## Optional integrations
 

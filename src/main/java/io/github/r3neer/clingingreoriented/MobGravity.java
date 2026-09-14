@@ -7,6 +7,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.ai.navigation.PathNavigation;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
@@ -22,6 +23,11 @@ public final class MobGravity {
         public boolean airUsed;
         public long breadcrumb;
         public java.util.UUID breadcrumbOwner;
+        public long breadcrumbRoute=-1;
+        public long breadcrumbRouteRetryAt;
+        public boolean breadcrumbRouteOwned;
+        public PathNavigation breadcrumbNavigation;
+        public boolean breadcrumbRelocating;
         public long retryAt;
         public long visualSequence;
         public void clearBorrow(){borrowedPreviousOwnership=Ownership.NONE;borrowedPreviousDirection=Direction.DOWN;}
@@ -189,15 +195,28 @@ public final class MobGravity {
         return true;
     }
     public static boolean replay(LivingEntity pet,Direction direction){
-        if(!ClingingReoriented.hasEffect(pet) || !supported(pet) || pet.isPassenger() || pet.isVehicle() || !pet.isAlive())return false;
-        var s=state(pet);ownershipStillMatches(pet,s);
+        if(!canReplayBreadcrumb(pet))return false;
+        var s=state(pet);
         if(AirChanges.grounded(pet))s.airUsed=false;
         Direction current=GravityDirectionUtil.getOwnGravityDirection(pet);
         if(direction==current)return true;
         if((s.ownership==Ownership.EXTERNAL||s.ownership==Ownership.NONE)&&current!=Direction.DOWN)return false;
         if(s.airUsed && !pet.hasEffect(Reorientation.EFFECT))return false;
         boolean airborne=!AirChanges.grounded(pet);
-        if(!ownedTurn(pet,direction,true,null))return false;
+        if(!ownedTurn(pet,direction,true,null)){
+            Vec3 centered=RotationUtil.getCenterAlignedPosition(pet.getBoundingBox(),pet.getDimensions(pet.getPose()),direction);
+            if(centered.distanceToSqr(pet.position())<=1.0E-12)return false;
+            s.breadcrumbRelocating=true;
+            try{if(!ownedRelocateTree(pet,direction,centered,null))return false;}
+            finally{s.breadcrumbRelocating=false;}
+        }
         s.airUsed|=airborne;s.ownership=Ownership.OWNED_EFFECT;s.ownedDirection=direction;s.clearBorrow();s.retryAt=0;return true;
+    }
+    static boolean breadcrumbRelocating(LivingEntity pet){return state(pet).breadcrumbRelocating;}
+    static boolean canReplayBreadcrumb(LivingEntity pet){
+        if(!ClingingReoriented.hasEffect(pet) || !supported(pet) || pet.isPassenger() || pet.isVehicle() || !pet.isAlive())return false;
+        var s=state(pet);ownershipStillMatches(pet,s);
+        Direction current=GravityDirectionUtil.getOwnGravityDirection(pet);
+        return (s.ownership!=Ownership.EXTERNAL&&s.ownership!=Ownership.NONE)||current==Direction.DOWN;
     }
 }

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Pet breadcrumb pursuit
+
+- Make affected tame pets acquire `FollowOwnerGoal` for nearby gravity breadcrumbs even inside vanilla's owner-follow dead zone.
+- Navigate to each breadcrumb projected onto the pet's current gravity-relative movement plane, then replay the owner's turn and release navigation while unsupported.
+- Refresh Gravity Changer's replaced navigation instance, preserve queued breadcrumbs across the bounded internal turn placement, and keep external teleports, sitting, missing effects and foreign gravity ownership fail-closed.
+
 ## [0.1.0-alpha.14] - 2026-09-14
 
 ### Gravity Fall control and camera
