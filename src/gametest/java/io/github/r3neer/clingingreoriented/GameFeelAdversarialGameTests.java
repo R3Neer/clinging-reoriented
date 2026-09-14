@@ -139,18 +139,20 @@ public final class GameFeelAdversarialGameTests {
         h.assertTrue(GravityDirectionUtil.getGravityDirection(horse)==Direction.EAST&&GravityDirectionUtil.getGravityDirection(p)==Direction.EAST,"rider/root hierarchy missed EAST");
         h.assertTrue(horse.getDeltaMovement().equals(momentum),"mounted EAST turn changed root momentum");
         h.assertTrue(MobGravity.state(horse).ownership==MobGravity.Ownership.BORROWED_RIDER,"mount did not record rider loan ownership");
-        Vec3 eastStep=p.position();wolf.teleportTo(eastStep.x,eastStep.y,eastStep.z);follow.tick();
+        Vec3 eastStep=p.position();
+        horse.teleportTo(eastStep.x+4.0D,eastStep.y,eastStep.z);horse.positionRider(p);
+        wolf.teleportTo(eastStep.x,eastStep.y,eastStep.z);follow.tick();
         h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.EAST,"pet did not replay first mounted breadcrumb");
         h.assertTrue(MobGravity.state(wolf).ownership==MobGravity.Ownership.OWNED_EFFECT,"pet incorrectly inherited rider-loan ownership");
-        wolf.teleportTo(p.getX()+8.0D,p.getY(),p.getZ()+8.0D);
 
         var north=ClingingReoriented.attempt(p,direction(Direction.NORTH),GravityTransition.headingFromYaw(Direction.EAST,p.getYRot()));
         h.assertTrue(north==ClingingReoriented.Result.SUCCESS,"mounted NORTH turn failed: "+north);
         h.assertTrue(GravityDirectionUtil.getGravityDirection(horse)==Direction.NORTH&&GravityDirectionUtil.getGravityDirection(p)==Direction.NORTH,"rider/root hierarchy missed NORTH");
         h.assertTrue(horse.getDeltaMovement().equals(momentum),"mounted NORTH turn changed root momentum");
-        Vec3 northStep=p.position();wolf.teleportTo(northStep.x,northStep.y,northStep.z);follow.tick();
+        Vec3 northStep=p.position();
+        horse.teleportTo(northStep.x+4.0D,northStep.y,northStep.z);horse.positionRider(p);
+        wolf.teleportTo(northStep.x,northStep.y,northStep.z);follow.tick();
         h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.NORTH,"pet did not replay second mounted breadcrumb");
-        wolf.teleportTo(p.getX()+8.0D,p.getY(),p.getZ()+8.0D);
 
         p.stopRiding();MobGravity.tick(horse);
         h.assertTrue(GravityDirectionUtil.getGravityDirection(horse)==Direction.DOWN,"dismount did not retire borrowed mount frame");
