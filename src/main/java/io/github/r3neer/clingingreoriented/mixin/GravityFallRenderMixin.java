@@ -37,7 +37,20 @@ public abstract class GravityFallRenderMixin {
             if(mc.level!=null && mc.level.getEntity(avatar.id) instanceof Player player){
                 float partial=renderState.ageInTicks-(float)Math.floor(renderState.ageInTicks);
                 Quaternionf extra=GravityFallVisuals.extraRoot(player,partial);
-                if(extra!=null){poseStack.pushPose();poseStack.mulPose(extra);pushed=true;}
+                if(extra!=null){
+                    poseStack.pushPose();
+                    // EntityRenderDispatcher's origin is the entity's feet and LivingEntityRenderer
+                    // builds the humanoid upward from that point. A macro body rotation around that
+                    // origin makes the whole avatar orbit its feet and disappear toward the HUD.
+                    // Keep the currently displayed body center fixed instead; the pivot is expressed
+                    // in the already-applied visual-gravity frame, so this is also continuous while
+                    // Q_visual is held independently of physical gravity.
+                    float pivot=Math.max(0.0F,avatar.boundingBoxHeight*0.5F);
+                    poseStack.translate(0.0F,pivot,0.0F);
+                    poseStack.mulPose(extra);
+                    poseStack.translate(0.0F,-pivot,0.0F);
+                    pushed=true;
+                }
             }
         }
         CLINGING_GRAVITY_FALL_PUSHES.get().push(pushed);
