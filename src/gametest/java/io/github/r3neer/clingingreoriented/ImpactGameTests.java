@@ -16,10 +16,6 @@ public final class ImpactGameTests {
     private static net.minecraft.server.level.ServerPlayer owned(GameTestHelper h,Vec3 pos,Direction gravity){
         var p=h.makeMockServerPlayerInLevel();
         GameType.SURVIVAL.updatePlayerAbilities(p.getAbilities());
-        // The connected GameTest helper starts the real ServerGamePacketListenerImpl's
-        // 60-tick "client loaded" grace window but no client ever sends the completion packet.
-        // ServerPlayer deliberately rejects all damage during that window. Advance the public
-        // timeout so these tests exercise normal post-login survival damage semantics.
         for(int i=0;i<ServerGamePacketListenerImpl.CLIENT_LOADED_TIMEOUT_TIME;i++)p.connection.tickClientLoadTimeout();
         if(!p.connection.hasClientLoaded())throw new AssertionError("impact fixture mock connection never reached loaded state");
         p.snapTo(pos);p.addEffect(new MobEffectInstance(Reorientation.EFFECT,400));
@@ -64,6 +60,24 @@ public final class ImpactGameTests {
         float before=p.getHealth();p.setDeltaMovement(0,-1.2,0);p.move(MoverType.SELF,new Vec3(0,-1.2,0));
         h.assertTrue(p.getHealth()<before,"DOWN surface still hurts after gravity already changed to EAST;"+diag(p,before));
         h.assertTrue(p.fallDistance==0.0F,"impact engine does not leave stale vanilla fall distance");h.succeed();
+    }
+
+    @GameTest(padding=20)
+    public void actualLateTurnAndOwnershipExitCannotEraseArbitraryNormalImpact(GameTestHelper h){
+        floor(h,4,Blocks.STONE);var p=aboveFloor(h,5.5,5.5,4,Direction.DOWN);
+        p.move(MoverType.SELF,new Vec3(0,.01,0));
+        h.assertTrue(ImpactState.state(p).armed,"pre-turn managed motion did not arm impact ownership");
+        Vec3 impact=new Vec3(0,-1.2,0);p.setDeltaMovement(impact);
+        var result=ClingingReoriented.attempt(p,new Vec3(1,0,0),GravityTransition.headingFromYaw(Direction.DOWN,p.getYRot()));
+        h.assertTrue(result==ClingingReoriented.Result.SUCCESS,"late DOWN -> EAST turn was rejected: "+result);
+        h.assertTrue(com.moigferdsrte.gravitychanger.util.GravityDirectionUtil.getGravityDirection(p)==Direction.EAST,"late turn did not establish EAST gravity");
+        h.assertTrue(p.getDeltaMovement().equals(impact),"late gravity turn rotated or replaced world impact momentum");
+        p.removeAllEffects();var owner=ClingingReoriented.data(p);owner.owned=false;owner.visualFrameOwned=false;p.setOnGround(false);
+        float before=p.getHealth();p.move(MoverType.SELF,impact);
+        h.assertTrue(p.getHealth()<before,"actual late turn + ownership exit erased DOWN-surface impact under EAST gravity;"+diag(p,before));
+        float after=p.getHealth();p.move(MoverType.SELF,Vec3.ZERO);
+        h.assertTrue(p.getHealth()==after,"combined late-turn impact was charged more than once;"+diag(p,after));
+        h.succeed();
     }
 
     @GameTest(padding=20)

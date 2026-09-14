@@ -75,8 +75,6 @@ public final class FirstPersonChecks {
             context.takeScreenshot("firstperson-" + direction.getName());
         }
 
-        // S04 holdout: First Person may render the Gravity Fall body, but the avatar root
-        // is presentation-only and must never become camera roll/yaw/pitch input.
         AtomicReference<Vec3> cameraBefore=new AtomicReference<>();
         context.runOnClient(mc->{
             var player=mc.player;
@@ -104,9 +102,25 @@ public final class FirstPersonChecks {
             if(!GravityFallVisuals.active(mc.player))throw new AssertionError("Gravity Fall root vanished before First Person render checkpoint");
         });
         context.takeScreenshot("firstperson-gravity-fall-root");
+
         context.runOnClient(mc->{
             GravityFallVisuals.receive(mc,new GravityFallSync.Visual(
-                mc.player.getId(),mc.player.getUUID(),GravityFallSync.Phase.RESET.ordinal(),-1,0.0F,50_002L));
+                mc.player.getId(),mc.player.getUUID(),GravityFallSync.Phase.LAND.ordinal(),Direction.DOWN.get3DDataValue(),4.0F,50_002L));
+            GravityFallVisuals.tick(mc);
+            if(!GravityFallVisuals.landing(mc.player))throw new AssertionError("First Person Gravity Fall landing did not enter BODY_LANDING");
+        });
+        context.waitTicks(2);
+        context.runOnClient(mc->{
+            Vec3 after=cameraForward(mc);
+            if(after.distanceTo(cameraBefore.get())>2.0E-3D)
+                throw new AssertionError("First Person BODY_LANDING fed avatar root rotation back into camera: before="+cameraBefore.get()+" after="+after);
+            if(!GravityFallVisuals.landing(mc.player))throw new AssertionError("First Person BODY_LANDING ended before partial landing checkpoint");
+        });
+        context.takeScreenshot("firstperson-gravity-fall-landing");
+
+        context.runOnClient(mc->{
+            GravityFallVisuals.receive(mc,new GravityFallSync.Visual(
+                mc.player.getId(),mc.player.getUUID(),GravityFallSync.Phase.RESET.ordinal(),-1,0.0F,50_003L));
             GravityFallVisuals.clear();
             ClingingReoriented.data(mc.player).visualFrameOwned=false;
             VisualTransitions.clear();
