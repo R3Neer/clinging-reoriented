@@ -50,7 +50,7 @@ public final class ClingingReoriented implements ModInitializer {
             && GravityDirectionUtil.getOwnGravityDirection(root)==state.ownedDirection;
     }
     private static void reconcileVisualOwnership(ServerPlayer p){
-        var s=data(p);boolean next=s.owned||mountedVisualOwned(p);
+        var s=data(p);boolean next=controlsPhysics(p)||mountedVisualOwned(p);
         if(s.visualFrameOwned!=next){s.visualFrameOwned=next;Payloads.publish(p);}
     }
 
