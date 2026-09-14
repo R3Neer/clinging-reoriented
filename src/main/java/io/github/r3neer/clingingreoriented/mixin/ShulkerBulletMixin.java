@@ -38,7 +38,7 @@ public abstract class ShulkerBulletMixin extends Projectile implements ShulkerCh
     @Shadow private double targetDeltaX;
     @Shadow private double targetDeltaY;
     @Shadow private double targetDeltaZ;
-    @Shadow private void selectNextMoveDirection(@Nullable Direction.Axis avoidAxis,@Nullable Entity target){throw new AssertionError();}
+    @Shadow private void selectNextMoveDirection(Direction.Axis avoidAxis,@Nullable Entity target){throw new AssertionError();}
 
     @Unique private boolean clinging$captured;
     @Unique private boolean clinging$launchedCharge;

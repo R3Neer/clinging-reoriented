@@ -52,7 +52,7 @@ public final class ShulkerChargeTargeting {
         if(center.getType()!=HitResult.Type.MISS&&level.getBlockState(center.getBlockPos()).is(Blocks.TARGET))return Acquisition.block(center.getBlockPos(),true);
 
         Entity bestEntity=null;Score bestEntityScore=null;Entity owner=bullet.getOwner();
-        for(LivingEntity candidate:level.getEntitiesOfClass(LivingEntity.class,bullet.getBoundingBox().inflate(RANGE),e->e!=bullet&&e!=owner&&e.isAlive()&&e.canBeHitByProjectile()&&(!(e instanceof Player p)||!p.isSpectator()))){
+        for(LivingEntity candidate:level.getEntitiesOfClass(LivingEntity.class,bullet.getBoundingBox().inflate(RANGE),e->e!=owner&&e.isAlive()&&e.canBeHitByProjectile()&&(!(e instanceof Player p)||!p.isSpectator()))){
             Vec3 aim=candidate.getBoundingBox().getCenter();var scored=score(intent,aim.subtract(origin));if(scored.isEmpty()||!visible(level,bullet,origin,aim))continue;
             Score candidateScore=scored.get();if(bestEntityScore==null||candidateScore.compareTo(bestEntityScore)<0){bestEntity=candidate;bestEntityScore=candidateScore;}
         }
