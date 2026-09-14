@@ -2,15 +2,21 @@ package io.github.r3neer.clingingreoriented.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.moigferdsrte.gravitychanger.client.GravityRenderContext;
+import com.moigferdsrte.gravitychanger.client.GravityRenderState;
+import io.github.r3neer.clingingreoriented.BodyRenderMath;
 import io.github.r3neer.clingingreoriented.client.GravityFallVisuals;
 import java.util.ArrayDeque;
+import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
+import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.state.AvatarRenderState;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.Vec3;
 import org.joml.Quaternionf;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -39,21 +45,35 @@ public abstract class GravityFallRenderMixin {
                 Quaternionf extra=GravityFallVisuals.extraRoot(player,partial);
                 if(extra!=null){
                     poseStack.pushPose();
-                    // EntityRenderDispatcher's origin is the entity's feet and LivingEntityRenderer
-                    // builds the humanoid upward from that point. A macro body rotation around that
-                    // origin makes the whole avatar orbit its feet and disappear toward the HUD.
-                    // Keep the currently displayed body center fixed instead; the pivot is expressed
-                    // in the already-applied visual-gravity frame, so this is also continuous while
-                    // Q_visual is held independently of physical gravity.
-                    float pivot=Math.max(0.0F,avatar.boundingBoxHeight*0.5F);
-                    poseStack.translate(0.0F,pivot,0.0F);
-                    poseStack.mulPose(extra);
-                    poseStack.translate(0.0F,-pivot,0.0F);
+                    if(clinging$firstPersonBodyPass(mc,player)){
+                        @SuppressWarnings({"rawtypes","unchecked"})
+                        EntityRenderer renderer=((EntityRenderDispatcher)(Object)this).getRenderer(renderState);
+                        Vec3 renderOffset=renderer.getRenderOffset(renderState);
+                        Quaternionf visual=((GravityRenderState)renderState).gravitychanger$getGravityRotation();
+                        Vec3 cameraPivot=BodyRenderMath.localCameraPivot(
+                            x+renderOffset.x,y+renderOffset.y,z+renderOffset.z,visual);
+                        Vec3 pivot=BodyRenderMath.firstPersonPivot(cameraPivot,avatar.boundingBoxHeight);
+                        poseStack.translate(pivot.x,pivot.y,pivot.z);
+                        poseStack.mulPose(extra);
+                        poseStack.translate(-pivot.x,-pivot.y,-pivot.z);
+                    }else{
+                        float pivot=BodyRenderMath.bodyCenterPivot(avatar.boundingBoxHeight);
+                        poseStack.translate(0.0F,pivot,0.0F);
+                        poseStack.mulPose(extra);
+                        poseStack.translate(0.0F,-pivot,0.0F);
+                    }
                     pushed=true;
                 }
             }
         }
         CLINGING_GRAVITY_FALL_PUSHES.get().push(pushed);
+    }
+
+    @Unique
+    private static boolean clinging$firstPersonBodyPass(Minecraft mc,Player player){
+        return FabricLoader.getInstance().isModLoaded("firstperson")
+            && mc.options.getCameraType()==CameraType.FIRST_PERSON
+            && mc.getCameraEntity()==player;
     }
 
     @Inject(method="submit",at=@At(value="INVOKE",target=CLINGING_RENDER_TARGET,shift=At.Shift.AFTER))
