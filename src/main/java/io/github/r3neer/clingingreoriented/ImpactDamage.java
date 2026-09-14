@@ -16,41 +16,72 @@ public final class ImpactDamage {
     private static final double FACE_PROBE=2.0E-4D;
     private ImpactDamage() {}
 
-    /** @return true when vanilla distance accumulation must be suppressed. */
+    /**
+     * Fast path from vanilla/Gravity Changer checkFallDamage. Returning true suppresses
+     * distance accumulation while Clinging owns (or has armed) the impact lifecycle.
+     */
     public static boolean intercept(LivingEntity entity,double fallbackVertical,boolean onGround,BlockState onState,BlockPos onPos){
         var state=ImpactState.state(entity);
         if(!state.armed)return false;
         entity.fallDistance=0.0F;
         if(entity.level().isClientSide())return true;
 
-        Vec3 intended;
-        Vec3 actual;
         if(state.moveActive){
             if(state.handledSequence==state.moveSequence)return true;
-            state.handledSequence=state.moveSequence;
-            intended=ImpactPhysics.finite(state.intended)?state.intended:Vec3.ZERO;
-            actual=entity.position().subtract(state.start);
-        }else{
-            // Rare doCheckFallDamage path outside Entity.move: retain safe local vertical semantics.
-            intended=new Vec3(0.0D,fallbackVertical,0.0D);actual=onGround?Vec3.ZERO:intended;
+            Optional<Surface> supplied=onGround&&onState!=null&&onPos!=null&&!onState.isAir()
+                ?Optional.of(new Surface(onPos,onState)):Optional.empty();
+            resolveMove(entity,state,supplied);
+            return true;
         }
+
+        // Rare doCheckFallDamage path outside Entity.move: retain safe local vertical semantics.
+        Vec3 intended=new Vec3(0.0D,fallbackVertical,0.0D);
+        Vec3 actual=onGround?Vec3.ZERO:intended;
+        apply(entity,intended,actual,onGround&&onState!=null&&onPos!=null&&!onState.isAir()
+            ?Optional.of(new Surface(onPos,onState)):Optional.empty());
+        entity.fallDistance=0.0F;
+        return true;
+    }
+
+    /**
+     * Authoritative arbitrary-normal fallback at Entity.move TAIL. Gravity Changer's
+     * fall-damage hook is gravity-relative: after a late gravity turn, a real collision
+     * against the old DOWN floor can absorb world velocity while the entity is not
+     * "onGround" in its new EAST frame, so checkFallDamage is never called. The completed
+     * world move still exposes that impact as intended-vs-actual displacement. Sequence
+     * fencing makes this a no-op whenever the normal hook already handled the move.
+     */
+    public static void afterMove(LivingEntity entity){
+        var state=ImpactState.state(entity);
+        if(!state.armed||!state.moveActive)return;
+        entity.fallDistance=0.0F;
+        if(entity.level().isClientSide())return;
+        if(state.handledSequence==state.moveSequence)return;
+        resolveMove(entity,state,Optional.empty());
+    }
+
+    private static void resolveMove(LivingEntity entity,ImpactState.State state,Optional<Surface> supplied){
+        state.handledSequence=state.moveSequence;
+        Vec3 intended=ImpactPhysics.finite(state.intended)?state.intended:Vec3.ZERO;
+        Vec3 actual=entity.position().subtract(state.start);
+        apply(entity,intended,actual,supplied);
+        entity.fallDistance=0.0F;
+    }
+
+    private static void apply(LivingEntity entity,Vec3 intended,Vec3 actual,Optional<Surface> supplied){
         Vec3 absorbed=ImpactPhysics.absorbedVelocity(intended,actual);
         double speed=absorbed.length();
-        if(speed<=1.0E-7D)return true;
+        if(speed<=1.0E-7D)return;
         double equivalent=ImpactPhysics.vanillaEquivalentFallDistance(speed);
-        if(equivalent<MIN_EFFECTIVE_FALL_DISTANCE)return true;
+        if(equivalent<MIN_EFFECTIVE_FALL_DISTANCE)return;
 
-        Optional<Surface> surface=onGround&&onState!=null&&onPos!=null&&!onState.isAir()
-            ?Optional.of(new Surface(onPos,onState))
-            :impactSurface(entity,absorbed);
+        Optional<Surface> surface=supplied.isPresent()?supplied:impactSurface(entity,absorbed);
         if(surface.isPresent()){
             var hit=surface.get();
             hit.state().getBlock().fallOn(entity.level(),hit.state(),hit.pos(),entity,equivalent);
         }else{
             entity.causeFallDamage(equivalent,1.0F,entity.damageSources().fall());
         }
-        entity.fallDistance=0.0F;
-        return true;
     }
 
     private record Surface(BlockPos pos,BlockState state) {}
