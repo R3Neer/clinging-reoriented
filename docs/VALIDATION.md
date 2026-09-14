@@ -46,7 +46,7 @@ That post-merge run is the S05 no-change gate. The release-prep/canonicalization
 
 ### Asset provenance
 
-The Shulker Charge 16x16 GUI icon and project-authored 3D geometry are original GPL-3.0-or-later project assets. Editable icon source remains under `docs/art/shulker-charge/`. The 3D item model references `minecraft:entity/shulker/spark` at runtime; the Mojang texture itself is not redistributed.
+The Shulker Charge 16x16 GUI icon, item texture and project-authored 3D item geometry are original GPL-3.0-or-later project assets. Editable icon source remains under `docs/art/shulker-charge/`. The launched Charge remains the exact vanilla ShulkerBullet entity, so Minecraft's own projectile renderer/model/texture are used at runtime for that entity and are not redistributed by this project.
 
 ## Unreleased pet breadcrumb pursuit — local validation 2026-09-14
 
