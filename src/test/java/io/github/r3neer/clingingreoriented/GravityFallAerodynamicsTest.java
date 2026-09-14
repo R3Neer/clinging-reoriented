@@ -19,7 +19,7 @@ final class GravityFallAerodynamicsTest {
     @Test void largeLookOffsetPullsBodyGraduallyAndAddsOnlyDrag(){
         Vec3 velocity=new Vec3(0,-2,0);
         var body=BodyOrientation.start(new Quaternionf(),velocity);
-        Vec3 look=BodyOrientation.bodyUp(body.orientation()); // 90 degrees away from normal body-facing
+        Vec3 look=BodyOrientation.bodyUp(body.orientation());
         Vec3 beforeFacing=GravityFallAerodynamics.bodyFacing(body.orientation(),0.0F);
         double beforeAngle=Math.acos(Math.max(-1.0D,Math.min(1.0D,beforeFacing.dot(look))));
 
@@ -39,5 +39,35 @@ final class GravityFallAerodynamicsTest {
         assertEquals(1.0D,GravityFallAerodynamics.dragFactor(1.0D),1.0E-12D);
         assertEquals(1.0D-GravityFallAerodynamics.MAX_EXTRA_DRAG,GravityFallAerodynamics.dragFactor(0.0D),1.0E-12D);
         assertTrue(GravityFallAerodynamics.dragFactor(0.0D)>0.98D,"broadside air brake became implausibly abrupt");
+    }
+
+    @Test void forwardAirDiveRedirectsExistingMomentumWithoutAddingSpeed(){
+        Vec3 velocity=new Vec3(0.0D,-3.0D,0.0D);
+        Vec3 look=new Vec3(0.0D,-1.0D,1.0D).normalize();
+        Vec3 steered=GravityFallAerodynamics.redirectMomentum(velocity,look,1.0D);
+        assertEquals(velocity.length(),steered.length(),1.0E-10D,"air dive created or destroyed speed before drag");
+        assertTrue(steered.z>0.0D,"forward gaze did not bend fall momentum toward +Z");
+        assertTrue(steered.y<0.0D,"one steering tick unrealistically removed the falling component");
+    }
+
+    @Test void steeringAuthorityIsDotProductGated(){
+        Vec3 velocity=new Vec3(0.0D,-3.0D,0.0D);
+        Vec3 perpendicular=new Vec3(1.0D,0.0D,0.0D);
+        Vec3 backward=new Vec3(0.0D,1.0D,0.0D);
+        assertEquals(velocity,GravityFallAerodynamics.redirectMomentum(velocity,perpendicular,1.0D),
+            "perpendicular gaze stole fall momentum for a free sidestep");
+        assertEquals(velocity,GravityFallAerodynamics.redirectMomentum(velocity,backward,1.0D),
+            "backward gaze reversed fall momentum for free");
+        assertEquals(velocity,GravityFallAerodynamics.redirectMomentum(velocity,new Vec3(0,-1,1),0.0D),
+            "air dive steered without W input");
+    }
+
+    @Test void strongerAlignmentProducesStrongerTurn(){
+        Vec3 velocity=new Vec3(0.0D,-3.0D,0.0D);
+        Vec3 mostlyAligned=new Vec3(0.0D,-1.0D,0.5D).normalize();
+        Vec3 weaklyAligned=new Vec3(0.0D,-0.2D,1.0D).normalize();
+        Vec3 a=GravityFallAerodynamics.redirectMomentum(velocity,mostlyAligned,1.0D);
+        Vec3 b=GravityFallAerodynamics.redirectMomentum(velocity,weaklyAligned,1.0D);
+        assertTrue(a.z>b.z,"larger velocity/look dot product did not yield stronger redirection");
     }
 }
