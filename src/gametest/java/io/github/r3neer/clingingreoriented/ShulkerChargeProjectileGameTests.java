@@ -4,6 +4,7 @@ import io.github.r3neer.clingingreoriented.testmixin.EntityTestAccessor;
 import io.github.r3neer.clingingreoriented.testmixin.ShulkerTestAccessor;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
@@ -35,9 +36,12 @@ public final class ShulkerChargeProjectileGameTests {
 
     static {
         ServerEntityEvents.ALLOW_LOAD.register((entity,level,spawnReason,isLoadedFromDisk)->{
-            if(entity.getType()==EntityTypes.SHULKER&&spawnReason==EntitySpawnReason.BREEDING){
+            if(entity.getType()==EntityTypes.SHULKER){
                 for(ShulkerSpawnWatch watch:SHULKER_SPAWN_WATCHES){
-                    if(watch.level==level&&watch.area.contains(entity.position()))watch.allowed.incrementAndGet();
+                    if(watch.level==level&&watch.area.contains(entity.position())){
+                        watch.allowed.incrementAndGet();
+                        watch.lastReason.set(spawnReason);
+                    }
                 }
             }
             return true;
@@ -55,9 +59,11 @@ public final class ShulkerChargeProjectileGameTests {
         private final AABB area;
         private final AtomicInteger allowed=new AtomicInteger();
         private final AtomicInteger loaded=new AtomicInteger();
+        private final AtomicReference<EntitySpawnReason> lastReason=new AtomicReference<>();
         private ShulkerSpawnWatch(ServerLevel level,AABB area){this.level=level;this.area=area;SHULKER_SPAWN_WATCHES.add(this);}
         private int allowed(){return allowed.get();}
         private int loaded(){return loaded.get();}
+        private EntitySpawnReason lastReason(){return lastReason.get();}
         private void close(){SHULKER_SPAWN_WATCHES.remove(this);}
     }
 
@@ -144,8 +150,10 @@ public final class ShulkerChargeProjectileGameTests {
 
     @GameTest(maxTicks=180,padding=60) public void launchedChargePreservesVanillaShulkerDuplication(GameTestHelper h){
         ServerLevel level=h.getLevel();Vec3 parentPos=h.absoluteVec(new Vec3(18.5,7,14.5));Vec3 destination=parentPos.add(12,0,0);keepSimulated(h,parentPos,destination);
+        h.assertTrue(EntityTypes.SHULKER.canSpawn(level),"vanilla SHULKER EntityType must be spawnable in this GameTest level");
+        var creationProbe=EntityTypes.SHULKER.create(level,EntitySpawnReason.BREEDING);h.assertTrue(creationProbe!=null,"vanilla BREEDING Shulker creation must be available in this GameTest level");
         var shulker=new DeterministicTeleportShulker(level,destination);shulker.snapTo(parentPos);shulker.setNoAi(true);((ShulkerTestAccessor)(Object)shulker).clinging$setRawPeekAmount(100);h.assertTrue(level.addFreshEntity(shulker),"deterministic vanilla-duplication Shulker enters world");float before=shulker.getHealth();
-        Vec3 oldPosition=shulker.position();AABB oldArea=new AABB(oldPosition,oldPosition).inflate(8.0D);var offspring=new ShulkerSpawnWatch(level,oldArea);
+        Vec3 oldPosition=shulker.position();AABB oldDensityArea=shulker.getBoundingBox().inflate(8.0D);var offspring=new ShulkerSpawnWatch(level,oldDensityArea);
         Vec3 origin=parentPos.add(-2,0.5,0);keepSimulated(h,origin,parentPos);var bullet=chargeAbsolute(h,origin,shulker.getBoundingBox().getCenter().subtract(origin));
         h.assertTrue(bullet.getType()==EntityTypes.SHULKER_BULLET,"launched Charge keeps exact vanilla type required by Shulker duplication");h.assertTrue(((ShulkerChargeProjectile)(Object)bullet).clinging$targetEntity()==shulker,"duplication fixture owns shulker target");
         h.startSequence()
@@ -153,8 +161,9 @@ public final class ShulkerChargeProjectileGameTests {
             .thenWaitUntil(()->h.assertTrue(!bullet.isAlive(),"Charge physically reaches and is consumed by shulker interaction; ticks="+bullet.tickCount+" pos="+bullet.position()+" vel="+bullet.getDeltaMovement()))
             .thenExecute(()->h.assertTrue(shulker.getHealth()<before,"vanilla shulker damage path was reached before duplication assertion"))
             .thenExecute(()->h.assertTrue(shulker.position().distanceToSqr(oldPosition)>1.0D,"vanilla shulker-bullet duplication branch must invoke teleport; old="+oldPosition+" current="+shulker.position()+" health="+shulker.getHealth()))
-            .thenWaitUntil(()->h.assertTrue(offspring.allowed()>=1,"vanilla hitByShulkerBullet must create a BREEDING Shulker and reach ALLOW_LOAD; allowed="+offspring.allowed()+" loaded="+offspring.loaded()+" parent="+shulker.position()+" old="+oldPosition+" health="+shulker.getHealth()))
-            .thenWaitUntil(()->h.assertTrue(offspring.loaded()>=1,"vanilla BREEDING Shulker must enter ServerLevel tracking; allowed="+offspring.allowed()+" loaded="+offspring.loaded()+" parent="+shulker.position()+" old="+oldPosition+" health="+shulker.getHealth()))
+            .thenExecute(()->{int count=level.getEntities(EntityTypes.SHULKER,oldDensityArea,Shulker::isAlive).size();h.assertTrue(count<=1,"vanilla duplication density gate must have zero failure probability in fixture; count="+count+" area="+oldDensityArea);})
+            .thenWaitUntil(()->h.assertTrue(offspring.allowed()>=1,"vanilla hitByShulkerBullet must submit a new Shulker to ALLOW_LOAD; allowed="+offspring.allowed()+" loaded="+offspring.loaded()+" reason="+offspring.lastReason()+" parent="+shulker.position()+" old="+oldPosition+" health="+shulker.getHealth()))
+            .thenWaitUntil(()->h.assertTrue(offspring.loaded()>=1,"new vanilla Shulker must enter ServerLevel tracking; allowed="+offspring.allowed()+" loaded="+offspring.loaded()+" reason="+offspring.lastReason()+" parent="+shulker.position()+" old="+oldPosition+" health="+shulker.getHealth()))
             .thenExecute(offspring::close)
             .thenSucceed();
     }
