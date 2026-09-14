@@ -34,7 +34,6 @@ public final class PlayerData {
     public final java.util.ArrayDeque<SupportSample> supportHistory = new java.util.ArrayDeque<>();
     public Payloads.MoveReference pendingMove;
 
-    // Gamefeel update: server-side short-horizon landing state. Not persisted across lifecycle replacement.
     public int airborneTicks;
     public boolean landingCommitted;
     public LandingSurfaces.Contact landingContact;
@@ -47,15 +46,17 @@ public final class PlayerData {
     public long landingSequence;
     public boolean freeFlightVisualHeld;
 
-    // Gravity Fall is also transient server authority. Continuous orientation stays client-derived.
     public boolean gravityFallActive;
     public boolean gravityFallLanding;
     public Direction gravityFallLandingGravity=Direction.DOWN;
     public double gravityFallLandingEtaTicks;
     public long gravityFallSequence;
 
-    // Safety leash for high-speed free flight. It deliberately survives ordinary support unbinds
-    // and gravity turns; only an actual context/lifecycle transfer should discard the safe anchor.
+    public Direction maceFallDirection=Direction.DOWN;
+    public Vec3 maceFallLastPosition;
+    public double maceFallDistance;
+    public boolean maceFallActive;
+
     public Vec3 flightSafePosition;
     public boolean flightSafetyHolding;
     public Vec3 flightHeldVelocity=Vec3.ZERO;
@@ -66,6 +67,7 @@ public final class PlayerData {
     }
     public void clearLandingCommit(){landingCommitted=false;landingContact=null;landingKind=null;landingEtaTicks=0.0D;landingDeadlineTick=0L;}
     public void clearGravityFall(){gravityFallActive=false;gravityFallLanding=false;gravityFallLandingGravity=Direction.DOWN;gravityFallLandingEtaTicks=0.0D;}
+    public void clearMaceFall(){maceFallDirection=Direction.DOWN;maceFallLastPosition=null;maceFallDistance=0.0D;maceFallActive=false;}
     public void clearFlightSafetyHold(){flightSafetyHolding=false;flightHeldVelocity=Vec3.ZERO;}
     public void clearFlightSafety(){flightSafePosition=null;clearFlightSafetyHold();}
     public interface Holder { PlayerData clinging$data(); }
