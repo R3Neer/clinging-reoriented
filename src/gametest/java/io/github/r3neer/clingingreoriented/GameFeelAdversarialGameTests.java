@@ -123,8 +123,8 @@ public final class GameFeelAdversarialGameTests {
     @GameTest(padding=36)
     public void mountLoanAndPetBreadcrumbOwnershipStayIndependentAcrossTurns(GameTestHelper h){
         var p=managed(h,Direction.DOWN);
-        var horse=h.spawn(EntityTypes.HORSE,p.blockPosition());horse.setNoAi(true);horse.setOnGround(false);horse.setNoGravity(true);
-        var wolf=h.spawn(EntityTypes.WOLF,p.blockPosition());wolf.setNoAi(true);wolf.setOnGround(false);wolf.setNoGravity(true);wolf.tame(p);
+        var horse=h.spawn(EntityTypes.HORSE,new BlockPos(8,14,8));horse.teleportTo(p.getX(),p.getY(),p.getZ());horse.setNoAi(true);horse.setOnGround(false);horse.setNoGravity(true);
+        var wolf=h.spawn(EntityTypes.WOLF,new BlockPos(16,14,16));wolf.setNoAi(true);wolf.setOnGround(false);wolf.setNoGravity(true);wolf.tame(p);
         wolf.addEffect(new MobEffectInstance(Reorientation.EFFECT,1200));
         wolf.teleportTo(p.getX()+8.0D,p.getY(),p.getZ()+8.0D);
         h.assertTrue(p.startRiding(horse,true,true),"fixture could not mount rider");
