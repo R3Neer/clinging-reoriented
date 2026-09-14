@@ -54,7 +54,8 @@ public final class PlayerData {
     public double gravityFallLandingEtaTicks;
     public long gravityFallSequence;
 
-    // Safety leash for high-speed free flight. Never persisted across ownership/lifecycle changes.
+    // Safety leash for high-speed free flight. It deliberately survives ordinary support unbinds
+    // and gravity turns; only an actual context/lifecycle transfer should discard the safe anchor.
     public Vec3 flightSafePosition;
     public boolean flightSafetyHolding;
     public Vec3 flightHeldVelocity=Vec3.ZERO;
@@ -62,7 +63,6 @@ public final class PlayerData {
     public void unbind() {
         support = null; supportId = -1; supportPosition = null; supportBox = null; lastTransport = Vec3.ZERO; groundedOnSurface = false;
         supportHistory.clear();supportSampleSequence=0;lastConsumedSupportSample=-1;pendingMove=null;
-        clearFlightSafety();
     }
     public void clearLandingCommit(){landingCommitted=false;landingContact=null;landingKind=null;landingEtaTicks=0.0D;landingDeadlineTick=0L;}
     public void clearGravityFall(){gravityFallActive=false;gravityFallLanding=false;gravityFallLandingGravity=Direction.DOWN;gravityFallLandingEtaTicks=0.0D;}
