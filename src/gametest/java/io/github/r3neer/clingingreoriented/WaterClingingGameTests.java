@@ -8,7 +8,7 @@ import net.minecraft.world.phys.Vec3;
 
 public final class WaterClingingGameTests {
     @GameTest(padding=16)
-    public void waterAndBodyContactDoNotRechargeButSeabedSupportDoes(GameTestHelper h) {
+    public void waterOverridesGroundFlagsBodyContactAndSeabedSupport(GameTestHelper h) {
         var p=h.makeMockServerPlayerInLevel();
         var feet=h.absoluteVec(new Vec3(5.5,6.0,5.5));
         for(var pos:BlockPos.betweenClosed(h.absolutePos(new BlockPos(2,3,2)),h.absolutePos(new BlockPos(9,10,9))))
@@ -30,7 +30,7 @@ public final class WaterClingingGameTests {
         var seabed=BlockPos.containing(feet.add(0,-.01,0));
         h.getLevel().setBlockAndUpdate(seabed,Blocks.STONE.defaultBlockState());
         p.setOnGround(true);p.setDeltaMovement(Vec3.ZERO);AirChanges.refresh(p);
-        h.assertFalse(state.airChangeUsed,"standing on a solid seabed block with the feet-side face supported recharges Clinging");
+        h.assertTrue(state.airChangeUsed,"solid seabed support must not recharge Clinging while the body still intersects water");
         h.succeed();
     }
 }

@@ -55,9 +55,6 @@ public final class FlightSafety {
         Direction gravity=GravityDirectionUtil.getGravityDirection(player);
         Vec3 current=player.position();
 
-        // If a previous tick stopped at an unloaded frontier, keep the entity stationary while
-        // testing the retained one-tick step. The surrounding player ticket can then finish
-        // loading the adjacent chunk without us repeatedly overshooting and teleporting back.
         if(state.flightSafetyHolding){
             Vec3 held=clampVelocity(state.flightHeldVelocity);
             Vec3 probe=current.add(held);
@@ -76,9 +73,6 @@ public final class FlightSafety {
             }
         }
 
-        // Re-clamp after movement/other modifiers too. START_SERVER_TICK prevents one huge
-        // overshoot; this second fence prevents any same-tick modifier from exporting excess
-        // velocity into the following tick.
         Vec3 velocity=clampVelocity(player.getDeltaMovement());
         if(!velocity.equals(player.getDeltaMovement()))player.setDeltaMovement(velocity);
 
@@ -91,9 +85,6 @@ public final class FlightSafety {
         boolean hardBreach=!withinHardBounds(player,current,gravity);
         Vec3 safe=state.flightSafePosition;
         if(safe==null||!readyAt(player,safe,gravity)){
-            // START_SERVER_TICK normally guarantees a safe anchor. The fallback covers activation
-            // or lifecycle races: first try the previous one-tick location, then project a hard
-            // out-of-world position back inside the legal border/build volume.
             Vec3 previous=current.subtract(velocity);
             if(readyAt(player,previous,gravity))safe=previous;
             else if(hardBreach){
@@ -104,9 +95,6 @@ public final class FlightSafety {
                 ImpactState.clear(player);
                 return;
             }else{
-                // We are already in an unavailable chunk with no prior sample. Hold this position;
-                // the player's own chunk ticket can finish loading it, after which capture/tick
-                // will establish a normal anchor again.
                 state.flightSafePosition=current;
                 state.flightSafetyHolding=true;
                 state.flightHeldVelocity=velocity;
@@ -122,18 +110,12 @@ public final class FlightSafety {
         Vec3 frontier=furthestReady(safe,current,accepted);
         teleport(player,frontier,Vec3.ZERO);
         state.flightSafePosition=frontier;
-        // A safety correction is not a physical collision. Erase any armed impact/fall sample so
-        // the rescue itself can never become lethal on the following tick.
         ImpactState.clear(player);
 
         if(hardBreach){
-            // There is nothing to load beyond a hard border/build limit. Do not keep a latent
-            // outward vector that would hammer the same boundary forever.
             state.clearFlightSafetyHold();
             player.setDeltaMovement(Vec3.ZERO);
         }else{
-            // Unloaded chunk frontier: preserve the capped momentum, but hold position until the
-            // next one-tick step is actually backed by available chunks.
             state.flightSafetyHolding=true;
             state.flightHeldVelocity=velocity;
             player.setDeltaMovement(Vec3.ZERO);
@@ -205,7 +187,7 @@ public final class FlightSafety {
 
     private static boolean eligible(ServerPlayer player){
         return player.isAlive()&&!player.isSpectator()&&!player.isSleeping()&&!player.isPassenger()
-            &&!player.isFallFlying()&&!player.isInWater()&&!player.isInLava()&&!player.getAbilities().flying
+            &&!player.isFallFlying()&&!FluidContext.intersects(player)&&!player.getAbilities().flying
             &&!AirChanges.grounded(player);
     }
 
