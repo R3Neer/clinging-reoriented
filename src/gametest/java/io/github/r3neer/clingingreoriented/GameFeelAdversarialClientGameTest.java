@@ -47,8 +47,13 @@ public final class GameFeelAdversarialClientGameTest implements FabricClientGame
             context.waitFor(mc->mc.player!=null&&mc.player.hasEffect(Reorientation.EFFECT)&&Math.abs(mc.player.getY()-86.0D)<.25D);
             context.runOnClient(mc->{
                 mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
-                GravityFallVisuals.clear();camera.set(cameraForward(mc));
+                GravityFallVisuals.clear();
             });
+            // CameraType mutates options immediately, but mainCamera is rebuilt on later render ticks.
+            // Let that view switch settle before freezing the baseline; FA/EMF makes the old same-call
+            // read observably racy under software rendering even though Clinging's camera stays stable.
+            context.waitTicks(3);
+            context.runOnClient(mc->camera.set(cameraForward(mc)));
 
             Direction current=Direction.DOWN;
             Direction[] turns={Direction.EAST,Direction.UP,Direction.NORTH,Direction.DOWN,Direction.WEST,Direction.UP};
@@ -63,9 +68,7 @@ public final class GameFeelAdversarialClientGameTest implements FabricClientGame
                 if(result!=ClingingReoriented.Result.SUCCESS)throw new AssertionError("client six-turn fixture rejected "+previous+" -> "+target+": "+result);
                 context.waitFor(mc->GravityDirectionUtil.getOwnGravityDirection(mc.player)==target);
                 context.waitFor(mc->VisualTransitions.holding(mc.player));
-                context.runOnClient(mc->{
-                    if(cameraForward(mc).distanceTo(camera.get())>EPS)throw new AssertionError("camera accumulated movement after physical turn to "+target);
-                });
+                context.runOnClient(mc->assertVec(camera.get(),cameraForward(mc),"camera accumulated movement after physical turn to "+target));
                 current=target;
             }
             context.takeScreenshot("s05-six-turn-retained-camera");
