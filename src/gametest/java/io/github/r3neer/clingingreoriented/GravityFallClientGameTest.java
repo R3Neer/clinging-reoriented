@@ -26,6 +26,7 @@ public final class GravityFallClientGameTest implements FabricClientGameTest {
         AtomicLong sequence=new AtomicLong(10_000L);
         AtomicReference<Vec3> cameraStart=new AtomicReference<>();
         AtomicReference<Quaternionf> eastBody=new AtomicReference<>();
+        AtomicReference<Quaternionf> westBody=new AtomicReference<>();
         AtomicReference<Quaternionf> partialLanding=new AtomicReference<>();
 
         try(var world=context.worldBuilder().create()){
@@ -95,7 +96,8 @@ public final class GravityFallClientGameTest implements FabricClientGameTest {
             context.takeScreenshot("gravity-fall-zero-hold");
             context.runOnClient(mc->{
                 advance(mc,1,new Vec3(-.20,0,0));
-                assertVec(new Vec3(-1,0,0),BodyOrientation.bodyUp(body(mc)),"WEST direction after zero crossing");
+                Quaternionf west=body(mc);westBody.set(new Quaternionf(west));
+                assertVec(new Vec3(-1,0,0),BodyOrientation.bodyUp(west),"WEST direction after zero crossing");
                 assertCamera(cameraStart.get(),mc,"180-degree velocity reversal moved camera");
             });
             context.takeScreenshot("gravity-fall-reverse-west");
@@ -113,7 +115,7 @@ public final class GravityFallClientGameTest implements FabricClientGameTest {
                 advance(mc,2,Vec3.ZERO);
                 Quaternionf mid=body(mc);partialLanding.set(new Quaternionf(mid));
                 Quaternionf target=RotationUtil.getEntityRotationQuaternion(Direction.DOWN);
-                if(equivalent(mid,target)||equivalent(mid,eastBody.get()))throw new AssertionError("BODY_LANDING midpoint collapsed to an endpoint");
+                if(equivalent(mid,target)||equivalent(mid,westBody.get()))throw new AssertionError("BODY_LANDING midpoint collapsed to an endpoint");
             });
             context.takeScreenshot("gravity-fall-landing-mid");
 
