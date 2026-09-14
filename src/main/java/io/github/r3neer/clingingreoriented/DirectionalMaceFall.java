@@ -38,8 +38,8 @@ public final class DirectionalMaceFall {
         state.maceFallLastPosition=position;
         double fallen=alongGravity(delta,gravity);
         double fallSpeed=alongGravity(player.getDeltaMovement(),gravity);
-        boolean falling=!AirChanges.grounded(player)&&!player.onClimbable()
-            &&fallen>FALL_EPSILON||!AirChanges.grounded(player)&&!player.onClimbable()&&fallSpeed>FALL_EPSILON;
+        boolean unsupported=!AirChanges.grounded(player)&&!player.onClimbable();
+        boolean falling=unsupported&&(fallen>FALL_EPSILON||fallSpeed>FALL_EPSILON);
 
         if(!falling){
             state.maceFallDistance=0.0D;
@@ -52,17 +52,17 @@ public final class DirectionalMaceFall {
     }
 
     /** Value substituted only for mace fall-distance reads in a directional-gravity context. */
-    public static float value(Entity entity,float vanilla){
+    public static double value(Entity entity,double vanilla){
         if(!(entity instanceof Player player)||!directionalContext(player))return vanilla;
         var state=ClingingReoriented.data(player);
         Direction gravity=GravityDirectionUtil.getGravityDirection(player);
-        if(state.maceFallLastPosition==null||state.maceFallDirection!=gravity)return 0.0F;
+        if(state.maceFallLastPosition==null||state.maceFallDirection!=gravity)return 0.0D;
         double value=state.maceFallDistance;
         if(!AirChanges.grounded(player)&&!player.onClimbable()){
             double pending=alongGravity(player.position().subtract(state.maceFallLastPosition),gravity);
             if(pending>0.0D)value+=pending;
         }
-        return (float)Math.min(Float.MAX_VALUE,Math.max(0.0D,value));
+        return Math.max(0.0D,value);
     }
 
     public static void rebase(Player player){
