@@ -35,14 +35,17 @@ public abstract class MovementMixin {
         Entity self=(Entity)(Object)this;
         MovingSurface.teleported(self);
         if(self instanceof LivingEntity living)ImpactState.clear(living);
-        if(self instanceof Player player)ClingingReoriented.data(player).clearFlightSafety();
+        if(self instanceof Player player){
+            var state=ClingingReoriented.data(player);
+            state.clearFlightSafety();state.clearMaceFall();
+        }
     }
     @Inject(method="teleport",at=@At("HEAD"))
     private void clinging$dimension(TeleportTransition transition,CallbackInfoReturnable<Entity> cir){
         Entity self=(Entity)(Object)this;MovingSurface.teleported(self);if(self instanceof LivingEntity living)ImpactState.clear(living);
         if((Object)this instanceof Player p){
             var s=ClingingReoriented.data(p);
-            s.retirementPending=false;s.nextRetirementAttempt=0;s.clearFlightSafety();
+            s.retirementPending=false;s.nextRetirementAttempt=0;s.clearFlightSafety();s.clearMaceFall();
         }
     }
     @Inject(method="canCollideWith",at=@At("HEAD"),cancellable=true)
