@@ -35,10 +35,23 @@ public final class WaterClientGameTest implements FabricClientGameTest {
                 p.teleport(new TeleportTransition(level,new Vec3(.5,82,.5),Vec3.ZERO,-90,0,TeleportTransition.DO_NOTHING));
                 p.setNoGravity(true);p.setDeltaMovement(Vec3.ZERO);p.removeAllEffects();
                 p.addEffect(new MobEffectInstance(Reorientation.EFFECT,1200));
-                ClingingReoriented.data(p).airChangeUsed=false;
+                var s=ClingingReoriented.data(p);
+                s.airChangeUsed=false;
+                // S05 lifecycle holdout: enter a real water fixture with an already-active Gravity Fall.
+                // Everything else remains eligible/owned so water itself is what must retire the body root.
+                s.owned=true;s.selected=Direction.DOWN;s.visualFrameOwned=true;
+                s.airborneTicks=GravityFallState.START_AIRBORNE_TICKS+8;
+                s.gravityFallActive=true;s.gravityFallLanding=true;
+                s.gravityFallLandingGravity=Direction.DOWN;s.gravityFallLandingEtaTicks=2.0D;
             });
             context.waitFor(mc->mc.player!=null&&mc.player.isInWater()&&mc.player.hasEffect(Reorientation.EFFECT));
             context.waitTicks(4);
+            boolean gravityFallCleared=world.getServer().computeOnServer(server->{
+                var p=server.getPlayerList().getPlayers().getFirst();var s=ClingingReoriented.data(p);
+                return !s.gravityFallActive&&!s.gravityFallLanding&&s.gravityFallLandingEtaTicks==0.0D
+                    && GravityDirectionUtil.getGravityDirection(p)==Direction.DOWN;
+            });
+            if(!gravityFallCleared)throw new AssertionError("Entering real water did not retire active Gravity Fall/BODY_LANDING cleanly");
 
             long baseline=world.getServer().computeOnServer(server->ClingingReoriented.data(server.getPlayerList().getPlayers().getFirst()).lastRequest);
             double startY=world.getServer().computeOnServer(server->server.getPlayerList().getPlayers().getFirst().getY());
