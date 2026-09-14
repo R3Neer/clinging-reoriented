@@ -53,8 +53,11 @@ public final class GravityInputGameTests {
     }
 
     @GameTest(padding=16) public void sidewaysGravityUsesSameSprintLandingPrediction(GameTestHelper h){
-        var p=h.makeMockServerPlayerInLevel();clear(h,p.blockPosition(),8);
+        var p=h.makeMockServerPlayerInLevel();
         var support=h.absolutePos(new BlockPos(8,8,5));
+        // Clear the actual absolute fixture volume. makeMockServerPlayerInLevel initially lives
+        // at world origin, so clearing around its pre-teleport block position clears the wrong postcode.
+        clear(h,support,4);
         h.getLevel().setBlockAndUpdate(support,Blocks.STONE.defaultBlockState());
         // EAST gravity uses the player's position as the +X foot plane. Put that plane 0.20
         // blocks west of the wall and center the 0.6-wide tangent AABB inside the wall's Y/Z span.
