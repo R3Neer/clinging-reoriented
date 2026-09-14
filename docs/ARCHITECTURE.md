@@ -1,107 +1,136 @@
 # Architecture
 
-Clinging: Reoriented 0.1.0-alpha.13 separates **physical gravity**, **player camera**, **body presentation**, **landing authority** and **impact damage** instead of treating a gravity-direction write as one visual/physical event.
+Clinging: Reoriented 0.1.0-alpha.14 separates **physical gravity**, **camera ownership**, **body presentation**, **landing authority**, **aerodynamic steering**, **impact damage** and **interaction context** instead of treating a gravity-direction write as one monolithic event.
 
 ## Authority and design rule
 
-The server owns physical gravity, collision, effect/charge state, landing commitment and damage. A voluntary gravity decision changes acceleration while preserving the entity's existing **world-space velocity vector**. Presentation can describe that decision, but it cannot mutate physical position, velocity, collision or damage.
+The server owns physical gravity, collision, effect/charge state, landing commitment, aerodynamic velocity changes, safety intervention and damage. A voluntary gravity decision changes acceleration while preserving the current **world-space velocity vector**.
 
-The core design boundary is: **Elytra controls continuous movement; Clinging/Reorientation control acceleration discretely.** Alpha.13 introduces no camera steering, lift, boost, surface magnetism or automatic braking.
+Presentation may interpolate that decision but cannot invent position, collision or damage. Gravity Fall air-diving is the one deliberate continuous control layer: it redirects existing momentum within a bounded server-authoritative rule and does not create speed/lift.
 
 ## Input and intent
 
-`GravityInput` plus client input mixins produce edge-triggered requests. The request protocol remains `select_intent_v3`, carrying two world-space intents captured at the same edge:
+`GravityInput` plus client input mixins produce edge-triggered gravity requests. `select_intent_v3` carries two world-space intents captured from the rendered frame:
 
-- `selectionLook`: the actually rendered camera forward, used only to choose NORTH/SOUTH/EAST/WEST/UP/DOWN;
-- `navigationHeading`: pitch-independent heading used for gravity-frame orientation transport where required.
+- `selectionLook`: chooses NORTH/SOUTH/EAST/WEST/UP/DOWN;
+- `navigationHeading`: pitch-independent heading used for gravity-coordinate orientation transport.
 
-The server validates sequence/revision, effect ownership, input context, Clinging airborne budget, target direction, mount hierarchy and collision clearance. It sanitizes client headings before geometry uses them.
+The server validates sequence/revision, effect ownership, input context, airborne budget, target, hierarchy and collision clearance.
 
-Water uses `WaterDoubleTapDetector`, a passive rising-edge observer. Vanilla retains the key state. Sprint-jump reservation remains a bounded real-support prediction rather than a cooldown.
+Water uses `WaterDoubleTapDetector` for a Space-release-Space gesture while leaving vanilla key state intact. `WorldVerticalWaterMixin` makes owned swimming ascent/descent use world +Y/-Y. `ClimbablePolicy` plus climbable mixins implement DOWN vanilla, lateral ignore and mirrored UP behaviour.
+
+During sustained Gravity Fall, `GravityFallAerodynamicsClientInitializer` sends sparse `gravity_fall_look_v1` samples containing world-space camera gaze and clamped positive forward intent. The server accepts only fresh, finite, monotonic samples while Gravity Fall owns the context.
 
 ## Physical gravity and momentum
 
-`GravityTransition` plans gravity/yaw coordinate transport but voluntary turns do not rotate world velocity. A 180-degree gravity reversal therefore produces physical deceleration through zero followed by acceleration in the new direction.
+`GravityTransition` plans gravity/yaw coordinate transport but voluntary turns do not rotate world velocity. A 180-degree reversal therefore decelerates through zero before accelerating in the new direction.
 
-Gravity Changer remains the gravity-coordinate authority. Clinging tracks whether a physical/visual frame is its responsibility and revokes ownership when another source legitimately takes over.
+Gravity Changer remains the gravity-coordinate authority. Clinging records whether physical and visual state is its responsibility and releases ownership when another source takes over.
 
 ## Free-flight camera ownership
 
-The local player's visual path has three distinct `VisualTransitions` modes:
+`VisualTransitions` has three presentation modes:
 
-- `HOLD`: a successful free-flight gravity change captures the quaternion currently being displayed, applies the logical yaw gauge change and compensates it so the same world frame remains visible;
-- `LAND`: a retained frame SLERPs to the canonical future-floor frame only after server landing commitment;
-- `SNAP`: retained for immediate Clinging-owned cleanup/legacy local transitions and tracked non-player presentation.
+- `HOLD`: preserve the current rendered world frame across a physical gravity write;
+- `LAND`: interpolate a retained frame toward the committed future floor;
+- `SNAP`: immediate/legacy local cleanup plus tracked non-player presentation.
 
-The corresponding local payloads are `visual_hold_v1`, `visual_land_v1`, `visual_cancel_v1` and the immediate `visual_transition_v2`. `VisualTransitions` uses a monotonic connection-scoped sequence. A cancel caused by real landing invalidation can hold the exact current quaternion; a transfer/lifecycle cancel releases ownership completely.
+Payloads are monotonic and connection/identity fenced. A cancellation caused by invalidated landing support may hold the exact current quaternion; a lifecycle/context transfer releases ownership.
 
-Quarter LAND/SNAP timing is 180 ms and opposite half-turn timing 240 ms, quadratic ease-out. A new Reorientation decision during free flight updates physical gravity while the rendered world frame remains stable. It does not queue a series of camera turns.
+Alpha.14 makes local-player LAND use `LandingTiming.PRESENTATION_NANOS = 500_000_000` while ordinary tracked SNAP retains its shorter turn-kind timing. Camera LAND remains independent from physical gravity, which already changed when requested.
 
-## Landing surfaces and prediction
+## Full-sphere Gravity Fall camera
 
-The public API consists of `LandingSurfaceProvider` and `LandingSurfaces`. Providers expose bounded support/predicted-contact semantics and stable identity suitable for revalidation. `VanillaLandingSurfaceProvider` supplies the base implementation over real collision geometry. `SweptAabb` is used for continuous contact geometry rather than endpoint-only guessing.
+`GravityFallLookMixin` owns full-sphere pitch only while the local player has active Gravity Fall presentation. Vanilla `Entity.turn` normally funnels pitch through the +/-90-degree convention; the mixin updates the underlying Euler fields directly during this ownership window and normalizes only whole 360-degree turns.
 
-Provider rules are fail-closed: invalid/non-finite data, stale identity, exceptions or a contact whose gravity no longer matches cannot become a valid floor. External providers do not bypass Clinging's preflight and the public contract contains no Scale Brews classes.
+`GravityFallLookState` detects active-to-inactive release. `GravityFallLookMath.vanillaEquivalent` then maps any full-sphere orientation back to an equivalent vanilla yaw/pitch pair without changing the look vector. For example, pitch +120 degrees becomes pitch +60 degrees with yaw rotated 180 degrees.
 
-`LandingPrediction` simulates only the short window needed for presentation. `LandingState` is server authority for the final landing window. A candidate must remain the same contact, retain matching gravity, pass `LandingSurfaces.revalidate`, stay within its deadline and remain physically reachable.
+This state is camera-only. It does not change cardinal gravity selection or physical acceleration by itself.
 
-When ETA reaches the presentation horizon, `LandingState` marks `landingCommitted` and emits `visual_land_v1`. Input-side `LandingState.committed()` closes the one-tick gap between actual touchdown and the end-server-tick state update. Gravity requests during commitment are discarded, not queued.
+## Landing surfaces, fluids and prediction
 
-If a surface invalidates while Clinging still owns physics, `LandingState.cancel(..., true)` emits a cancel that preserves the current rendered frame. Elytra, water/lava, vehicles, teleport/transfer, death or ownership loss use transfer cleanup instead because a different subsystem/context now owns presentation.
+`LandingSurfaceProvider` / `LandingSurfaces` expose bounded support and swept-contact semantics with stable identity for revalidation. `VanillaLandingSurfaceProvider` uses actual collision geometry and `SweptAabb` provides continuous contact testing.
 
-## Gravity Fall state and body root
+`FluidContext.intersects` is a shared context fence. Any non-empty fluid volume intersecting the body suspends Clinging support/landing semantics before providers can make a floor valid. Water, lava and modded fluids therefore share one rule, and submerged solid contact cannot recharge Clinging or start landing reorientation.
 
-`GravityFallState` is a server-authoritative **coarse phase machine**, not a render-quaternion authority. Sustained presentation begins after `START_AIRBORNE_TICKS = 12` when the player remains airborne and Clinging/Reorientation still owns physics. It publishes discrete START/LAND/RESUME/RESET events through `GravityFallSync`; it does not send a quaternion every tick.
+`LandingPrediction.MAX_TICKS` is `LandingTiming.PRESENTATION_TICKS = 10`. `LandingState` commits only while the candidate remains the same contact, matches physical gravity, revalidates and stays reachable. Input-side `LandingState.committed()` closes the touchdown/end-tick gap.
 
-`GravityFallVisuals`, `BodyOrientation` and `BodyRenderMath` reconstruct the macroscopic body frame client-side. The body head-feet axis follows **world velocity** with a six-tick entry blend. Near degenerate speed it retains the last reliable frame. Orientation transport uses minimal rotation/parallel-transport style continuity rather than rebuilding from a global up vector, avoiding accidental barrel rolls.
+When the context changes to fluid, Elytra, vehicle, teleport/lifecycle or foreign ownership, retained landing presentation is released rather than frozen as if support had merely disappeared.
 
-When a valid floor enters the short body-landing horizon, the body converges toward that floor frame. BODY_LANDING is presentation and can start from a valid prediction before the stricter camera `LANDING_COMMITTED` threshold. Losing that candidate can RESUME sustained body tracking without forcing a camera event.
+## Gravity Fall phase and body root
 
-`GravityFallRenderMixin` applies the macro transform around the logical body center rather than the feet, preventing the model from orbiting around its own pivot. It does not replace limb animation. Fresh Animations/EMF/ETF remain owners of their internal animation layers.
+`GravityFallState` is a server-authoritative **coarse phase machine**. Sustained presentation begins after `START_AIRBORNE_TICKS = 12` while physics ownership remains valid. It publishes START/LAND/RESUME/RESET through `GravityFallSync`; it does not stream body quaternions every tick.
 
-First Person compatibility shares the same visual gravity/camera state but the macro body root is prevented from feeding back into the camera.
+`GravityFallVisuals`, `BodyOrientation` and `BodyRenderMath` reconstruct the body client-side. The head-feet axis primarily follows **world velocity** with a six-tick entry blend and retains the last reliable frame at degenerate speed.
 
-## Control frame
+During SUSTAIN, look may pull the macro body only outside `LOOK_DEADZONE_RADIANS = 35 degrees`, with at most 7.5 degrees of follow per tick. During LAND, this steering is disabled and body interpolation uses the shared 10-tick/500 ms landing timing.
 
-Alpha.13 adds no air steering. Movement magnitude remains whatever the existing player/physics stack produces. `VisualMovementFrame` / `VisualMovementMixin` translate movement intent using the frame that the player actually sees so camera retention does not make W/A/S/D secretly obey an unrelated logical gravity basis.
+`GravityFallRenderMixin` applies only the macro root. Fresh Animations/EMF/ETF remain owners of internal limb/head/equipment animation.
+
+## First Person pivot isolation
+
+First Person renders a local avatar translated relative to the real camera. Rotating the Gravity Fall root around the ordinary body center caused look-down clipping; rotating exactly around the camera hid too much body.
+
+`BodyRenderMath.localCameraPivot` expresses the camera point in the already-rotated avatar frame. `firstPersonPivot` blends body center toward that exact camera pivot with `FIRST_PERSON_CAMERA_PIVOT_BLEND = 0.72`. `GravityFallRenderMixin` uses that pivot only during the First Person body pass. The real camera never receives the avatar macro transform.
+
+## Aerodynamics and air-diving
+
+`GravityFallAerodynamics` contains pure bounded rules used by the server and mirrored visually by the client:
+
+- body look-follow: 35-degree deadzone, max 7.5 degrees/tick;
+- posture drag: factor 1.0 when streamlined, down to 0.987 when perfectly broadside;
+- W air-diving: max 6 degrees/tick, gated by positive `dot(velocityDirection, look)`;
+- redirect is a great-circle bend of the velocity direction and preserves its magnitude before drag;
+- speed below 0.20 blocks/tick is not redirected.
+
+`GravityFallAerodynamicsInitializer` runs after `GravityFallInitializer`, so the current tick's Gravity Fall phase is resolved before drag/steering. LAND, fluids, Elytra, passengers, death and lost physics ownership shut the layer off.
+
+## Flight safety
+
+`FlightSafety` is server-authoritative. It caps Clinging-controlled airborne world speed to **3.92 blocks/tick** while preserving vector direction, both before movement and at end-of-tick intervention points.
+
+It also tracks the last valid loaded/bounded position. Motion toward an unavailable chunk frontier is held with capped momentum retained until the next destination is available. Hard world/build-border violations are projected back inside and outward momentum is discarded. Safety intervention clears `ImpactState` so rescue is not itself interpreted as a damaging collision.
 
 ## Impact lifecycle
 
-`ImpactState` arms a short physical lifecycle while Clinging/Reorientation owns or has just owned the relevant fall. `Entity.move` instrumentation records the world-space start and intended movement. `ImpactDamage` compares intended movement with actual post-collision displacement through `ImpactPhysics.absorbedVelocity`.
+`ImpactState` arms a short physical lifecycle while Clinging/Reorientation owns or has just owned the relevant fall. Movement instrumentation records intended world displacement; `ImpactDamage` compares it with actual post-collision displacement through `ImpactPhysics.absorbedVelocity`.
 
-Only movement blocked in its travel direction contributes to absorbed impact speed. The combined blocked vector is handled as one event. `ImpactPhysics.vanillaEquivalentFallDistance` maps the absorbed speed back onto vanilla fall kinematics. `ImpactDamage` then prefers the impacted block's `fallOn` callback and otherwise calls vanilla fall damage.
+Only blocked movement in the travel direction contributes. The combined blocked vector is handled once, converted to a vanilla-equivalent fall distance and preferably routed through the impacted block's vanilla `fallOn` path.
 
-While armed, ordinary `fallDistance` accumulation is suppressed/reset so it cannot double-count the same event. `afterMove` is the arbitrary-normal fallback for cases such as a late gravity turn where Gravity Changer's gravity-relative `onGround` no longer describes the surface that actually blocked world motion. A per-move sequence fence prevents the ordinary hook and fallback from charging twice.
+This supersedes old gravity-turn fall-distance segmentation as the primary Clinging damage model.
 
-This architecture intentionally supersedes alpha.11/alpha.12's gravity-turn fall-distance segmentation as the primary damage model.
+## Directional mace fall height
+
+Vanilla/Gravity Changer `fallDistance` is unsuitable for mace smash semantics when gravity changes axis or strength. `DirectionalMaceFall` therefore tracks literal positional displacement projected onto the **current gravity direction**.
+
+A direction change/new fall begins a fresh segment. `DirectionalMaceMixin` redirects every relevant 26.2 mace `fallDistance` field read to that geometric value. The mixin handles the actual bytecode owners separately: `LivingEntity` for smash eligibility/damage routines and `Entity` for knockback.
 
 ## Gravity ownership and lifecycle
 
-Player state in `PlayerData` separates physical ownership, effective visual-frame ownership, airborne/landing state and Gravity Fall epoch. Teleport/transfer clears transient landing presentation before spatial context changes. Respawn/replacement carries connection-level monotonic epochs without migrating an obsolete entity-instance animation.
+`PlayerData` separates physical ownership, visual frame, airborne/landing state, Gravity Fall epoch/look/aero state, mace fall segment and safety frontier state. Teleports/transfers clear transient spatial state before context changes. Respawn/replacement preserves monotonic epochs without migrating obsolete entity-instance animation.
 
-Remote player Gravity Fall uses discrete snapshots/epochs so a tracker entering mid-fall reconstructs current coarse presentation without per-tick packets. UUID/epoch checks reject stale identity.
+Remote Gravity Fall uses discrete semantic epochs rather than per-tick quaternion packets. UUID/sequence checks reject stale tracked identity.
 
 ## Mounts and pets
 
-Mounted gravity remains transactional over the root/passenger hierarchy. `MountedGravity` creates one physical plan; opposite mounted turns use one rider-selected 180-degree axis and rebase each entity's own heading through that plan.
+Mounted gravity remains transactional over the root/passenger hierarchy. Non-player `MobGravity` presentation remains tracked SNAP rather than local HOLD/LAND/full-sphere camera behaviour. Entity ID + UUID + monotonic sequence fences presentation, and `VisualTransitions.tickAll()` advances owned animations off-screen.
 
-Non-player `MobGravity` presentation remains a tracked SNAP, not local free-flight HOLD/LAND. `entity_visual_transition` includes entity ID, UUID, target, yaw delta, turn kind and a per-mob monotonic sequence. Client resolution requires both current entity identity and fresh sequence. `VisualTransitions.tickAll()` advances owned transitions even outside the renderer/frustum.
-
-`GravityBreadcrumbs` keeps bounded pet route replay and lifecycle clearing. S05 exercises replay through vanilla `FollowOwnerGoal` rather than teleport-only fixtures.
+`GravityBreadcrumbs` keeps bounded pet replay and lifecycle cleanup.
 
 ## Optional integrations
 
-Required production code does not compile against Scale Brews. Existing legacy Scale/Anatomy reflection and pseudo mixin paths remain isolated and fail closed. The alpha.13 landing-surface API is deliberately independent from those bridges; a concrete Scale provider is out of scope.
+Production code does not compile against Scale Brews. Scale compatibility remains test/runtime isolated and the public landing API contains no Scale classes.
 
-First Person is mixin-gated and owns its own camera/model baseline. Fresh Animations/Player Extension, EMF and ETF are optional test fixtures, not runtime dependencies. Clinging only owns its macro transform.
+First Person is mixin-gated. Fresh Animations/FA Player Extension/EMF/ETF are pinned optional test fixtures. Clinging owns only the macro transform around their animation.
 
 ## State summary
 
-The observable conceptual states are:
+The major conceptual states are:
 
-1. `GROUNDED`: real gravity-relative support;
-2. `AIRBORNE`: physical gravity can change while the camera frame remains retained;
-3. `SUSTAINED_GRAVITY_FALL`: body root follows world velocity;
-4. `LANDING_COMMITTED`: camera landing snap is active and voluntary gravity input is blocked.
+1. `GROUNDED`: real gravity-relative support outside fluid context;
+2. `AIRBORNE`: gravity can change while the camera frame remains retained;
+3. `SUSTAINED_GRAVITY_FALL`: velocity-owned body + bounded look-follow/aerodynamics + optional W momentum redirection;
+4. `LANDING_COMMITTED`: 500 ms camera/body landing presentation with voluntary gravity input blocked;
+5. context transfer: fluid/Elytra/vehicle/teleport/lifecycle/foreign ownership releases incompatible presentation.
 
-These are deliberately orthogonal to effect acquisition, mount loans, pet breadcrumbs and external gravity ownership.
+These states remain orthogonal to effect acquisition, mount loans, pet breadcrumbs and external gravity ownership.
