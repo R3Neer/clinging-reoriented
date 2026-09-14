@@ -85,7 +85,34 @@ public final class WaterClientGameTest implements FabricClientGameTest {
             context.waitTicks(8);
             long held=world.getServer().computeOnServer(server->ClingingReoriented.data(server.getPlayerList().getPlayers().getFirst()).lastRequest);
             if(held!=firstTurn)throw new AssertionError("Holding second underwater tap repeated gravity requests");
-            context.getInput().releaseKey(options->options.keyJump);context.waitTicks(2);
+            context.getInput().releaseKey(options->options.keyJump);context.waitTicks(8);
+
+            // World-vertical water controls are deliberately independent of physical gravity.
+            // EAST is a strong holdout because Gravity Changer's default local-water transform
+            // would send these +/-Y impulses horizontally along X instead.
+            world.getServer().runOnServer(server->{
+                var p=server.getPlayerList().getPlayers().getFirst();
+                p.teleport(new TeleportTransition(server.overworld(),new Vec3(.5,82,.5),Vec3.ZERO,p.getYRot(),p.getXRot(),TeleportTransition.DO_NOTHING));
+                p.setNoGravity(true);p.setDeltaMovement(Vec3.ZERO);
+            });
+            context.waitFor(mc->mc.player.isInWater()&&GravityDirectionUtil.getOwnGravityDirection(mc.player)==Direction.EAST);
+            context.waitTicks(2);
+            double eastUpStart=world.getServer().computeOnServer(server->server.getPlayerList().getPlayers().getFirst().getY());
+            context.getInput().holdKey(options->options.keyJump);context.waitTicks(6);
+            context.runOnClient(mc->{
+                if(mc.player.getY()<=eastUpStart+.02D)throw new AssertionError("EAST-gravity Space did not move world +Y in water");
+                if(GravityDirectionUtil.getOwnGravityDirection(mc.player)!=Direction.EAST)throw new AssertionError("single EAST-gravity swim Space changed gravity");
+            });
+            context.getInput().releaseKey(options->options.keyJump);context.waitTicks(8);
+
+            world.getServer().runOnServer(server->{var p=server.getPlayerList().getPlayers().getFirst();p.setDeltaMovement(Vec3.ZERO);});
+            double eastDownStart=world.getServer().computeOnServer(server->server.getPlayerList().getPlayers().getFirst().getY());
+            context.getInput().holdKey(options->options.keyShift);context.waitTicks(6);
+            context.runOnClient(mc->{
+                if(mc.player.getY()>=eastDownStart-.02D)throw new AssertionError("EAST-gravity Shift did not move world -Y in water");
+                if(GravityDirectionUtil.getOwnGravityDirection(mc.player)!=Direction.EAST)throw new AssertionError("EAST-gravity swim Shift changed gravity");
+            });
+            context.getInput().releaseKey(options->options.keyShift);context.waitTicks(8);
 
             world.getServer().runOnServer(server->{
                 var p=server.getPlayerList().getPlayers().getFirst();var r=localRotationFor(Direction.EAST,new Vec3(0,0,1));
