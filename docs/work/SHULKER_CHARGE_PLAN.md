@@ -1,6 +1,6 @@
 # Shulker Charge — plan global
 
-Estado global: **S00–S02 CERRADOS · S03 REVALIDANDO CORRECCIÓN DE ROUTING · S04 BLOQUEADO EN GATE**.
+Estado global: **S00–S04 CERRADOS · S05 EN CURSO · S06 BLOQUEADO HASTA GATE ADVERSARIAL**.
 
 Baseline: `v0.1.0-alpha.13` / `be3b47284a71fbf4fcacb2ab2b2cb3776af290d3`.
 
@@ -20,16 +20,30 @@ Baseline: `v0.1.0-alpha.13` / `be3b47284a71fbf4fcacb2ab2b2cb3776af290d3`.
 ## S03 — Navegación, impacto, redstone y recaptura
 - [x] Implementación de routing/impacto/duplicación/recaptura.
 - [x] Detectado y corregido el caso Target Block tratado como obstáculo sólido.
-- [ ] Revalidar 105 GameTests completos y cerrar no-change gate.
+- [x] 105/105 GameTests completos verdes en run #624; revalidado en #626.
+- [x] No-change gate de producción cerrado.
 
 ## S04 — Cliente, modelo 3D y lenguaje visual
 - [x] GUI usa icono/modelo 2D definitivo presente en rama.
-- [x] Candidato de mano 3D y snapshots añadido.
-- [ ] Desbloquear tras cierre real de S03.
-- [ ] Revisar manualmente snapshots S04 y cerrar client gate.
+- [x] Presentación 3D y snapshots GUI/FP/TP/proyectil.
+- [x] Snapshot `FIXED` aislado añadido para que el modelo 3D sea evidencia inspeccionable sin modificar assets.
+- [x] Revisión manual + cliente base/First Person/Scale Brews/Fresh Animations + validador verdes en run #626.
 
 ## S05 — Campaña adversarial
-- [ ] Matriz combinada, performance, lifecycle y concurrencia.
+- [ ] Dispenser real: bloque + block entity + redstone + consumo exacto + facing preservado.
+- [ ] Lock válido no se sustituye por candidato posterior mejor.
+- [ ] Adquisición tardía automática desde free flight.
+- [ ] Target transferido a otra dimensión deja de resolver y provoca readquisición.
+- [ ] Carrera mixta arrow/melee y ownership no duplica drops.
+- [ ] Dos Charges simultáneas mantienen estado/targets independientes.
+- [ ] Stress smoke de múltiples Charges targetless durante varias rondas de readquisición.
+- [ ] Clasificar cualquier fallo y completar review/no-change gate final.
 
 ## S06 — Canonización e integración
-- [ ] Docs canónicos, retirar temporales, bump, CI rama/main y prerelease exacta.
+- [ ] Migrar comportamiento estable a README/GUIDE/ARCHITECTURE/COMPATIBILITY/VALIDATION/CHANGELOG.
+- [ ] Retirar `docs/work/SHULKER_CHARGE_*` tras migración.
+- [ ] Bump a `0.1.0-alpha.14` (alpha.13 ya está publicada).
+- [ ] CI completa sobre HEAD final de rama.
+- [ ] Integrar en `main` mediante PR/merge validado.
+- [ ] CI completa sobre `main` exacto.
+- [ ] Publicar prerelease `v0.1.0-alpha.14` desde el artefacto exacto validado.
