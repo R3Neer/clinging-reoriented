@@ -19,6 +19,8 @@ import org.joml.Quaternionf;
 /** Client-only ownership fence for held free-flight frames and landing/immediate snaps. */
 public final class VisualTransitions {
     private static final long TARGET_WAIT_NANOS=2_000_000_000L;
+    /** Landing presentation is intentionally slower than ordinary gravity snaps: 0.5 s. */
+    public static final long LAND_DURATION_NANOS=500_000_000L;
     private static final Map<GravityRotationAnimation,Active> ACTIVE=Collections.synchronizedMap(new WeakHashMap<>());
     private static final Map<UUID,Long> LATEST_ENTITY_SEQUENCE=new HashMap<>();
     private static volatile Field animationField;
@@ -125,7 +127,8 @@ public final class VisualTransitions {
             synchronized(ACTIVE){ACTIVE.put(animation,active);}
         }
         long elapsed=Math.max(0L,now-active.startedNanos());
-        float progress=(float)Math.min(1.0D,elapsed/(double)active.kind().durationNanos());
+        long duration=active.mode()==Mode.LAND?LAND_DURATION_NANOS:active.kind().durationNanos();
+        float progress=(float)Math.min(1.0D,elapsed/(double)duration);
         Quaternionf target=RotationUtil.getEntityRotationQuaternion(active.target());
         Quaternionf result=new Quaternionf(active.startVisual()).slerp(target,GravityTransition.easeOutQuadratic(progress));
         if(progress>=1.0F){clear(animation);return target;}
