@@ -138,8 +138,10 @@ public final class GravityFallVisuals {
                 Entity entity=resolve(client,active);
                 if(entity==null){if(++active.unresolvedTicks>UNRESOLVED_TTL_TICKS)it.remove();continue;}
                 active.unresolvedTicks=0;
-                // Defensive local fence: server normally sends RESET first, but visual ownership must never outlive Elytra/removal.
-                if(entity.isRemoved()||(entity instanceof LivingEntity living&&living.isFallFlying())){it.remove();continue;}
+                // Server RESET remains authoritative, but locally observable incompatible states
+                // should never wait on network latency before releasing the macro body root.
+                if(entity.isRemoved()||(entity instanceof LivingEntity living
+                    && (living.isFallFlying()||living.isInWater()||living.isInLava()))){it.remove();continue;}
                 ensureInitialized(active,entity);
                 if(active.mode==Mode.SUSTAIN){
                     active.transport=BodyOrientation.transport(active.transport,entity.getDeltaMovement());
