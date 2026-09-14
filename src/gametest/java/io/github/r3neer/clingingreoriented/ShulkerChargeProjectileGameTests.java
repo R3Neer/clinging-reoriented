@@ -13,7 +13,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.effect.MobEffects;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntitySpawnReason;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Shulker;
@@ -34,10 +34,18 @@ public final class ShulkerChargeProjectileGameTests {
     private static final CopyOnWriteArrayList<ShulkerSpawnWatch> SHULKER_SPAWN_WATCHES=new CopyOnWriteArrayList<>();
 
     static {
+        ServerEntityEvents.ALLOW_LOAD.register((entity,level,spawnReason,isLoadedFromDisk)->{
+            if(entity.getType()==EntityTypes.SHULKER&&spawnReason==EntitySpawnReason.BREEDING){
+                for(ShulkerSpawnWatch watch:SHULKER_SPAWN_WATCHES){
+                    if(watch.level==level&&watch.area.contains(entity.position()))watch.allowed.incrementAndGet();
+                }
+            }
+            return true;
+        });
         ServerEntityEvents.ENTITY_LOAD.register((entity,level)->{
             if(entity.getType()!=EntityTypes.SHULKER)return;
             for(ShulkerSpawnWatch watch:SHULKER_SPAWN_WATCHES){
-                if(watch.level==level&&watch.area.contains(entity.position()))watch.count.incrementAndGet();
+                if(watch.level==level&&watch.area.contains(entity.position()))watch.loaded.incrementAndGet();
             }
         });
     }
@@ -45,9 +53,11 @@ public final class ShulkerChargeProjectileGameTests {
     private static final class ShulkerSpawnWatch {
         private final ServerLevel level;
         private final AABB area;
-        private final AtomicInteger count=new AtomicInteger();
+        private final AtomicInteger allowed=new AtomicInteger();
+        private final AtomicInteger loaded=new AtomicInteger();
         private ShulkerSpawnWatch(ServerLevel level,AABB area){this.level=level;this.area=area;SHULKER_SPAWN_WATCHES.add(this);}
-        private int count(){return count.get();}
+        private int allowed(){return allowed.get();}
+        private int loaded(){return loaded.get();}
         private void close(){SHULKER_SPAWN_WATCHES.remove(this);}
     }
 
@@ -143,7 +153,9 @@ public final class ShulkerChargeProjectileGameTests {
             .thenWaitUntil(()->h.assertTrue(!bullet.isAlive(),"Charge physically reaches and is consumed by shulker interaction; ticks="+bullet.tickCount+" pos="+bullet.position()+" vel="+bullet.getDeltaMovement()))
             .thenExecute(()->h.assertTrue(shulker.getHealth()<before,"vanilla shulker damage path was reached before duplication assertion"))
             .thenExecute(()->h.assertTrue(shulker.position().distanceToSqr(oldPosition)>1.0D,"vanilla shulker-bullet duplication branch must invoke teleport; old="+oldPosition+" current="+shulker.position()+" health="+shulker.getHealth()))
-            .thenExecute(()->{h.assertTrue(offspring.count()>=1,"vanilla hitByShulkerBullet must add a Shulker offspring at the old position; loads="+offspring.count()+" parent="+shulker.position()+" old="+oldPosition+" health="+shulker.getHealth());offspring.close();})
+            .thenWaitUntil(()->h.assertTrue(offspring.allowed()>=1,"vanilla hitByShulkerBullet must create a BREEDING Shulker and reach ALLOW_LOAD; allowed="+offspring.allowed()+" loaded="+offspring.loaded()+" parent="+shulker.position()+" old="+oldPosition+" health="+shulker.getHealth()))
+            .thenWaitUntil(()->h.assertTrue(offspring.loaded()>=1,"vanilla BREEDING Shulker must enter ServerLevel tracking; allowed="+offspring.allowed()+" loaded="+offspring.loaded()+" parent="+shulker.position()+" old="+oldPosition+" health="+shulker.getHealth()))
+            .thenExecute(offspring::close)
             .thenSucceed();
     }
 }
