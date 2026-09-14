@@ -59,8 +59,24 @@ public final class LandingState {
         if(visualBecameNonCanonical)state.visualBaseKnown=false;
     }
 
+    /** Connection teardown: no packet is useful because the play connection is going away. */
     public static void lifecycleClear(ServerPlayer player){
-        var state=ClingingReoriented.data(player);state.airborneTicks=0;state.clearLandingCommit();state.visualBaseKnown=false;state.freeFlightVisualHeld=false;
+        clearTransient(ClingingReoriented.data(player));
+    }
+
+    /**
+     * Teleports keep the connection alive, so presentation ownership must be explicitly released
+     * before coordinates/world context change. A LAND animation can exist even if the free-flight
+     * HOLD flag is false, hence the broader landingCommitted || freeFlightVisualHeld fence.
+     */
+    public static void transferClear(ServerPlayer player){
+        var state=ClingingReoriented.data(player);
+        if(state.landingCommitted||state.freeFlightVisualHeld)Payloads.cancelLanding(player,false);
+        clearTransient(state);
+    }
+
+    private static void clearTransient(PlayerData state){
+        state.airborneTicks=0;state.clearLandingCommit();state.visualBaseKnown=false;state.freeFlightVisualHeld=false;
     }
 
     private static void touchdown(ServerPlayer player,Direction gravity){
