@@ -1,6 +1,6 @@
 # Architecture
 
-Clinging: Reoriented 0.1.0-alpha.15 separates **physical gravity**, **camera ownership**, **body presentation**, **landing authority**, **aerodynamic steering**, **impact damage**, **interaction context** and the independent **Shulker Charge projectile lifecycle** instead of treating a gravity-direction write as one monolithic event.
+Clinging: Reoriented 0.1.0-alpha.16 separates **physical gravity**, **camera ownership**, **body presentation**, **landing authority**, **aerodynamic steering**, **impact damage**, **interaction context** and the independent **Shulker Charge projectile lifecycle** instead of treating a gravity-direction write as one monolithic event.
 
 ## Authority and design rule
 
