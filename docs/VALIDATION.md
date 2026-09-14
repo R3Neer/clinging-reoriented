@@ -2,7 +2,7 @@
 
 ## 0.1.0-beta.1 — Gravity Charge beta gate
 
-Gravity Charge is the feature that moves Clinging: Reoriented from alpha to beta. The beta label does **not** weaken validation: the feature must pass the complete matrix on the final branch HEAD, then again on the exact integrated `main` commit before `v0.1.0-beta.1` can be published.
+Gravity Charge is the feature that moves Clinging: Reoriented from alpha to beta. The beta label does **not** weaken validation: the feature passed the complete matrix on the final branch HEAD and then again on the exact integrated `main` commit before `v0.1.0-beta.1` was published.
 
 ### Final public/internal naming
 
@@ -14,7 +14,7 @@ Before first publication, the provisional development name “Shulker Charge” 
 - implementation/tests/assets: `GravityCharge*`, `gravity_charge*`, snapshots `gravity-charge-*`;
 - sprint namespace: `GC-S00` … `GC-S06`.
 
-No released world or artifact ever used `clinging_reoriented:shulker_charge`, so beta.1 intentionally carries no legacy alias. CI also validates exact `en_us`/`es_es` key parity and non-empty Spanish values.
+No released world or artifact ever used `clinging_reoriented:shulker_charge`, so beta.1 intentionally carries no legacy alias. CI validates exact `en_us`/`es_es` key parity and non-empty Spanish values.
 
 ### Gravity Charge invariants
 
@@ -44,7 +44,7 @@ The default client snapshot matrix includes:
 - `gravity-charge-projectile-renderer`;
 - `gravity-charge-fixed-3d`.
 
-The item GUI/held assets are original project assets using the project-owned `gravity_charge` texture. The projectile snapshot intentionally exercises Minecraft's vanilla ShulkerBullet renderer because the runtime entity remains vanilla.
+The item GUI/held assets are original project assets using the project-owned `gravity_charge` texture. The projectile snapshot intentionally exercises Minecraft's vanilla ShulkerBullet renderer because runtime entity type remains vanilla.
 
 ### Adversarial campaign history
 
@@ -54,7 +54,21 @@ Run **#706** then failed before compilation because Modrinth returned HTTP 503 f
 
 Run **#710** (`34895769482`) passed the complete matrix before the alpha.14 synchronization. Run **#714** (`34897063938`) passed the complete post-merge matrix on `a16d16faaa2cbd3c4b51678f08310ebc9a8bf681`, including build/JUnit, server GameTests, default client, First Person, Scale Brews server/client, Fresh Animations and semantic screenshots.
 
-Alpha.15 was subsequently published from exact `main` commit `fe74b979179065afa505baa4b2ece75bebc9f4d2` after its own full validation. Beta.1 therefore revalidates Gravity Charge on top of the **published last-alpha baseline**, rather than inheriting an older green run by assumption.
+Alpha.15 was subsequently published as the last alpha for pet gravity-breadcrumb pursuit. Beta.1 therefore revalidated Gravity Charge on top of the **published last-alpha baseline**, rather than inheriting an older green run by assumption.
+
+### Final beta.1 evidence
+
+The final public/internal rename and beta preparation landed at `6a22223bc20591a9e320bef84521fb402501df56`.
+
+- **Feature branch run #754** (`34900246377`): success — localization parity, build/JUnit, server GameTests, default client, First Person, Scale Brews server/client, Fresh Animations and semantic snapshots all green.
+- `main` was fast-forwarded to that exact commit, so integration introduced no different merge tree.
+- **Main run #758** (`34901126185`): success — the complete matrix passed again on the exact release commit.
+- **Publish beta.1 prerelease #11** (`34902013181`): success — downloaded the artifact from main run #758, verified the expected regular/sources JARs and published without rebuilding.
+- **Release/tag:** `v0.1.0-beta.1`, target `6a22223bc20591a9e320bef84521fb402501df56`.
+- **Regular JAR SHA-256:** `41d0d9f3d0fab9c504cab619facd740508442ba4350d2d680b39f126ed5630fb`.
+- **Sources JAR SHA-256:** `c761f923dbbe45f51b5286a462525190d998f8564bfa6e9cf7ecda672d2a0215`.
+
+This is the evidence that closes GC-S06 and the alpha line.
 
 ## Compatibility matrix
 
@@ -91,6 +105,7 @@ Automated assertions and snapshots are evidence, not a substitute for human game
 
 ## Historical releases
 
+- **0.1.0-beta.1**: Gravity Charge; first beta.
 - **0.1.0-alpha.15**: pet gravity-breadcrumb pursuit; last alpha.
 - **0.1.0-alpha.14**: Gravity Fall control/camera, 500 ms landing, full-sphere look, aerodynamics, fluid/climbable policy, safety and directional mace.
 - **0.1.0-alpha.13**: retained camera, Gravity Fall body, absorbed-collision impact and landing-surface API.
