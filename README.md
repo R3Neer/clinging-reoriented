@@ -2,10 +2,7 @@
 
 The floor is wherever you decide it is.
 
-**Clinging: Reoriented** turns the Clinging effect from Alex's Mobs into an
-airborne gravity ability for Minecraft 26.2 on Fabric. Release **Space** after
-leaving the ground, then press it again while airborne to fall toward the
-nearest world-cardinal direction to your view.
+**Clinging: Reoriented** turns the Clinging effect from Alex's Mobs into an airborne gravity ability for Minecraft 26.2 on Fabric. Leave your local floor, release **Space**, look toward another world-cardinal direction and press Space again. Clinging grants one voluntary airborne gravity decision; **Reorientation** removes that one-turn limit.
 
 [![Minecraft 26.2](https://img.shields.io/badge/Minecraft-26.2-62B47A)](https://www.minecraft.net/)
 [![Fabric](https://img.shields.io/badge/Loader-Fabric-DDBD3B)](https://fabricmc.net/)
@@ -14,118 +11,51 @@ nearest world-cardinal direction to your view.
 
 ![Clinging turns east into the new down](docs/images/0000_clinging-east-gravity.png)
 
-## Two ways to turn
+## The alpha.13 movement language
 
-- **Clinging** grants exactly one voluntary gravity turn per airborne stretch.
-  Landing on your local floor restores the charge. Once spent, every further
-  voluntary direction, including vanilla **DOWN**, waits for a real landing.
-- **Reorientation** grants unlimited airborne turns. Brew it by adding a
-  **shulker shell** to a Clinging potion. Extended, splash and lingering forms
-  retain the ordinary brewing routes.
+A voluntary turn changes **physical gravity immediately** but preserves the existing world-space velocity vector. Gravity changes acceleration, not momentum. Reversing gravity therefore brakes the old motion naturally, crosses zero speed, and only then accelerates the other way.
 
-A valid turn preserves world momentum and the physical body's world-space center
-when a feet-pivot rotation would otherwise clip the floor or wall being left behind.
-It is still rejected when the rotated body is genuinely obstructed, the chosen
-direction is unchanged, or another mechanic owns the input. Holding Space never
-repeats a turn.
+The local player's camera no longer rotates merely because gravity changed. While airborne, Clinging retains the world frame that was actually being rendered. Reorientation can therefore chain discrete acceleration choices while the camera remains the player's. `selectionLook` still uses the rendered look, so the retained camera remains a valid way to choose the next cardinal gravity direction.
 
-Usable Elytra always take priority: Space deploys the Elytra instead of changing
-gravity, and no turns are accepted while gliding. A queued sprint-jump also keeps
-Space when the player is sprinting downward and predicted to touch the current
-local floor soon, preventing a near-landing double tap from being mistaken for
-Clinging/Reorientation. Normal jump power preserves the original one-tick guard;
-stronger effective jump power, including Jump Boost/Leaping and compatible
-`JUMP_STRENGTH` modifiers, expands only that near-landing prediction up to a hard
-three-tick cap.
+When the real trajectory is about to meet a valid gravity-relative floor, Clinging commits that landing and rotates the retained frame toward the new floor. Quarter-turn landings use **180 ms** and opposite half-turn landings **240 ms**, with quadratic ease-out. A very late landing starts immediately rather than speeding the camera up unnaturally. During this short `LANDING_COMMITTED` window new gravity requests are discarded, never queued. If the surface genuinely disappears or another lifecycle owner takes over, the current displayed frame is preserved instead of snapping back.
 
-## Underwater controls
+## Gravity Fall body presentation
 
-Water keeps Vanilla's normal Space-to-ascend control. A single press or held Space
-only swims upward; Clinging/Reorientation observes the key without consuming it.
-To request a gravity turn while in water, release Space and press it a second time
-within **250 ms**. The second press still reaches Vanilla, so swimming input remains
-live even if the gravity request succeeds or is rejected.
+After **12 airborne ticks** under Clinging/Reorientation physics, a sustained fall enters Gravity Fall presentation. Over a **6-tick blend**, the player's macroscopic body root begins to follow the **actual world velocity**, not the current gravity or camera direction. Near zero speed it keeps the last reliable body frame, preventing flips when gravity reverses and velocity changes sign.
 
-The double-tap detector is edge-based: holding never repeats, entering the water
-while Space is already held cannot synthesize a tap, and leaving the water or other
-input-context changes discard a partial pair. A detected pair is consumed as one
-gesture, so a third rapid press begins a new pair rather than firing again.
+Approaching a future floor moves the body into BODY_LANDING and converges it toward the landing frame. This body presentation does not steer the camera and does not add air control. Fresh Animations, when installed, keeps ownership of limb animation, head tracking, equipment and micro-animation; Clinging adds only the macro body transform.
 
-Water itself never restores Clinging's one-turn charge. The player must genuinely
-stand on a solid block with the feet-side face supported according to the current
-gravity. Merely being submerged or touching a block with the torso/side does not
-count; standing on the seabed does.
+Elytra, water/lava, vehicles, death/respawn, teleport and foreign gravity ownership are explicit presentation boundaries. Elytra remains the continuous-flight mechanic; Clinging/Reorientation remain discrete gravity decisions.
 
-## Gravity snap presentation
+## Impact damage follows the collision
 
-Clinging/Reorientation gravity is physical immediately, but the camera and body use
-a short visual snap instead of Gravity Changer's generic canonical-frame
-interpolation. Quarter turns settle in **0.18 s** and opposite half turns in
-**0.24 s**, with a quadratic ease-out: still immediate in feel, but long enough to
-see the direction of the rotation.
+Alpha.13 replaces gravity-turn fall-distance segmentation as the primary Clinging impact model. While the Clinging impact lifecycle is armed, damage comes from the **world-space velocity actually absorbed by a blocking collision**. That absorbed speed is converted to a vanilla-equivalent fall distance and delegated back into the vanilla block/fall pipeline whenever possible.
 
-Target selection and retained heading are deliberately separate. The rendered
-camera direction chooses the new gravity, while the player's navigation heading is
-captured independently from yaw with pitch treated as zero. Looking straight up or
-down just to select UP/DOWN therefore no longer destroys the direction the player
-was travelling. A DOWN↔UP turn keeps that world heading when the camera is levelled
-again.
+Consequences are deliberately physical: a late gravity turn cannot erase a high-speed collision with the old floor; genuinely braking by reversing gravity can reduce or remove the damage; tangential motion contributes little or nothing; and one multi-axis collision is handled once rather than once per blocked axis.
 
-Perpendicular changes rotate only around the single axis required to reach the new
-floor. Rapid Reorientation changes continue from the frame currently on screen
-rather than snapping back or queueing old rotations. Each successful gravity change
-also starts a fresh vanilla fall-distance segment, so chaining legitimate
-Reorientation turns does not accumulate one artificial mega-fall.
+## Landing surfaces are extensible
 
-Clinging-owned mount and pet changes use the same **180/240 ms quadratic snap**.
-For a mounted turn, rider and root mount share one physical rotation; on an opposite
-180-degree change the rider's navigation heading chooses the axis, while the mount's
-own heading is transported through that same axis to derive its own yaw gauge.
-Standalone pet replay instead derives the physical plan from the pet's own heading.
-Owned restoration/retirement keeps the same presentation. Unrelated or foreign
-Gravity Changer writes never gain Clinging visual ownership and keep Gravity
-Changer's ordinary animation.
+Alpha.13 exposes a small public `LandingSurfaceProvider` / `LandingSurfaces` contract. Vanilla collision geometry is the base provider. External providers can report bounded support/predicted contact and stable identity for revalidation, but they cannot bypass Clinging's authority or physical preflight. Providers fail closed on stale, non-finite or invalid data.
 
-These timings are gameplay/presentation semantics and are not configurable.
-Clinging creates no client JSON configuration file; old
-`config/clinging-reoriented-client.json` files from earlier alphas are ignored.
+The API intentionally contains no Scale Brews types. Concrete Scale Brews landing-surface integration is outside alpha.13 and belongs in a consumer/adapter layer rather than in Clinging's public contract.
 
-## Things to try
+## Existing controls retained
 
-- Jump into open air, look toward a wall and press Space again.
-- Swim with Space held, then use a deliberate double Space tap to reorient without
-  giving up Vanilla ascent control.
-- Spend Clinging underwater and verify that free swimming/body contact does not
-  restore it, while actually standing on the seabed does.
-- Land sideways, jump relative to your new floor and spend Clinging's restored
-  charge.
-- Spend Clinging's turn and verify that even DOWN now waits for a real landing.
-- With gravity DOWN, face north, glance straight up to choose UP, then level the
-  camera again: your world heading should still be north.
-- Chain rapid Reorientation turns and watch each snap continue from the current
-  displayed frame without accumulating fall damage from earlier segments.
-- Sprint-jump repeatedly across flat ground, then repeat with Jump Boost/Leaping;
-  the queued landing jump should remain protected without blocking Space while
-  ascending or far from support.
-- Die and respawn after several turns; the first new turn must still use the same
-  Clinging snap presentation rather than Gravity Changer's old interpolation.
-- Give a tamed animal its own gravity effect and let it replay turns along the
-  route where it follows you; its body should now use the same short snap.
-- Use Reorientation while riding to turn any compatible airborne living mount
-  and its complete passenger hierarchy through one shared physical rotation.
+- **Clinging:** one successful voluntary airborne turn until real gravity-relative feet support restores the charge.
+- **Reorientation:** unlimited voluntary airborne turns. Brew it by adding a shulker shell to a Clinging potion; ordinary extension/splash/lingering routes remain.
+- **Water:** normal or held Space remains vanilla ascent. A deliberate second Space rising edge after a release within **250 ms** requests a gravity turn without consuming swimming input.
+- **Sprint-jump protection:** an imminent supported landing reserves Space for vanilla sprint-jump. Normal `0.42` jump power keeps one tick; stronger effective jump power extends only that bounded prediction, capped at three ticks.
+- **Elytra:** usable Elytra always has priority over gravity selection.
 
-When an owned gravity effect expires, the mod first restores DOWN in place. If
-that is obstructed it may relocate locally by at most four blocks; if no safe
-local placement exists, the previous frame remains temporarily while retirement
-is retried. This forced retirement is cleanup, not a voluntary Clinging turn, and
-is not blocked by a spent airborne charge.
+## Mounts and pets
 
-The full behavior of mounts, pets, beacons, recovery and effect expiry is in the
-**[player guide](docs/GUIDE.md)**.
+Mounted Reorientation still turns a compatible airborne living root and its passenger hierarchy atomically. Pet replay still follows bounded owner breadcrumbs when the pet has its own compatible effect. These non-player entities keep Clinging's owned **180/240 ms tracked snap** presentation; alpha.13's free-flight camera hold is a local-player camera rule, not a generic mob camera concept.
+
+Tracked entity transitions are fenced by entity UUID plus monotonic sequence and continue advancing while off-screen. Foreign Gravity Changer writes remain foreign and keep upstream presentation ownership.
 
 ## Install
 
-Install the regular JAR on **both the client and server** together with:
+Install the regular JAR on **both client and server** with:
 
 - Minecraft 26.2
 - Java 25
@@ -136,76 +66,39 @@ Install the regular JAR on **both the client and server** together with:
 - Gravity Changer Unofficial Port 1.5.2-beta.5-mc26.2
 - Cloth Config API
 
-Alex's Mobs is required because this mod deliberately builds on its Clinging
-effect and potions. Gravity Changer is required because it supplies the actual
-gravity state, coordinate transforms, movement and collision physics.
+This is an **alpha**. Back up important worlds before updating and use matching versions on every multiplayer participant.
 
-This is an **alpha**. Back up important worlds before updating and use matching
-versions on every multiplayer participant. See the
-[validation report](docs/VALIDATION.md) for tested behavior and remaining QA.
+## Optional companions and compatibility
 
-## Recommended companions
-
-- **[Alchemical Leather](https://github.com/R3Neer/alchemical-leather)** is the
-  recommended companion. Its current alpha.3 can infuse Clinging or
-  Reorientation into compatible boots and dyeable animal armor. Reorientation
-  remains deliberately excluded from its villager-trade economy.
-- **First Person** is optional. Clinging transforms First Person's body offset only
-  while Clinging owns the visual gravity frame/transition. CI exercises First
-  Person 2.7.2 in a separate real-client lane.
-
-Scale Brews is under active architectural development and is **not part of the
-current runtime/support target**. Clinging's mounted-gravity contract is generic:
-a Tiny Mount is just a living root vehicle. Scale is responsible for making its
-own flight/glide/pounce mechanics honor that root's gravity when Scale is ready.
-Optional legacy Scale integration is discovered reflectively and disables itself
-when the installed Scale API is absent or incompatible.
+- **Alchemical Leather** remains optional and can supply Clinging/Reorientation through compatible equipment.
+- **First Person 2.7.2** is tested with Not Enough Animations 1.12.4. Gravity Fall may rotate the body root, but that transform must not feed back into the camera.
+- **Fresh Animations 1.10.5 + FA Player Extension 1.1 + EMF 3.3.5 + ETF 7.2** are exercised in a pinned client lane. They remain optional.
+- **Scale Brews beta.5** is exercised in isolated server/client compatibility lanes. Production compile/runtime does not require it, and no concrete Scale landing adapter is part of this release.
 
 ## Project status
 
-**0.1.0-alpha.12** is the current development version. It adds passive underwater
-Space arbitration, jump-power-aware sprint-landing protection and snap-presentation
-parity for Clinging-owned mounts and pets. Ordinary Space remains Vanilla swimming;
-a deliberate 250 ms double tap requests a submerged turn without consuming ascent.
-Clinging recharge remains tied to real gravity-relative feet support. Stronger jump
-power widens only the near-landing sprint-jump reservation, from alpha.11's exact
-one-tick baseline up to three ticks. Mounts and pets now use the same 180/240 ms
-quadratic visual transport as players while foreign Gravity Changer changes remain
-upstream-owned.
+**0.1.0-alpha.13** is the gamefeel, landing and impact prerelease. Its release-candidate matrix covers build/JUnit, **86 server GameTests**, default client GameTests, First Person, optional Scale Brews server/client lanes, and a pinned Fresh Animations/Player Extension lane. CI also validates and preserves semantic screenshot checkpoints for retained camera, zero-speed stability, velocity-vs-gravity body orientation, cancelled landing, Falling/Elytra language, First Person and Fresh Animations landing progression.
 
-CI covers dedicated server GameTests, JUnit geometry/input tests, the real default
-client suites including underwater controls and tracked-entity snap ownership, a
-separate real-client First Person 2.7.2 lane and optional Scale Brews runtime
-compatibility lanes. Full-pack human playtesting, dedicated multiplayer latency and
-long pet routes remain manual checks; automated success is not presented as human
-gameplay QA.
+Automated coverage is deliberately not called human gameplay QA. Dedicated multiplayer latency, motion-comfort/readability and long full-pack sessions remain manual acceptance work.
 
-## Build and contribute
+## Build and documentation
 
-Use Java 25 and the included Gradle wrapper. A connected clean checkout resolves
-the audited required versions from Modrinth and builds without any Scale Brews JAR:
+Use Java 25 and the included Gradle wrapper:
 
 ```powershell
 .\gradlew.bat build runGameTest
 .\gradlew.bat runClientGameTest
 ```
 
-Production `compileClasspath` deliberately excludes Scale Brews, and the build has
-a guard that fails if a Scale JAR leaks into it. CI proves the clean base build
-first. A separate optional compatibility lane downloads the public Scale Brews
-beta.5 JAR into `test-libs` and loads it only at runtime with `-PwithScaleBrews`;
-the production artifact never requires or bundles that fixture. First Person uses
-its own isolated test fixtures in the same way.
+Production `compileClasspath` remains Scale-free. Optional compatibility fixtures are isolated test-only inputs.
 
 - [Player guide](docs/GUIDE.md)
+- [Architecture](docs/ARCHITECTURE.md)
 - [Compatibility](docs/COMPATIBILITY.md)
 - [Configuration](docs/CONFIGURATION.md)
-- [Architecture](docs/ARCHITECTURE.md)
 - [Validation](docs/VALIDATION.md)
 - [Changelog](CHANGELOG.md)
 
-[GPL-3.0-or-later](LICENSE). Third-party projects keep their own licenses and are
-not bundled; see [credits and notices](THIRD_PARTY_NOTICES.md).
+[GPL-3.0-or-later](LICENSE). Third-party projects keep their own licenses and are not bundled; see [credits and notices](THIRD_PARTY_NOTICES.md).
 
-Not an official Minecraft product. Not approved by or associated with Mojang or
-Microsoft.
+Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.

@@ -1,38 +1,38 @@
 # Configuration
 
-Clinging: Reoriented currently exposes **no mod-owned configuration file**.
+Clinging: Reoriented 0.1.0-alpha.13 exposes **no mod-owned configuration file**. The values below are gameplay/presentation semantics rather than user preferences.
 
-Gravity snap timing is intentionally part of the gameplay/presentation contract:
+## Local-player camera and landing
 
-- perpendicular 90-degree turns: **0.18 seconds**;
-- opposite 180-degree turns: **0.24 seconds**;
+A voluntary gravity change during free flight does **not** rotate the local camera. The currently rendered world frame is held. Camera rotation is reserved for a physically predicted landing:
+
+- 90-degree landing: **180 ms**;
+- opposite 180-degree landing: **240 ms**;
 - easing: quadratic ease-out (`1 - (1-t)^2`).
 
-Physical gravity changes immediately; the short transition affects presentation
-only. The timings are fixed so multiplayer clients, tracked mounts/pets, First
-Person compatibility and the turn-feel contract all use the same behavior. Active
-Clinging-owned entity snaps also advance while the tracked entity is temporarily
-off-screen, so looking away cannot postpone a 180/240 ms event until the next time
-the mob is rendered.
+If a committed landing invalidates while Clinging still owns the flight, the exact currently displayed frame is retained. Transfer to Elytra, water/lava, vehicles, teleport/lifecycle or foreign ownership releases the obsolete Clinging presentation instead.
 
-Underwater input arbitration is fixed gameplay semantics too. A normal press or
-hold of Space remains Vanilla swimming/ascending; Clinging/Reorientation requests a
-turn only on a second Space rising edge after a release and within **250 ms** of the
-first. The detector passively observes the key and never consumes or rewrites the
-Vanilla input state. This window is not configurable in alpha.12.
+## Gravity Fall body
 
-Sprint-landing protection is also fixed. Normal effective jump power (`0.42`) keeps
-one tick of near-landing reservation. Stronger effective jump power expands the
-horizon proportionally as `jumpPower / 0.42`, clamped from **1 to 3 ticks**. The
-value is derived from `JUMP_STRENGTH` plus Vanilla Jump Boost power rather than a
-Clinging-specific setting. It protects only a predicted supported landing while
-sprinting and descending; it is not a general cooldown or input delay.
+- sustained Gravity Fall entry: **12 airborne ticks**;
+- body-root blend into velocity tracking: **6 ticks**.
 
-Earlier alphas created `config/clinging-reoriented-client.json`. Alpha.10 and later
-do not read, create, rewrite or migrate that file. An old file may be deleted; if it
-remains on disk it is simply ignored.
+These are fixed alpha.13 tuning constants. The body follows world velocity and holds the last reliable frame near zero speed. They do not add air steering or camera following.
 
-Unrelated Gravity Changer changes, Gravity Anchor/Core transitions, commands and
-other mods keep their own Gravity Changer presentation behavior. Clinging's fixed
-snap policy applies only to transitions initiated or retired by
-Clinging/Reorientation, including owned mount loans, pet replay and forced retirement.
+## Mounts and pets
+
+Clinging-owned non-player entity transitions still use the fixed **180/240 ms** tracked SNAP presentation. This is distinct from the local player's free-flight HOLD/LAND model. Active tracked snaps advance even while the entity is off-screen.
+
+## Water
+
+Normal and held Space remain vanilla swimming input. A second rising edge after a real release within **250 ms** requests Clinging/Reorientation. The detector does not consume or rewrite the vanilla key state. The window is fixed.
+
+## Sprint-jump reservation
+
+Normal effective jump power (`0.42`) reserves one tick near a predicted supported sprint landing. Stronger effective jump power expands the bounded horizon proportionally and caps it at **3 ticks**. This is derived from `JUMP_STRENGTH` plus vanilla Jump Boost rather than a Clinging setting.
+
+## Legacy files
+
+Earlier alphas created `config/clinging-reoriented-client.json`. Alpha.10 and later do not read or migrate it; an old file can be deleted safely or left ignored.
+
+Unrelated Gravity Changer transitions, anchors/cores, commands and foreign mods retain their own presentation rules.
