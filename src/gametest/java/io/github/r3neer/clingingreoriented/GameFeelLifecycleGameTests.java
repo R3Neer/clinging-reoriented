@@ -112,4 +112,15 @@ public final class GameFeelLifecycleGameTests {
         h.assertTrue(s.visualSequence==241,"ownership loss should emit one release, not retain current LAND frame");
         h.succeed();
     }
+
+    @GameTest(padding=20)
+    public void borrowedAnchorKeepsPhysicalRecordButDropsEffectiveVisualOwnership(GameTestHelper h){
+        var p=managed(h);var s=ClingingReoriented.data(p);
+        s.anchorBorrowed=true;s.visualFrameOwned=true;
+        ClingingReoriented.reconcile(p);
+        h.assertTrue(s.owned,"anchor borrowing should retain Clinging's durable physical ownership record");
+        h.assertFalse(ClingingReoriented.controlsPhysics(p),"anchor borrowing unexpectedly left Clinging in effective physics control");
+        h.assertFalse(s.visualFrameOwned,"replicated visual ownership stayed true while the anchor owned presentation/physics");
+        h.succeed();
+    }
 }
