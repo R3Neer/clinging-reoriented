@@ -3,10 +3,12 @@ package io.github.r3neer.clingingreoriented.mixin;
 import io.github.r3neer.clingingreoriented.ShulkerChargeProjectile;
 import io.github.r3neer.clingingreoriented.ShulkerChargeTargeting;
 import io.github.r3neer.clingingreoriented.ShulkerCharges;
+import java.util.ArrayList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.DamageTypeTags;
+import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityReference;
@@ -62,12 +64,27 @@ public abstract class ShulkerBulletMixin extends Projectile implements ShulkerCh
     @Override public void clinging$forceAcquire(){if(level() instanceof ServerLevel&&clinging$launchedCharge&&!clinging$hasValidTarget())clinging$acquireOrFly();}
 
     @Inject(method="tick",at=@At("HEAD"))
-    private void clinging$tickCharge(CallbackInfo ci){
+    private void clinging$tickChargeHead(CallbackInfo ci){
         if(!clinging$launchedCharge||level().isClientSide())return;setNoGravity(true);
-        if(clinging$hasValidTarget())return;
+        if(clinging$validBlockTarget()){clinging$steerBlockTarget();return;}
+        if(clinging$validEntityTarget())return;
         finalTarget=null;clinging$targetBlock=null;
         if(clinging$reacquireTicks>0){clinging$reacquireTicks--;return;}
         clinging$acquireOrFly();
+    }
+
+    @Inject(method="tick",at=@At("TAIL"))
+    private void clinging$tickChargeTail(CallbackInfo ci){
+        if(!clinging$launchedCharge||level().isClientSide()||!isAlive()||!clinging$validBlockTarget())return;
+        if(flightSteps>0){--flightSteps;if(flightSteps==0)clinging$selectNextBlockMoveDirection(currentMoveDirection==null?null:currentMoveDirection.getAxis());}
+        if(currentMoveDirection==null)return;
+        BlockPos current=blockPosition();Direction.Axis axis=currentMoveDirection.getAxis();
+        if(level().loadedAndEntityCanStandOn(current.relative(currentMoveDirection),this)){
+            clinging$selectNextBlockMoveDirection(axis);return;
+        }
+        BlockPos target=clinging$targetBlock;
+        if(target==null)return;
+        if((axis==Direction.Axis.X&&current.getX()==target.getX())||(axis==Direction.Axis.Y&&current.getY()==target.getY())||(axis==Direction.Axis.Z&&current.getZ()==target.getZ()))clinging$selectNextBlockMoveDirection(axis);
     }
 
     @Inject(method="addAdditionalSaveData",at=@At("TAIL"))
@@ -92,10 +109,10 @@ public abstract class ShulkerBulletMixin extends Projectile implements ShulkerCh
         if(!arrow&&!melee)return;clinging$captured=true;spawnAtLocation(level,ShulkerCharges.ITEM);
     }
 
-    @Unique private boolean clinging$hasValidTarget(){
-        Entity entity=clinging$resolveEntityTarget();if(entity!=null&&entity.isAlive()&&(!(entity instanceof Player p)||!p.isSpectator()))return true;
-        if(clinging$targetBlock==null)return false;
-        if(!(level() instanceof ServerLevel server)||!server.isLoaded(clinging$targetBlock))return false;
+    @Unique private boolean clinging$hasValidTarget(){return clinging$validEntityTarget()||clinging$validBlockTarget();}
+    @Unique private boolean clinging$validEntityTarget(){Entity entity=clinging$resolveEntityTarget();return entity!=null&&entity.isAlive()&&(!(entity instanceof Player p)||!p.isSpectator());}
+    @Unique private boolean clinging$validBlockTarget(){
+        if(clinging$targetBlock==null||!(level() instanceof ServerLevel server)||!server.isLoaded(clinging$targetBlock))return false;
         return server.getBlockState(clinging$targetBlock).is(Blocks.TARGET);
     }
     @Unique private @Nullable Entity clinging$resolveEntityTarget(){return finalTarget==null?null:EntityReference.getEntity(finalTarget,level());}
@@ -103,11 +120,31 @@ public abstract class ShulkerBulletMixin extends Projectile implements ShulkerCh
         if(!(level() instanceof ServerLevel server))return;Vec3 intent=clinging$intent();var acquisition=ShulkerChargeTargeting.acquire(server,(ShulkerBullet)(Object)this,intent);
         clinging$reacquireTicks=4;
         if(acquisition.entity()!=null){clinging$targetBlock=null;finalTarget=EntityReference.of(acquisition.entity());selectNextMoveDirection(null,acquisition.entity());return;}
-        if(acquisition.block()!=null){finalTarget=null;clinging$targetBlock=acquisition.block();clinging$setFreeFlight(Vec3.atCenterOf(acquisition.block()).subtract(position()));return;}
+        if(acquisition.block()!=null){finalTarget=null;clinging$targetBlock=acquisition.block();clinging$selectNextBlockMoveDirection(null);return;}
         finalTarget=null;clinging$targetBlock=null;clinging$setFreeFlight(intent);
+    }
+    @Unique private void clinging$steerBlockTarget(){
+        targetDeltaX=Mth.clamp(targetDeltaX*1.025D,-1.0D,1.0D);targetDeltaY=Mth.clamp(targetDeltaY*1.025D,-1.0D,1.0D);targetDeltaZ=Mth.clamp(targetDeltaZ*1.025D,-1.0D,1.0D);
+        Vec3 movement=getDeltaMovement();setDeltaMovement(movement.add((targetDeltaX-movement.x)*0.2D,(targetDeltaY-movement.y)*0.2D,(targetDeltaZ-movement.z)*0.2D));
+    }
+    @Unique private void clinging$selectNextBlockMoveDirection(Direction.Axis avoidAxis){
+        BlockPos targetPos=clinging$targetBlock;if(targetPos==null)return;
+        double targetX=targetPos.getX()+0.5D,targetY=targetPos.getY()+0.5D,targetZ=targetPos.getZ()+0.5D;Direction selection=null;
+        if(!targetPos.closerToCenterThan(position(),2.0D)){
+            BlockPos current=blockPosition();ArrayList<Direction> options=new ArrayList<>();
+            if(avoidAxis!=Direction.Axis.X){if(current.getX()<targetPos.getX()&&level().isEmptyBlock(current.east()))options.add(Direction.EAST);else if(current.getX()>targetPos.getX()&&level().isEmptyBlock(current.west()))options.add(Direction.WEST);}
+            if(avoidAxis!=Direction.Axis.Y){if(current.getY()<targetPos.getY()&&level().isEmptyBlock(current.above()))options.add(Direction.UP);else if(current.getY()>targetPos.getY()&&level().isEmptyBlock(current.below()))options.add(Direction.DOWN);}
+            if(avoidAxis!=Direction.Axis.Z){if(current.getZ()<targetPos.getZ()&&level().isEmptyBlock(current.south()))options.add(Direction.SOUTH);else if(current.getZ()>targetPos.getZ()&&level().isEmptyBlock(current.north()))options.add(Direction.NORTH);}
+            selection=Direction.getRandom(random);
+            if(options.isEmpty()){for(int attempts=5;!level().isEmptyBlock(current.relative(selection))&&attempts>0;--attempts)selection=Direction.getRandom(random);}else selection=options.get(random.nextInt(options.size()));
+            targetX=getX()+selection.getStepX();targetY=getY()+selection.getStepY();targetZ=getZ()+selection.getStepZ();
+        }
+        currentMoveDirection=selection;double x=targetX-getX(),y=targetY-getY(),z=targetZ-getZ(),distance=Math.sqrt(x*x+y*y+z*z);
+        if(distance==0.0D){targetDeltaX=targetDeltaY=targetDeltaZ=0.0D;}else{targetDeltaX=x/distance*0.15D;targetDeltaY=y/distance*0.15D;targetDeltaZ=z/distance*0.15D;}
+        needsSync=true;flightSteps=10+random.nextInt(5)*10;
     }
     @Unique private void clinging$setFreeFlight(Vec3 vector){
         Vec3 safe=ShulkerChargeTargeting.safeIntent(vector);Direction direction=Direction.getApproximateNearest(safe.x,safe.y,safe.z);currentMoveDirection=direction;flightSteps=10;
-        Vec3 delta=new Vec3(direction.getStepX(),direction.getStepY(),direction.getStepZ()).scale(0.15D);targetDeltaX=delta.x;targetDeltaY=delta.y;targetDeltaZ=delta.z;setDeltaMovement(delta);
+        Vec3 delta=new Vec3(direction.getStepX(),direction.getStepY(),direction.getStepZ()).scale(0.15D);targetDeltaX=delta.x;targetDeltaY=delta.y;targetDeltaZ=delta.z;setDeltaMovement(delta);needsSync=true;
     }
 }
