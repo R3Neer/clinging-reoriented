@@ -4,6 +4,7 @@ import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.level.GameType;
@@ -14,6 +15,12 @@ public final class ImpactGameTests {
     private static net.minecraft.server.level.ServerPlayer owned(GameTestHelper h,Vec3 pos,Direction gravity){
         var p=h.makeMockServerPlayerInLevel();
         GameType.SURVIVAL.updatePlayerAbilities(p.getAbilities());
+        // The connected GameTest helper starts the real ServerGamePacketListenerImpl's
+        // 60-tick "client loaded" grace window but no client ever sends the completion packet.
+        // ServerPlayer deliberately rejects all damage during that window. Advance the public
+        // timeout so these tests exercise normal post-login survival damage semantics.
+        for(int i=0;i<ServerGamePacketListenerImpl.CLIENT_LOADED_TIMEOUT_TIME;i++)p.connection.tickClientLoadTimeout();
+        if(!p.connection.hasClientLoaded())throw new AssertionError("impact fixture mock connection never reached loaded state");
         p.snapTo(pos);p.addEffect(new MobEffectInstance(Reorientation.EFFECT,400));
         ClingingReoriented.write(p,gravity);var s=ClingingReoriented.data(p);s.owned=true;s.selected=gravity;s.visualFrameOwned=true;
         p.setOnGround(false);p.fallDistance=0;p.setHealth(20);return p;
@@ -28,7 +35,8 @@ public final class ImpactGameTests {
         p.snapTo(p.position().add(0.0D,shift,0.0D));
         p.setOnGround(false);
         if(Math.abs(p.getBoundingBox().minY-(floorTop+0.01D))>1.0E-6D)throw new AssertionError("directional impact fixture failed to align above floor");
-        if(p.getAbilities().invulnerable)throw new AssertionError("impact fixture unexpectedly retained creative invulnerability");
+        if(p.getAbilities().invulnerable||p.getAbilities().mayfly)throw new AssertionError("impact fixture unexpectedly retained creative abilities");
+        if(p.isInvulnerableTo(p.serverLevel(),p.damageSources().fall()))throw new AssertionError("impact fixture remains invulnerable to fall damage after mock client load");
         return p;
     }
     private static String diag(net.minecraft.server.level.ServerPlayer p,float before){
@@ -37,7 +45,9 @@ public final class ImpactGameTests {
         Vec3 absorbed=ImpactPhysics.absorbedVelocity(state.intended,actual);
         return " health="+p.getHealth()+"/"+before
             +" controls="+ClingingReoriented.controlsPhysics(p)
-            +" invuln="+p.getAbilities().invulnerable
+            +" loaded="+p.connection.hasClientLoaded()
+            +" invuln="+p.getAbilities().invulnerable+" mayfly="+p.getAbilities().mayfly
+            +" fallInvuln="+p.isInvulnerableTo(p.serverLevel(),p.damageSources().fall())
             +" armed="+state.armed+" active="+state.moveActive
             +" seq="+state.moveSequence+" handled="+state.handledSequence
             +" start="+state.start+" end="+p.position()
