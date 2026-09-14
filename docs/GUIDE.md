@@ -1,6 +1,6 @@
 # Player guide
 
-This guide describes Clinging: Reoriented **0.1.0-alpha.15**.
+This guide describes Clinging: Reoriented **0.1.0-alpha.16**.
 
 ## Controls and gravity turns
 
@@ -51,7 +51,7 @@ At speed >= **0.75 blocks/tick**, Gravity Fall reuses vanilla's `ELYTRA_FLYING` 
 
 Clinging predicts a bounded trajectory using the real body, velocity, gravity and landing-surface providers. A candidate floor must be physically valid support under the active gravity.
 
-Alpha.15 retains the shared **10-tick / 500 ms** landing window introduced in alpha.14. Camera LAND and BODY_LANDING use that timing when prediction begins early enough. This is intentionally separate from the shorter 180/240 ms tracked SNAP used by non-player entities.
+Alpha.16 retains the shared **10-tick / 500 ms** landing window introduced in alpha.14. Camera LAND and BODY_LANDING use that timing when prediction begins early enough. This is intentionally separate from the shorter 180/240 ms tracked SNAP used by non-player entities.
 
 During `LANDING_COMMITTED`, new gravity requests are discarded rather than queued. If the predicted support disappears while Clinging still owns flight, the exact current presentation becomes the held frame. If another subsystem takes ownership instead, Clinging releases the obsolete landing state.
 
@@ -139,17 +139,45 @@ Clinging comes from Alex's Mobs Continued and grants one successful voluntary ai
 
 **Reorientation is now brewed with a Shulker Charge, not a Shulker Shell.** Add a Shulker Charge to a Clinging potion to obtain Reorientation; long Clinging maps to long Reorientation, and redstone extends normal Reorientation. Vanilla splash and lingering routes remain available. Clinging remains available as a tier-two beacon power; Reorientation is not a beacon choice.
 
-## Mounts and pets
+## Mounts and gravity-following pets
 
 Clinging itself does not grant mounted turning. With Reorientation, a fresh Space while a compatible root mount is airborne can turn the complete passenger hierarchy only when destination preflight succeeds for every member. Failure is atomic.
 
-Tamed animals with their own compatible effect can replay bounded owner-turn breadcrumbs while following. Sitting pets do not replay. Pets pursue each pending breadcrumb on their current gravity-relative movement plane, replay the turn there, release navigation while unsupported and resume after landing. Non-player entities keep Clinging's tracked **180/240 ms SNAP** presentation rather than inheriting the local player's 500 ms Gravity Fall landing or full-sphere camera.
+A tame pet does **not** inherit your gravity remotely. To replay your gravity route it needs its **own compatible Clinging or Reorientation effect** and the normal tame-owner relationship.
+
+Every relevant owner turn records a bounded breadcrumb containing place, direction, dimension and time. When a valid breadcrumb is pending, the pet can temporarily use vanilla `FollowOwnerGoal` to pursue it even if the owner is inside vanilla's normal ten-block follow-start dead zone.
+
+The pet does not pathfind to an impossible airborne owner coordinate. The breadcrumb is projected onto the pet's **current gravity-relative movement plane**:
+
+- DOWN/UP gravity: XZ plane;
+- EAST/WEST gravity: YZ plane;
+- NORTH/SOUTH gravity: XY plane.
+
+The pet walks to that projection using ordinary navigation and the follow goal's own bounded stopping semantics, capped at a two-block arrival radius. Only then does it replay the recorded gravity turn.
+
+After replay, the pet releases `FollowOwnerGoal` while unsupported so directional gravity physics owns the fall. Once it finds support in the new frame, pursuit of the next queued breadcrumb may resume.
+
+If rotating at the current feet position would intersect the old support, replay may use **one center-aligned, collision-preflighted internal relocation**. That move belongs to the same breadcrumb transaction and preserves later queued turns. An **external teleport** is different: it invalidates the old route and stops Clinging-authored pursuit.
+
+Gravity Changer replaces a mob's `PathNavigation` after gravity changes. Clinging refreshes the `FollowOwnerGoal` navigation reference across the goal lifecycle so the pet always drives the current directional navigator rather than a stale pre-turn object.
+
+Safety/lifecycle rules:
+
+- sitting pauses pursuit; standing can resume the pending breadcrumb;
+- pets without a compatible effect keep vanilla follow behaviour and its normal start dead zone;
+- stale and wrong-dimension breadcrumbs are skipped;
+- owner lifecycle cleanup removes obsolete trails;
+- passenger/vehicle or other incompatible contexts do not replay;
+- foreign gravity ownership remains foreign and is never stolen;
+- ordinary Clinging still respects its one-air-turn budget; Reorientation can replay further airborne steps.
+
+Non-player gravity presentation remains Clinging's shorter **180/240 ms tracked SNAP**. Pets do not inherit the local player's 500 ms landing presentation or full-sphere camera.
 
 ## Recovery and lifecycle
 
 When Clinging-owned gravity must retire, the mod first attempts DOWN in place and then a deterministic validated local search within four blocks. If no safe placement exists, retirement remains pending instead of teleporting to a distant checkpoint.
 
-Teleport, dimension transfer, death/respawn, disconnect, fluid entry, Elytra and foreign ownership explicitly clear or transfer transient landing/Gravity Fall state. Respawn keeps visual epochs monotonic so stale packets cannot become new presentation state.
+Teleport, dimension transfer, death/respawn, disconnect, fluid entry, Elytra and foreign ownership explicitly clear or transfer transient landing/Gravity Fall state. Respawn keeps visual epochs monotonic so stale packets cannot become new presentation state. Pet breadcrumb routing separately distinguishes its bounded internal replay relocation from an external teleport that invalidates the route.
 
 ## Landing-surface API
 
