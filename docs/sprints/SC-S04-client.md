@@ -9,8 +9,8 @@ SC-002 y el lenguaje visual de SC-030/031: icono GUI, presentación 3D en contex
 ## Implementación estable
 
 - `assets/clinging_reoriented/items/shulker_charge.json` selecciona por `minecraft:display_context`: `gui` usa `shulker_charge_gui` y el resto cae en `shulker_charge_3d`.
-- El modelo 3D conserva las tres placas ortogonales inspiradas en `ShulkerBulletModel` y referencia el recurso vanilla `minecraft:entity/shulker/spark` en vez de redistribuir texturas de Mojang.
-- La entidad lanzada sigue siendo exactamente `EntityTypes.SHULKER_BULLET`; no existe renderer paralelo.
+- El modelo 3D conserva las tres placas ortogonales inspiradas en `ShulkerBulletModel`. La revisión original de S04 usó temporalmente `minecraft:entity/shulker/spark`; la corrección de asset `4e6e5660817062c868ce37cccf4debf02fc061c4` cambió el modelo definitivo a la textura propia `clinging_reoriented:item/shulker_charge`, eliminando esa referencia de item a assets de Mojang.
+- La entidad lanzada sigue siendo exactamente `EntityTypes.SHULKER_BULLET`; su renderer sigue siendo vanilla y, por tanto, Minecraft conserva la propiedad de sus propios recursos de proyectil en runtime.
 - No se añade HUD de lock ni homing curvo.
 
 ## Evidencia visual
@@ -25,6 +25,8 @@ Snapshots default validados a 854×480:
 - `shulker-charge-fixed-3d`: evidencia aislada del fallback 3D mediante ItemFrame invisible.
 
 La revisión manual detectó que las capturas en mano no aíslan bien el objeto porque la skin/brazo del jugador ocupa gran parte del encuadre. Se clasificó como **gap de evidencia**, no como fallo del asset. Se añadió por ello el snapshot `FIXED`, sin modificar el arte ni el modelo definitivo. El snapshot aislado confirma que el fallback 3D resuelve y renderiza; también permanece estable bajo Fresh Animations. El validador exige además que sea byte-distinto del icono GUI y del renderer de proyectil.
+
+La corrección posterior `4e6e566` cambió sólo el texture wiring del item 3D a la textura propia del proyecto. El gate post-merge #714 (`34897063938`) revalidó cliente base, First Person, Scale Brews, Fresh Animations y el validador semántico con esos assets definitivos.
 
 ## Compatibilidad validada
 
