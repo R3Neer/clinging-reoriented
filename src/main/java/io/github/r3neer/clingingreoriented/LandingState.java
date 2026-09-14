@@ -14,8 +14,9 @@ public final class LandingState {
         var state=ClingingReoriented.data(player);
         Direction gravity=GravityDirectionUtil.getGravityDirection(player);
         if(!eligibleContext(player)){
-            if(state.freeFlightVisualHeld)Payloads.cancelLanding(player,false);
-            state.freeFlightVisualHeld=false;state.airborneTicks=0;state.clearLandingCommit();state.visualBaseKnown=false;return;
+            // Elytra/water/vehicle/death/etc. own the next presentation. Unlike an invalidated
+            // landing surface, there is no Clinging frame to preserve after this boundary.
+            transferClear(player);return;
         }
         if(AirChanges.grounded(player)){
             touchdown(player,gravity);return;
@@ -23,8 +24,10 @@ public final class LandingState {
         state.airborneTicks=Math.min(1_000_000,state.airborneTicks+1);
         if(!state.visualBaseKnown){state.visualBaseDirection=gravity;state.visualBaseKnown=true;}
         if(!ClingingReoriented.controlsPhysics(player)){
-            if(state.landingCommitted)cancel(player,true);
-            return;
+            // Losing physics ownership is not a landing cancellation/resume. Release the retained
+            // camera outright so an anchor, foreign gravity source, expiry or other owner can render
+            // its own frame instead of inheriting a frozen Clinging HOLD.
+            transferClear(player);return;
         }
 
         Optional<LandingPrediction.Candidate> predicted=LandingPrediction.predict(player,LandingPrediction.MAX_TICKS);
@@ -52,6 +55,7 @@ public final class LandingState {
         return true;
     }
 
+    /** Surface invalidation while Clinging still owns physics: preserve the exact visible frame. */
     public static void cancel(ServerPlayer player,boolean visualBecameNonCanonical){
         var state=ClingingReoriented.data(player);
         if(state.landingCommitted&&state.freeFlightVisualHeld)Payloads.cancelLanding(player,true);
@@ -65,9 +69,8 @@ public final class LandingState {
     }
 
     /**
-     * Teleports keep the connection alive, so presentation ownership must be explicitly released
-     * before coordinates/world context change. A LAND animation can exist even if the free-flight
-     * HOLD flag is false, hence the broader landingCommitted || freeFlightVisualHeld fence.
+     * Ownership/teleport teardown while the connection remains alive. Release every retained
+     * Clinging camera/landing presentation before another subsystem or spatial context takes over.
      */
     public static void transferClear(ServerPlayer player){
         var state=ClingingReoriented.data(player);
@@ -95,7 +98,8 @@ public final class LandingState {
     private static GravityTransition.TurnKind kindFor(PlayerData state,Direction target){
         if(!state.visualBaseKnown)return GravityTransition.TurnKind.HALF;
         if(state.visualBaseDirection==target)return null;
-        return state.visualBaseDirection.getOpposite()==target?GravityTransition.TurnKind.HALF:GravityTransition.TurnKind.QUARTER;
+        if(state.visualBaseDirection.getOpposite()==target)return GravityTransition.TurnKind.HALF;
+        return GravityTransition.TurnKind.QUARTER;
     }
 
     private static boolean same(LandingSurfaces.Contact a,LandingSurfaces.Contact b){return a!=null&&b!=null&&a.gravity()==b.gravity()&&a.key().equals(b.key());}
