@@ -11,8 +11,8 @@ Clinging: Reoriented interoperates with the projects below. Their code and asset
 
 ## Shulker Charge artwork and vanilla references
 
-The Shulker Charge 2D inventory icon and project-authored 3D model geometry are original Clinging: Reoriented assets and are licensed **GPL-3.0-or-later** with the project. Editable source for the icon is retained under `docs/art/shulker-charge/`.
+The Shulker Charge 2D inventory icon, its texture and the project-authored 3D item model geometry are original Clinging: Reoriented assets and are licensed **GPL-3.0-or-later** with the project. Editable source for the icon is retained under `docs/art/shulker-charge/`.
 
-The 3D model references Minecraft's `minecraft:entity/shulker/spark` texture at runtime. The texture itself, vanilla ShulkerBullet model assets and other inspected Minecraft reference images are **not redistributed** by this repository. Minecraft names, textures and other Mojang assets remain subject to their own terms.
+The launched Charge intentionally remains the exact vanilla `minecraft:shulker_bullet` entity type, so Minecraft's ShulkerBullet renderer/model/texture are used by Minecraft itself at runtime. Those Mojang assets and the vanilla reference images inspected during design are **not redistributed** by this repository.
 
 All names and trademarks belong to their respective owners. Refer to each project's distribution for its license and terms.
