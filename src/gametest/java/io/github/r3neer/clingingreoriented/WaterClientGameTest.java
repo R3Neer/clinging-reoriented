@@ -2,6 +2,7 @@ package io.github.r3neer.clingingreoriented;
 
 import com.moigferdsrte.gravitychanger.util.GravityDirectionUtil;
 import com.moigferdsrte.gravitychanger.util.RotationUtil;
+import io.github.r3neer.clingingreoriented.client.GravityFallVisuals;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.minecraft.core.BlockPos;
@@ -45,6 +46,18 @@ public final class WaterClientGameTest implements FabricClientGameTest {
                 s.gravityFallLandingGravity=Direction.DOWN;s.gravityFallLandingEtaTicks=2.0D;
             });
             context.waitFor(mc->mc.player!=null&&mc.player.isInWater()&&mc.player.hasEffect(Reorientation.EFFECT));
+
+            // Network RESET remains authoritative, but an already-observable water state must drop
+            // the macro root locally without waiting for a packet round trip.
+            context.runOnClient(mc->{
+                GravityFallVisuals.clear();
+                GravityFallVisuals.receive(mc,new GravityFallSync.Visual(mc.player.getId(),mc.player.getUUID(),GravityFallSync.Phase.START.ordinal(),-1,0.0F,1L));
+                if(!GravityFallVisuals.active(mc.player))throw new AssertionError("water fence fixture could not activate local Gravity Fall");
+                GravityFallVisuals.tick(mc);
+                if(GravityFallVisuals.active(mc.player))throw new AssertionError("observable water state did not immediately release local Gravity Fall root");
+                GravityFallVisuals.clear();
+            });
+
             context.waitTicks(4);
             boolean gravityFallCleared=world.getServer().computeOnServer(server->{
                 var p=server.getPlayerList().getPlayers().getFirst();var s=ClingingReoriented.data(p);
