@@ -52,7 +52,6 @@ public final class GravityFallClientGameTest implements FabricClientGameTest {
             });
             context.takeScreenshot("gravity-fall-pre-start");
 
-            // START: begin from the frame actually being displayed, then blend toward head-first DOWN.
             context.runOnClient(mc->{
                 mc.player.setDeltaMovement(new Vec3(0,-.20,0));
                 send(mc,sequence,GravityFallSync.Phase.START,null,0.0F);
@@ -77,7 +76,6 @@ public final class GravityFallClientGameTest implements FabricClientGameTest {
             });
             context.takeScreenshot("gravity-fall-sustained-down");
 
-            // A trajectory curve rotates the body only when velocity itself changes.
             context.runOnClient(mc->{
                 advance(mc,1,new Vec3(.20,0,0));
                 Quaternionf body=body(mc);eastBody.set(new Quaternionf(body));
@@ -86,7 +84,6 @@ public final class GravityFallClientGameTest implements FabricClientGameTest {
             });
             context.takeScreenshot("gravity-fall-curve-east");
 
-            // Reserved adversarial holdout: EAST -> zero -> WEST.
             context.runOnClient(mc->{
                 advance(mc,5,Vec3.ZERO);
                 assertQuat(eastBody.get(),body(mc),"zero-speed crossing changed body twist/orientation");
@@ -101,7 +98,7 @@ public final class GravityFallClientGameTest implements FabricClientGameTest {
             });
             context.takeScreenshot("gravity-fall-reverse-west");
 
-            // BODY_LANDING captures the currently rendered horizontal body, not the camera/gravity frame.
+            // BODY_LANDING entry must begin exactly from the currently visible horizontal body.
             context.runOnClient(mc->{
                 Quaternionf before=body(mc);
                 mc.player.setDeltaMovement(Vec3.ZERO);
@@ -110,29 +107,48 @@ public final class GravityFallClientGameTest implements FabricClientGameTest {
                 assertQuat(before,body(mc),"LAND snapped away from current Gravity Fall body at entry");
             });
             context.takeScreenshot("gravity-fall-landing-begin");
+
+            // The screenshot above is allowed to consume real client ticks. Resume from whatever
+            // is visible now, re-establish a stable WEST body, then create a fresh LAND epoch for
+            // a deterministic one-tick midpoint assertion before any screenshot can advance it.
             context.runOnClient(mc->{
-                advance(mc,2,Vec3.ZERO);
+                Quaternionf beforeResume=body(mc);
+                send(mc,sequence,GravityFallSync.Phase.RESUME,null,0.0F);
+                assertQuat(beforeResume,body(mc),"post-begin RESUME snapped current body");
+                advance(mc,8,new Vec3(-.20,0,0));
+                assertVec(new Vec3(-1,0,0),BodyOrientation.bodyUp(body(mc)),"WEST body was not restored before midpoint epoch");
+
+                mc.player.setDeltaMovement(Vec3.ZERO);
+                send(mc,sequence,GravityFallSync.Phase.LAND,Direction.DOWN,4.0F);
+                GravityFallVisuals.tick(mc);
                 Quaternionf mid=body(mc);
                 Quaternionf target=RotationUtil.getEntityRotationQuaternion(Direction.DOWN);
-                if(equivalent(mid,target)||equivalent(mid,westBody.get()))throw new AssertionError("BODY_LANDING midpoint collapsed to an endpoint");
+                if(equivalent(mid,target)||equivalent(mid,westBody.get()))throw new AssertionError("BODY_LANDING one-tick midpoint collapsed to an endpoint");
             });
             context.takeScreenshot("gravity-fall-landing-mid");
 
-            // Invalidation resumes from the body quaternion visible at the instant RESUME arrives.
-            // A screenshot/render between the midpoint assertion and this event may legitimately
-            // advance LAND, so comparing against an older sample would manufacture a discontinuity.
+            // Separate fresh partial-LAND epoch for the RESUME continuity invariant. Keeping LAND
+            // and RESUME in one client callback prevents screenshot/render ticks from changing the
+            // reference frame between the two samples.
             context.runOnClient(mc->{
+                Quaternionf current=body(mc);
+                send(mc,sequence,GravityFallSync.Phase.RESUME,null,0.0F);
+                assertQuat(current,body(mc),"midpoint cleanup RESUME snapped current body");
+                advance(mc,8,new Vec3(-.20,0,0));
+                mc.player.setDeltaMovement(Vec3.ZERO);
+                send(mc,sequence,GravityFallSync.Phase.LAND,Direction.DOWN,4.0F);
+                GravityFallVisuals.tick(mc);
                 Quaternionf beforeResume=body(mc);
-                mc.player.setDeltaMovement(new Vec3(-.20,0,0));
+                if(equivalent(beforeResume,RotationUtil.getEntityRotationQuaternion(Direction.DOWN))||equivalent(beforeResume,westBody.get()))
+                    throw new AssertionError("RESUME holdout did not reach a partial landing state");
                 send(mc,sequence,GravityFallSync.Phase.RESUME,null,0.0F);
                 if(GravityFallVisuals.landing(mc.player))throw new AssertionError("RESUME left BODY_LANDING active");
-                assertQuat(beforeResume,body(mc),"RESUME snapped instead of continuing from current presentation");
+                assertQuat(beforeResume,body(mc),"RESUME snapped instead of continuing from current partial presentation");
                 advance(mc,8,new Vec3(-.20,0,0));
                 assertVec(new Vec3(-1,0,0),BodyOrientation.bodyUp(body(mc)),"RESUME did not return to velocity transport");
             });
             context.takeScreenshot("gravity-fall-resume-west");
 
-            // A valid touchdown preparation reaches canonical DOWN within the ETA/capped window.
             context.runOnClient(mc->{
                 mc.player.setDeltaMovement(Vec3.ZERO);
                 send(mc,sequence,GravityFallSync.Phase.LAND,Direction.DOWN,4.0F);
@@ -161,7 +177,6 @@ public final class GravityFallClientGameTest implements FabricClientGameTest {
         ));
     }
 
-    /** Advance presentation deterministically without moving the actual player fixture. */
     private static void advance(Minecraft mc,int ticks,Vec3 velocity){
         for(int i=0;i<ticks;i++){
             mc.player.setDeltaMovement(velocity);
@@ -197,7 +212,6 @@ public final class GravityFallClientGameTest implements FabricClientGameTest {
         return Math.abs(Math.abs(qa.dot(qb))-1.0F)<QUAT_EPS;
     }
 
-    /** Keep the test independent of GravityFallVisuals internals while sampling the real displayed gravity frame. */
     private static final class VisualTransitionsForTest {
         private static Quaternionf visual(Minecraft mc){return io.github.r3neer.clingingreoriented.client.VisualTransitions.current(mc.player);}
     }
