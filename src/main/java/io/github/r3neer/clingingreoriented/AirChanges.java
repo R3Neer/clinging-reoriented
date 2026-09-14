@@ -9,7 +9,8 @@ import net.minecraft.world.entity.player.Player;
 public final class AirChanges {
     /** Check real support in the active frame, never replenish from a client ground flag alone. */
     public static boolean grounded(LivingEntity p) {
-        if (p.isPassenger() || p.isFallFlying() || p instanceof Player player && player.getAbilities().flying) return false;
+        if (p.isPassenger() || p.isFallFlying() || FluidContext.intersects(p)
+            || p instanceof Player player && player.getAbilities().flying) return false;
         var gravity=GravityDirectionUtil.getGravityDirection(p);
         if(p.getDeltaMovement().dot(FaceGeometry.vector(gravity.getOpposite()))>1e-5)return false;
 

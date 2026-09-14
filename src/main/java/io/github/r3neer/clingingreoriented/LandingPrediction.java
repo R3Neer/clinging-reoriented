@@ -19,7 +19,7 @@ public final class LandingPrediction {
     private LandingPrediction() {}
 
     public static Optional<Candidate> predict(LivingEntity entity,int horizon){
-        if(entity==null||horizon<1||horizon>MAX_TICKS||entity.isPassenger()||entity.isFallFlying()||entity.isInWater()||entity.isInLava())return Optional.empty();
+        if(entity==null||horizon<1||horizon>MAX_TICKS||entity.isPassenger()||entity.isFallFlying()||FluidContext.intersects(entity))return Optional.empty();
         Direction gravity=GravityDirectionUtil.getGravityDirection(entity);
         Vec3 velocity=entity.getDeltaMovement();
         if(!ImpactPhysics.finite(velocity))return Optional.empty();
