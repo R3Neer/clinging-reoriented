@@ -3,6 +3,7 @@ package io.github.r3neer.clingingreoriented.client;
 import com.moigferdsrte.gravitychanger.util.RotationUtil;
 import io.github.r3neer.clingingreoriented.BodyOrientation;
 import io.github.r3neer.clingingreoriented.BodyRenderMath;
+import io.github.r3neer.clingingreoriented.GravityFallAerodynamics;
 import io.github.r3neer.clingingreoriented.GravityFallSync;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -12,7 +13,9 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.phys.Vec3;
 import org.joml.Quaternionf;
+import org.joml.Vector3f;
 
 /**
  * Client-derived Gravity Fall macro body frame. The server sends only semantic phase
@@ -85,9 +88,6 @@ public final class GravityFallVisuals {
     }
 
     private static void beginLand(Active active,Entity entity,Direction target,float etaTicks){
-        // Capture the body that is actually visible *before* changing modes. If SUSTAIN has
-        // already tilted the avatar head-first, LAND must continue from there rather than
-        // snapping back to the held camera/gravity frame for one render.
         Quaternionf current=null;
         if(entity!=null){
             ensureInitialized(active,entity);
@@ -138,13 +138,14 @@ public final class GravityFallVisuals {
                 Entity entity=resolve(client,active);
                 if(entity==null){if(++active.unresolvedTicks>UNRESOLVED_TTL_TICKS)it.remove();continue;}
                 active.unresolvedTicks=0;
-                // Server RESET remains authoritative, but locally observable incompatible states
-                // should never wait on network latency before releasing the macro body root.
                 if(entity.isRemoved()||(entity instanceof LivingEntity living
                     && (living.isFallFlying()||living.isInWater()||living.isInLava()))){it.remove();continue;}
                 ensureInitialized(active,entity);
                 if(active.mode==Mode.SUSTAIN){
                     active.transport=BodyOrientation.transport(active.transport,entity.getDeltaMovement());
+                    Vec3 look=entity==client.getCameraEntity()?cameraForward(client):entity.getLookAngle();
+                    if(entity instanceof LivingEntity living)
+                        active.transport=GravityFallAerodynamics.followLook(active.transport,look,living.yBodyRot);
                     if(active.transport.direction()!=null&&active.blendTicks<ENTRY_BLEND_TICKS)active.blendTicks=Math.min(ENTRY_BLEND_TICKS,active.blendTicks+1.0F);
                 }else if(active.mode==Mode.LAND){
                     active.landTicks+=1.0F;
@@ -208,6 +209,11 @@ public final class GravityFallVisuals {
         if(entity==null)return null;
         if(!active.uuid.equals(entity.getUUID()))return null;
         return entity;
+    }
+
+    private static Vec3 cameraForward(Minecraft client){
+        Vector3f forward=client.gameRenderer.mainCamera().rotation().transform(new Vector3f(0,0,-1));
+        return new Vec3(forward.x,forward.y,forward.z).normalize();
     }
 
     private static float smoothstep(float value){float t=Math.max(0.0F,Math.min(1.0F,value));return t*t*(3.0F-2.0F*t);}
