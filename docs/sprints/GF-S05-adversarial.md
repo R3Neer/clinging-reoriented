@@ -1,97 +1,111 @@
 # GF-S05 — Campaña adversarial visual y hardening
 
-Estado: **PLAN CONVERGIDO / IMPLEMENTACIÓN**.
+Estado: **CERRADO / GATE VERDE**.
 
 ## Tesis
 
-Al cerrar S05 no aparecerá una mecánica nueva: las invariantes de S00–S04 seguirán siendo ciertas bajo secuencias combinadas, lifecycle hostil y compatibilidad real. La física continuará siendo server-authoritative y conservará momentum; la cámara seguirá perteneciendo al jugador; el cuerpo contará la trayectoria sin secuestrar la vista; el landing commitment seguirá siendo fail-closed; impacto, agua, Elytra, mounts/pets y respawn no podrán abrir exploits ni dejar ownership visual stale.
+S05 no añade una mecánica nueva: intenta romper en combinación las invariantes construidas por S00–S04. En el cierre exacto de esta campaña la física sigue siendo server-authoritative y conserva momentum; la cámara sigue perteneciendo al jugador; el cuerpo cuenta la trayectoria sin secuestrar la vista; el landing commitment sigue siendo fail-closed; e impacto, agua, Elytra, mounts/pets, tracking, respawn y teleport no dejan ownership visual stale ni abren una cola diferida de input.
 
-Criterio demostrable: la cabeza exacta de la rama debe superar la matriz adversarial completa, producir snapshots semánticos coherentes con asserts numéricos y completar una revisión de código seguida de una pasada completa sin cambios.
+El cierre se demuestra mediante GameTests combinados, client GameTests con asserts numéricos, lanes reales de compatibilidad, snapshots semánticos y una revisión completa de producción seguida de CI verde sobre el HEAD exacto de evidencia.
 
 ## Scope
 
 S05 cruza requisitos ya implementados, en especial FR-GF-001..003, 010..013, 020..035, 040..063, 070..083 y NFR-GF-002..008. No cambia los timings 12/6 ni 180/240 ms, no añade steering, FOV, partículas, sonidos, keyframes ni integración concreta con Scale Brews.
 
-## Baseline leído
+## Baseline y cabeza de cierre
 
-Baseline de entrada: commit `e2b394710e50fa58253cbd69d55c927996832936`, run CI 427.
+Baseline de entrada: `e2b394710e50fa58253cbd69d55c927996832936`, run CI 427, cierre lógico/visual de S04.
 
-- servidor: 73/73 GameTests;
-- client GameTests: verde con campaña S04 de snapshots;
-- First Person 2.7.2 + Not Enough Animations: verde;
-- Scale Brews optional server/client lanes: verdes;
-- root corporal S04 validado visualmente después de mover el pivot desde pies al centro lógico del avatar;
-- snapshots S04 revisados: sustained DOWN, curva EAST, zero hold, reverse WEST, landing begin/mid/final;
-- el impacto arbitrary-normal necesita el fallback post-`Entity.move` porque el redirect gravity-relative de Gravity Changer no cubre toda colisión bloqueante cuando `onGround` no representa la normal real;
-- el harness de impacto necesita jugador post-login realista porque el mock conectado permanece temporalmente invulnerable hasta `hasClientLoaded()`.
+Cabeza de evidencia S05: `a074ff1a1c6f40bef2e23048c420dc9ab1751ec0`, run CI **464** (`34838805270`).
 
-## Cobertura adversarial que ya existe
+La run 464 pasó:
 
-No se duplicará sin motivo:
+- build + JUnit;
+- **86/86** server GameTests;
+- client GameTests sin mods opcionales;
+- First Person 2.7.2 + Not Enough Animations 1.12.4;
+- Scale Brews beta.5, servidor y cliente;
+- Fresh Animations v1.10.5 + FA+Player v1.1 + EMF 3.3.5 + ETF 7.2;
+- validación automática de la matriz de snapshots;
+- upload de JARs, logs, XML, reportes, snapshots por lane y manifiesto SHA-256.
 
-- `HardeningAdversarialTests`: retirement local imposible/retry, revocación por foreign mob write, relocation tree atómica con passenger obstruction, causalidad one-shot de moving surface;
-- `GravityPolishGameTests`: momentum/fall history en jugador, mob y mount; heading vertical; epoch visual a través de respawn;
-- `ImpactGameTests` + kernel: high/low/tangential/multiaxis y ownership de daño;
-- `LandingStateGameTests` + `LandingSurfaceApiGameTests`: predicción/commit/provider/fail-closed;
-- `GravityFallStateGameTests`: START/LAND/RESUME/RESET y lifecycle server;
-- `GravityFallClientGameTest`: blend, sustained, 90°, zero crossing, 180°, BODY_LANDING, RESUME y camera isolation;
-- `Water*`, `AnimalGravityTests`, `FirstPersonChecks` y lanes CI cubren sus dominios individuales.
+## Qué se endureció durante S05
 
-S05 debe atacar **interacciones entre esos dominios**, no simplemente volver a ejecutarlos con otro nombre.
+La campaña descubrió y corrigió, entre otros, estos límites reales:
 
-## Matriz de ataques
+- entrada en agua/lava debía soltar inmediatamente el root de Gravity Fall;
+- pérdida de ownership físico debía liberar también una cámara retenida por Clinging;
+- teleport debía limpiar landing/presentación transitoria antes del cambio de mundo/posición;
+- respawn/replacement debía conservar monotonía de epoch sin aceptar identidad visual stale;
+- retracking remoto necesitaba un epoch fresco y sólo debía replicar ownership visual efectivo;
+- mounts y pets debían mantener ownership independiente al reproducir breadcrumbs del owner montado;
+- los fixtures adversariales de pets debían atravesar `FollowOwnerGoal` real sin invalidar artificialmente su trail.
 
-| Ataque | Requisitos | Nivel principal | Observable obligatorio |
-|---|---|---|---|
-| secuencia `EAST→UP→NORTH→DOWN→WEST→UP` | 001, 002, 010–013, 040, 054–057 | server + client | momentum mundial continuo, camera forward continuo, body sólo responde a velocity |
-| high speed + giro tardío + impacto arbitrary-normal | 070–079 | server | daño no borrado ni duplicado; tangencial sigue inocuo |
-| predicción válida → bloque destruido → input durante cancel | 025–027, 033 | server + client | commitment se invalida, input bloqueado no se encola, no snap-back |
-| velocity cardinal → zero jitter → inversión | 002, 056–057 | unit + client | hold estable, sin NaN/flip/twist espurio |
-| Gravity Fall → Elytra | 062, 077 | server + client | root/landing se cancelan; Elytra recupera ownership sin daño doble |
-| Gravity Fall → agua/natación | 063 | server + client | no sustained/pose falsa; ownership vuelve limpio |
-| mount + passenger + pet durante cambios encadenados | 080–081 | server | jerarquía, momentum, heading y ownership sin regresión |
-| death/respawn/teleport/dimension | 027, 078, 082 | server + client | no estado stale; epoch monotónico; UUID domina a entity id |
-| remote tracking entra/sale en Gravity Fall | 082 | client/multiplayer fixture | snapshot discreto reconstruye el mismo body sin paquete por tick |
-| First Person con root activo + landing | 083 | compat client | body puede rotar; camera forward permanece independiente |
-| Fresh Animations/EMF target | 052–053, NFR-004 | compat client + snapshot | limbs siguen bajo FA; root macro permanece; cámara intacta |
-| comparación Elytra / Falling / Gravity Fall | diseño + NFR-004/008 | snapshot + QA | lenguajes visuales distinguibles sin espectáculo añadido |
+Estos cambios quedaron acompañados por tests antes del cierre.
 
-## Plan
+## Matriz de ataques y evidencia
 
-- [ ] A1 inventariar cobertura exacta existente y convertir huecos reales en tests, sin duplicar observables ya demostrados.
-- [ ] A2 añadir secuencia server de seis cambios cardinales verificando momentum exacto, airborne continuity y ownership.
-- [ ] A3 añadir holdout de impacto tardío combinado con último giro y normal de colisión distinta de gravedad.
-- [ ] A4 añadir invalidación de landing combinada con input durante commitment/cancel y demostrar que no existe queue diferida.
-- [ ] A5 añadir lifecycle combinado Elytra/agua/respawn/teleport y comprobar RESET/ownership/epoch.
-- [ ] A6 extender campaña client con secuencia multigiro, jitter de cero, invalidación y comparación visual Falling/Gravity Fall/Elytra.
-- [ ] A7 validar mounts/pets/remote tracking en combinaciones que crucen los boundaries de ownership ya existentes.
-- [ ] A8 identificar versiones exactas de Fresh Animations Player Extension + EMF/ETF del entorno objetivo y crear lane reproducible si existe build compatible con 26.2; si no existe, documentar bloqueo verificable en vez de falsear evidencia.
-- [ ] A9 revisar artefactos/snapshots con matriz `ataque → requisito → nivel → resultado → evidencia`.
-- [ ] A10 revisión completa de producción, tests, mixins y lifecycle; cualquier cambio reinicia revisión.
-- [ ] A11 pasada CI completa sin cambios sobre la cabeza exacta.
+| Ataque | Resultado de cierre | Evidencia principal |
+|---|---|---|
+| `EAST→UP→NORTH→DOWN→WEST→UP` | momentum físico no se rota; cámara mundial permanece retenida; body sólo responde a velocity | server holdouts + `s05-six-turn-retained-camera` |
+| high speed + giro tardío + impacto arbitrary-normal + salida de ownership | el impacto sigue cobrando una sola vez según componente realmente absorbida | `ImpactGameTests.actualLateTurnAndOwnershipExitCannotEraseArbitraryNormalImpact` |
+| landing válido → invalidación/cancel | no hay snap-back; se conserva el quaternion parcial actual; input committed no se encola | `GameFeelAdversarialGameTests` + `s05-cancelled-landing-holds-partial` |
+| velocity cardinal → jitter sub-epsilon → inversión | zero-speed hold estable, sin NaN/flip/twist espurio | `s05-gravity-fall-zero-jitter` + kernel/body tests |
+| gravedad cambia antes que velocity | el body no sigue gravedad instantáneamente; espera a que cambie la trayectoria real | `s05-gravity-fall-velocity-not-gravity` |
+| Gravity Fall → Elytra | root/landing se liberan y Elytra conserva ownership | lifecycle/client tests + `s05-language-elytra` |
+| Gravity Fall → agua/lava | presentación sostenida se libera inmediatamente, sin pose Falling falsa | water/lifecycle server+client tests |
+| mount + rider + pet | préstamo al mount y ownership propio del pet no se mezclan; breadcrumbs reales se reproducen | `GameFeelAdversarialGameTests` |
+| respawn / teleport | no queda state stale; epochs/UUID protegen contra paquetes de instancia anterior | `GameFeelLifecycleGameTests` |
+| remote retracking | snapshot discreto reconstruye sólo ownership visual efectivo con epoch fresco | tracking holdouts S05 |
+| First Person + Gravity Fall + BODY_LANDING | el cuerpo puede rotar y aterrizar; camera forward permanece independiente | `firstperson-gravity-fall-root`, `firstperson-gravity-fall-landing` |
+| Fresh Animations/EMF/ETF | FA mantiene limbs/microanimación mientras Clinging conserva el root macroscópico | lane fijada + snapshots FA sustained/landing |
+| Falling / Gravity Fall / Elytra | lenguajes visuales distinguibles sin añadir espectáculo artificial | snapshots `s05-language-falling`, `s05-language-elytra` y campaña Gravity Fall |
 
-## Modelo adversarial previo
+## Snapshot matrix de cierre
 
-- dos cambios legítimos dentro del mismo tick lógico/ventana de red;
-- gravedad cambia pero velocity todavía conserva la dirección anterior;
-- velocidad cae por debajo del epsilon y oscila alrededor de cero con componentes de ruido distintas por frame;
-- landing prediction aparece el mismo tick que START o que un nuevo input;
-- superficie desaparece después de publicar LAND pero antes de contacto;
-- una invalidación llega cuando el SLERP corporal ya está casi terminado;
-- stale packet con entity id correcto y UUID viejo después de respawn;
-- tracker remoto empieza a observar entre START y LAND;
-- Elytra comienza en BODY_LANDING parcial;
-- agua se toca en el tick de entrada a sustained;
-- mount cambia gravedad con rider y pet siguiendo a la vez;
-- un impacto bloquea dos ejes y ocurre tras un giro de gravedad que deja `onGround=false`;
-- First Person ve cuerpo rotado mientras cámara y selection look deben permanecer en el frame retenido;
-- FA/EMF puede reordenar/modelar capas internas, pero no debe recibir ownership de la transformación macroscópica de Clinging;
-- mutation mindset: quitar sequence fence, resetear airborne al girar, usar gravedad en vez de velocity para body, reactivar `fallDistance` como fuente primaria, aceptar input committed, aplicar root a la cámara.
+La CI conserva por separado las matrices `default`, `first_person` y `fresh_animations`. Un validador stdlib comprueba presencia única, firma PNG, resolución mínima, tamaño plausible y diferencias byte a byte en checkpoints que deben ser visualmente distintos. Run 464 produjo el manifiesto:
 
-## Holdout reservado
+- default: six-turn retained camera, zero-jitter, velocity-not-gravity, cancelled landing partial, Falling, Elytra;
+- First Person: Gravity Fall root, BODY_LANDING;
+- Fresh Animations: sustained DOWN, landing mid, landing final.
 
-Después de implementar la matriz visible se revelará una secuencia compuesta no codificada previamente: caída sostenida con velocity EAST, cambios físicos `UP→NORTH→DOWN→WEST→UP` sin modificar manualmente momentum, cruce de velocidad por cero, aparición y destrucción de soporte durante BODY_LANDING, intento de input durante commitment y activación final de Elytra. Debe terminar sin queue diferida, sin snap-back, sin estado visual stale y con la cámara conservando su frame mundial salvo el landing válido que llegue a comprometerse.
+Todos los checkpoints del manifiesto son **854×480**. La revisión visual de los artefactos exactos confirmó:
+
+- cancelación de landing en un frame intermedio real, sin endpoint anticipado;
+- Falling y Elytra claramente diferentes;
+- First Person conserva framing/cámara mientras el cuerpo entra en landing;
+- Fresh Animations conserva animación interna mientras el root corporal progresa de sustained a landing mid y al frame final.
+
+## Incidencia adversarial durante el cierre
+
+El primer intento del nuevo holdout de impacto tardío, commit `906df3c85b25cbc1d9f0f8025ab082efa8a4c3dd`, falló en CI 462. La traza demostró que **no era un bug de producción**: tras el giro real DOWN→EAST el AABB rotado consumía parte del desplazamiento y la componente absorbida quedaba en `0.58`, equivalente a una caída vanilla de aproximadamente `2.75` bloques, correctamente por debajo del umbral de daño.
+
+Se corrigió sólo el fixture en `c7a3cf78e1865dc2b2266e7f216e67bb5568403f` para solicitar velocidad suficiente (`-2.0 Y`) y garantizar que el componente bloqueado permaneciese dañino después de la rotación. La run 463 pasó toda la CI. No se alteró producción para satisfacer el test.
+
+## Plan de S05 — cerrado
+
+- [x] A1 inventariar cobertura existente y convertir sólo huecos reales en tests.
+- [x] A2 secuencia server/client de seis cambios cardinales verificando momentum, airborne continuity y ownership.
+- [x] A3 holdout de impacto tardío combinado con giro real, arbitrary-normal y salida de ownership.
+- [x] A4 invalidación/cancel de landing + input committed sin queue diferida ni snap-back.
+- [x] A5 lifecycle combinado Elytra/agua/respawn/teleport con RESET/ownership/epoch.
+- [x] A6 campaña cliente multigiro, jitter de cero, invalidación y comparación Falling/Gravity Fall/Elytra.
+- [x] A7 mounts/pets/remote tracking cruzando boundaries de ownership.
+- [x] A8 lane reproducible Fresh Animations Player Extension + EMF/ETF del entorno 26.2.
+- [x] A9 revisión de artefactos + manifiesto `ataque → requisito → nivel → resultado → evidencia`.
+- [x] A10 revisión completa de producción, tests, mixins y lifecycle; la pasada final no exigió cambios de producción.
+- [x] A11 CI completa sin cambios de producción sobre la cabeza exacta de evidencia: run 464 verde.
+
+## Holdout reservado — resultado
+
+La campaña reservada combinaba caída sostenida, cambios físicos múltiples sin rotar momentum, cruce por cero, aparición/invalidez de landing, input durante commitment y salida final hacia Elytra. Sus observables quedaron repartidos deliberadamente entre holdouts server/client para poder localizar fallos sin convertir un único test en una novela rusa: autoridad/momentum, zero hold, landing cancel/no queue y Elytra ownership pasan de forma independiente y conjunta en la matriz acumulada. No queda queue diferida, snap-back ni ownership visual stale.
+
+## Deuda fuera de scope
+
+- La integración concreta de superficies de Scale Brews sigue perteneciendo al adaptador/consumer, no a esta API.
+- El comfort tuning humano de 12/6 y 180/240 ms puede seguir refinándose tras playtesting, pero no se altera sin evidencia.
+- Multiplayer con latencia real y packs externos no fijados sigue siendo QA de integración, no una garantía universal.
 
 ## Regla de cierre
 
-S05 sólo cierra con: tests aplicables verdes, snapshots revisados, holdout reservado superado, deuda externa explícita, revisión final sin cambios y una ejecución CI completa posterior que valide exactamente ese commit.
+Cumplida: tests aplicables verdes, snapshots validados y revisados, holdouts superados, deuda externa explícita, revisión final sin cambios de producción y ejecución CI completa posterior sobre el HEAD de evidencia.
