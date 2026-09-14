@@ -1,133 +1,74 @@
 # Player guide
 
-This guide describes Clinging: Reoriented **0.1.0-alpha.14**.
+This guide describes Clinging: Reoriented **0.1.0-alpha.15**.
 
 ## Controls and gravity turns
 
-1. Leave your local gravity-relative floor by jumping, falling or being launched.
-2. Release the configured jump key.
-3. Look toward the world-cardinal direction that should become the next down direction.
-4. Press the jump key again while airborne.
+Leave your local gravity-relative floor, release the configured jump key, look toward the world-cardinal direction that should become down, then press jump again. Clinging permits one successful voluntary airborne gravity decision; Reorientation permits more. Gravity changes acceleration immediately but preserves current world-space velocity.
 
-The target is selected from the **rendered** look. Holding the same press never repeats a turn. Clinging permits one successful voluntary airborne turn; Reorientation permits more. Failed, blocked and same-direction attempts do not spend Clinging's charge.
+## Free-flight camera, Gravity Fall and air-diving
 
-A successful turn changes gravity immediately but preserves the current world-space velocity. Gravity changes acceleration, not momentum, so reversing gravity brakes the existing motion before accelerating the other way.
+Airborne gravity changes keep the local camera independent from logical gravity. During sustained Gravity Fall, vertical look is full-sphere and can pass through both poles. On exit, the same viewing direction is converted to an equivalent vanilla yaw/pitch pair.
 
-## Free-flight camera and 360-degree look
+After 12 airborne ticks, the macro body blends toward actual world velocity. Gaze can pull the body only outside a 35-degree neck deadzone, at up to 7.5 degrees/tick. Broadside posture adds bounded drag while streamlined posture adds none.
 
-Airborne gravity changes do not force the local camera into the new gravity basis. Clinging retains the world frame that was actually being rendered, while target selection continues to use that retained view.
+Holding **W** during sustained Gravity Fall redirects existing momentum toward gaze by at most 6 degrees/tick, scaled by positive velocity/look alignment. It preserves speed before drag and creates no thrust. At >=0.75 blocks/tick, Elytra-style airflow audio fades in over 10 ticks and then follows vanilla's speed-sensitive volume/pitch language.
 
-During sustained **Gravity Fall**, vertical look becomes full-sphere. Pitch can cross both poles and complete a full 360-degree loop instead of clamping at vanilla's +/-90 degrees. When Gravity Fall ends, the current viewing direction is converted to an equivalent vanilla yaw/pitch pair, so returning to vanilla coordinates does not change where the player is looking.
+## Landing and context
 
-## Gravity Fall body language
+Camera LAND and BODY_LANDING share a 10-tick / 500 ms manoeuvre. During `LANDING_COMMITTED`, new gravity requests are discarded rather than queued.
 
-After **12 airborne ticks** of Clinging/Reorientation-owned physics, a sustained fall starts Gravity Fall presentation unless another context already owns the moment. The macro body root blends over **6 ticks** toward the actual world velocity direction.
+Any intersecting non-empty fluid suspends support, landing and Gravity Fall semantics. In water, Space is world +Y and Shift world -Y while Clinging/Reorientation owns the movement. Ladders/vines/scaffolding are vanilla with DOWN gravity, ignored under lateral gravity and vertically mirrored under UP gravity.
 
-Velocity remains the primary body axis. Near zero speed the last reliable frame is retained so gravity reversals do not produce numerical flips.
+## Flight safety, impact and mace
 
-The camera may pull the body only after gaze leaves a **35-degree neck deadzone**. Beyond that cone, the macro body follows gradually, capped at **7.5 degrees per tick**. This does not give the camera ownership of logical gravity selection.
+Eligible Clinging flight is capped server-side at 3.92 blocks/tick while preserving direction. Unloaded chunk frontiers hold the player until movement is safe; hard world/build boundaries recover inside the valid region.
 
-Body/airflow alignment also changes drag. Streamlined flight receives no extra penalty; a perfectly broadside body receives at most **1.3% additional drag per tick**.
+Impact damage uses world-space velocity actually absorbed by collision. Mace smash height uses literal geometric distance along the current gravity direction in the current fall segment; changing gravity starts a fresh mace segment.
 
-Fresh Animations/EMF keeps ownership of limbs, head tracking, equipment and micro-animation. Clinging applies only the global Gravity Fall body root.
+## Gravity-following pets
 
-## Air-diving with W
+A tame pet does **not** inherit your gravity remotely. To follow your gravity route it needs its **own compatible Clinging or Reorientation effect** and normal tame-owner relationship.
 
-During sustained Gravity Fall, holding **W** bends existing momentum toward the camera look direction.
+Every relevant owner gravity change leaves a bounded breadcrumb containing place, direction, dimension and time. When a valid breadcrumb is pending, the pet can temporarily use vanilla `FollowOwnerGoal` to pursue it even if the owner is close enough that vanilla would normally refuse to start following because of its ten-block start dead zone.
 
-- Maximum redirect is **6 degrees per tick**.
-- Steering authority is proportional to the positive dot product between velocity direction and gaze.
-- Perpendicular or backward gaze produces no steering authority.
-- The redirect preserves speed before aerodynamic drag.
-- It generates no free thrust or Elytra-style lift.
+The pet does not pathfind directly to an airborne owner coordinate. The breadcrumb is projected onto the pet's **current gravity-relative movement plane**:
 
-This is controlled falling, not creative flight wearing a trench coat.
+- with DOWN/UP gravity, it walks across its current horizontal Y plane;
+- with EAST/WEST gravity, movement is projected onto the YZ plane;
+- with NORTH/SOUTH gravity, movement is projected onto the XY plane.
 
-## Fast-air sound
+The pet walks to that projected place using its ordinary navigation and the follow goal's own bounded stop distance, capped by Clinging to a maximum two-block arrival radius. It reorients only when it actually reaches that step.
 
-At speed >= **0.75 blocks/tick**, Gravity Fall reuses vanilla's `ELYTRA_FLYING` sound locally. It begins silent, fades in over **10 ticks**, then follows Elytra's speed-squared volume curve and high-speed pitch increase. It stops immediately when Gravity Fall ends or real Elytra flight starts.
+After replaying the turn, the pet releases `FollowOwnerGoal` while unsupported. It then falls/moves under real directional gravity instead of being dragged by pathfinding. When it gains support in the new gravity frame, the next queued breadcrumb can be pursued.
 
-## Landing commitment
+If rotating in place would collide with the old support, the replay may use one center-aligned, collision-preflighted internal relocation. This is part of the same breadcrumb transaction, so later queued steps are preserved. By contrast, an **external teleport** of the pet invalidates the old breadcrumb route and stops Clinging-authored navigation.
 
-Clinging predicts a bounded trajectory using the real body, velocity, gravity and landing-surface providers. A candidate floor must be physically valid support under the active gravity.
+Gravity Changer replaces the entity's `PathNavigation` when gravity changes. Clinging refreshes the `FollowOwnerGoal` navigation reference during `canUse`, continuation, start/stop and tick, so the goal always drives the current directional navigator rather than a stale pre-turn object.
 
-Alpha.14 reserves a shared **10-tick / 500 ms** landing window. Camera LAND and BODY_LANDING use that same timing when prediction begins early enough. This is intentionally separate from the shorter 180/240 ms tracked SNAP used by non-player entities.
+Safety/lifecycle rules:
 
-During `LANDING_COMMITTED`, new gravity requests are discarded rather than queued. If the predicted support disappears while Clinging still owns flight, the exact current presentation becomes the held frame. If another subsystem takes ownership instead, Clinging releases the obsolete landing state.
+- sitting pauses pursuit; standing again can resume the still-pending breadcrumb;
+- pets without a compatible effect retain vanilla follow behaviour, including the normal start dead zone;
+- stale breadcrumbs and breadcrumbs from another dimension are skipped;
+- owner death/offline cleanup removes old trails;
+- passenger/vehicle contexts and incompatible entities do not replay;
+- foreign gravity ownership remains foreign and is never stolen;
+- ordinary Clinging still respects its one-air-turn budget, while Reorientation can replay further airborne steps.
 
-## Fluids and water
+Non-player gravity presentation remains Clinging's shorter 180/240 ms tracked SNAP. Pets do not inherit the local player's full-sphere camera or 500 ms landing presentation, because, mercifully, wolves do not need a cinematography system.
 
-Intersecting **any non-empty fluid volume** suspends Clinging support, landing commitment/prediction and Gravity Fall presentation. The rule is generic, so modded fluids receive the same treatment as water and lava.
+## Mounts
 
-A seabed touched while the body is still submerged is not a Clinging floor and does not restore the one-turn budget. Recharge requires genuine gravity-relative support outside fluid context.
+Clinging itself does not grant mounted turning. With Reorientation, a compatible airborne root mount and passenger hierarchy can turn atomically only when destination preflight succeeds for every member.
 
-Water keeps its deliberate gravity-request gesture: press Space, release it, then press again within **250 ms**. The ordinary/held press remains swimming input. While Clinging/Reorientation owns water movement, Space is world **+Y** and Shift is world **-Y**, regardless of current gravity.
+## First Person and animation compatibility
 
-## Climbables
-
-World-vertical ladders, vines and scaffolding use an explicit gravity policy:
-
-- **DOWN:** vanilla behaviour.
-- **EAST/WEST/NORTH/SOUTH:** climbables are ignored for attachment, damping and climbing movement.
-- **UP:** vanilla Y mechanics are mirrored; climbing impulse points toward world -Y and sliding/downward behaviour mirrors toward +Y.
-
-Vanilla scaffolding/sneak exceptions remain preserved.
-
-## Sprint-jump intent
-
-Near genuine supported landing, Space is reserved for vanilla's next sprint-jump rather than being mistaken for Clinging/Reorientation. Normal effective jump power (`0.42`) keeps the shortest reservation; stronger effective `JUMP_STRENGTH` plus vanilla Jump Boost can extend the bounded lookahead, capped at three ticks.
-
-## Flight safety
-
-While Clinging controls sustained airborne physics, the server caps world-space speed at **3.92 blocks/tick** while preserving vector direction.
-
-The same safety layer prevents movement into chunk columns that are not currently available to the server. At a loaded frontier, position is held and capped momentum retained until the next destination becomes available. Hard build/world-border breaches are moved back inside and outward momentum is discarded.
-
-Safety intervention clears armed impact state so the correction itself cannot become a fake damaging collision.
-
-## Impact damage
-
-Clinging impact damage is based on world-space velocity actually absorbed by collision, not stale vanilla `fallDistance`.
-
-A last-second gravity change cannot erase a dangerous collision that still happens at speed. A real reversal can reduce damage if it brakes the player in time. Tangential motion contributes little or nothing, and one multi-axis collision is resolved once.
-
-The computed equivalent fall is routed back through vanilla block/fall handling whenever possible, retaining relevant block callbacks, immunities and mitigation.
-
-## Mace under directional gravity
-
-Mace smash height is literal geometric distance travelled along the **current gravity direction** in the current fall segment. A gravity-direction change starts a fresh segment.
-
-Previous-axis distance is not inherited, and gravity-strength scaling does not multiply the geometric height. The corrected value feeds smash eligibility, bonus damage and knockback.
-
-## Elytra
-
-Usable Elytra owns Space while airborne. It deploys normally instead of turning gravity, voluntary Clinging turns are rejected while gliding, and Gravity Fall presentation/sound yields immediately to real fall-flying.
-
-## First Person
-
-First Person 2.7.2 + Not Enough Animations 1.12.4 is an explicit compatibility target. Gravity Fall uses a blended camera/body pivot for the avatar root so steep look-down angles avoid clipping without solving the problem by hiding the body. The macro root never feeds back into the real camera.
+First Person 2.7.2 + Not Enough Animations 1.12.4 is an explicit compatibility target. The local avatar uses a blended camera/body pivot so steep look-down angles avoid clipping without hiding the body. Fresh Animations/EMF retains internal limb/head/equipment animation while Clinging applies only the macro body root.
 
 ## Effects and brewing
 
-Clinging comes from Alex's Mobs Continued and grants one successful voluntary airborne gravity decision before valid support restores it. Add a **shulker shell** to a Clinging potion to brew Reorientation, which removes the airborne turn limit. Redstone, gunpowder and dragon's breath retain their normal extension/splash/lingering routes. Clinging remains available as a tier-two beacon power; Reorientation is not a beacon choice.
-
-## Mounts and pets
-
-Clinging itself does not grant mounted turning. With Reorientation, a fresh Space while a compatible root mount is airborne can turn the complete passenger hierarchy only when destination preflight succeeds for every member. Failure is atomic.
-
-Tamed animals with their own compatible effect can replay bounded owner-turn breadcrumbs while following. Sitting pets do not replay. Non-player entities keep Clinging's tracked **180/240 ms SNAP** presentation rather than inheriting the local player's 500 ms Gravity Fall landing or full-sphere camera.
-
-## Recovery and lifecycle
-
-When Clinging-owned gravity must retire, the mod first attempts DOWN in place and then a deterministic validated local search within four blocks. If no safe placement exists, retirement remains pending instead of teleporting to a distant checkpoint.
-
-Teleport, dimension transfer, death/respawn, disconnect, fluid entry, Elytra and foreign ownership explicitly clear or transfer transient landing/Gravity Fall state. Respawn keeps visual epochs monotonic so stale packets cannot become new presentation state.
-
-## Landing-surface API
-
-Other mods can register a `LandingSurfaceProvider`. Providers may expose bounded support/predicted contact plus a stable revalidation key. They do not choose gravity, camera behaviour, placement or input policy. Invalid, stale, exceptional or non-finite provider results fail closed.
-
-Vanilla collision geometry is the base provider. Scale Brews types remain outside the public Clinging API; a concrete Scale-specific adapter belongs in a consumer/integration layer.
+Clinging comes from Alex's Mobs Continued and grants one successful voluntary airborne gravity decision before valid support restores it. Add a shulker shell to a Clinging potion to brew Reorientation. Redstone, gunpowder and dragon's breath retain their ordinary routes.
 
 ## Installation
 

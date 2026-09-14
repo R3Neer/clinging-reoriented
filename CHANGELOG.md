@@ -2,11 +2,18 @@
 
 ## Unreleased
 
-### Pet breadcrumb pursuit
+## [0.1.0-alpha.15] - 2026-09-14
 
-- Make affected tame pets acquire `FollowOwnerGoal` for nearby gravity breadcrumbs even inside vanilla's owner-follow dead zone.
-- Navigate to each breadcrumb projected onto the pet's current gravity-relative movement plane, then replay the owner's turn and release navigation while unsupported.
-- Refresh Gravity Changer's replaced navigation instance, preserve queued breadcrumbs across the bounded internal turn placement, and keep external teleports, sitting, missing effects and foreign gravity ownership fail-closed.
+### Pet gravity-breadcrumb pursuit
+
+- Make tame pets with their own compatible Clinging/Reorientation effect pursue pending owner gravity breadcrumbs through vanilla `FollowOwnerGoal`, including while the owner is inside vanilla's ten-block follow start dead zone.
+- Project each airborne breadcrumb onto the pet's **current gravity-relative movement plane** instead of asking ordinary pathfinding to reach an impossible 3D point through the air.
+- Use the follow goal's own bounded stopping semantics for arrival, then replay the recorded gravity turn only when the pet actually reaches that projected place.
+- After replay, release navigation while the pet is unsupported so real gravity physics owns the fall; once the pet finds support in the new frame, the still-pending breadcrumb queue can resume.
+- Refresh `FollowOwnerGoal`'s cached `PathNavigation` across its lifecycle because Gravity Changer replaces the navigation instance after a gravity change.
+- Permit one center-aligned, collision-preflighted internal relocation when rotating at the current feet position would intersect the old support; this internal placement preserves the breadcrumb transaction and later queued turns.
+- Keep the system fail-closed: sitting pauses pursuit without consuming the step, an external pet teleport invalidates the route, stale/foreign-dimension breadcrumbs are skipped, effect-free pets retain vanilla following, and foreign gravity ownership is never stolen.
+- Add projection/unit coverage plus GameTests for the vanilla dead zone, real scheduled wolf traversal, bounded arrival, grounded replay, ballistic goal release, navigation replacement, ordered queue preservation, sitting pause/resume and external teleport invalidation.
 
 ## [0.1.0-alpha.14] - 2026-09-14
 
