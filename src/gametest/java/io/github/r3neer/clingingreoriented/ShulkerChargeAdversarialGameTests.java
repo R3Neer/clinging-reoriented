@@ -4,7 +4,9 @@ import java.util.List;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.TicketType;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
@@ -13,6 +15,7 @@ import net.minecraft.world.entity.projectile.ShulkerBullet;
 import net.minecraft.world.entity.projectile.arrow.Arrow;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DispenserBlock;
@@ -20,7 +23,6 @@ import net.minecraft.world.level.block.entity.DispenserBlockEntity;
 import net.minecraft.world.level.portal.TeleportTransition;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.minecraft.gametest.framework.GameTestHelper;
 
 /** Reserved SC-S05 attacks against integration boundaries and state ownership. */
 public final class ShulkerChargeAdversarialGameTests {
@@ -28,9 +30,14 @@ public final class ShulkerChargeAdversarialGameTests {
         for(int x=minX;x<=maxX;x++)for(int y=minY;y<=maxY;y++)for(int z=minZ;z<=maxZ;z++)h.setBlock(new BlockPos(x,y,z),Blocks.AIR);
     }
 
+    private static void keepSimulated(GameTestHelper h,Vec3 point){
+        ChunkPos chunk=ChunkPos.containing(BlockPos.containing(point));
+        h.getLevel().getChunkSource().addTicketWithRadius(TicketType.PORTAL,chunk,2);
+    }
+
     private static ShulkerBullet launched(GameTestHelper h,Vec3 relative,Vec3 intent){
         var bullet=new ShulkerChargeBullet(h.getLevel());
-        Vec3 at=h.absoluteVec(relative);
+        Vec3 at=h.absoluteVec(relative);keepSimulated(h,at);
         bullet.snapTo(at.x,at.y,at.z,0,0);
         ((ShulkerChargeProjectile)(Object)bullet).clinging$initializeCharge(intent);
         h.assertTrue(h.getLevel().addFreshEntity(bullet),"adversarial Charge must enter server entity manager");
