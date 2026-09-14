@@ -1,14 +1,18 @@
 # SC-S03 — Navegación, impacto, redstone y recaptura
 
-Estado: **REABIERTO / REVALIDACIÓN DE IMPACTOS AISLADOS**.
+Estado: **REABIERTO / FIXTURES FÍSICOS EN COORDENADAS MUNDO**.
 
-La batería real de 105 GameTests descubrió primero un bug de producción: el propio Target Block se trataba como obstáculo. Esa corrección ya está aplicada y los dos holdouts de Target Block pasan.
+La batería real de 105 GameTests ya demuestra que daño/Levitation y duplicación vanilla funcionan. Los cuatro fallos restantes de #503/#88264e1 son Target Block recto/desalineado, bloque ordinario y shield.
 
-Los fallos restantes mezclaban impactos simples con navegación larga o estado del fixture. Se aíslan ahora:
+Diagnóstico:
+- el bloque ordinario muestra movimiento estable a `0.15` durante 82 ticks, por lo que el proyectil no está inmóvil;
+- los fixtures de bloque combinaban transformaciones relativas de GameTest con navegación cardinal en mundo;
+- el jugador del shield fixture tenía el suelo retirado y no estaba fijado contra gravedad.
 
-- daño/Levitation: vaca inmóvil a corta distancia, lock inicial obligatorio;
-- bloque ordinario: pared a corta distancia y vector de intención transformado a coordenadas mundo;
-- duplicación: shulker abierto con IA normal (vanilla `teleportSomewhere()` devuelve false si `isNoAi()`), disparo cercano y secuencia impacto → daño → segundo shulker;
-- los tests de routing largo quedan en los holdouts específicos de Target Block ya verdes.
+Corrección de fixture:
+- Target Blocks y pared se colocan y validan mediante `ServerLevel` en coordenadas mundo absolutas derivadas una sola vez de `absolutePos`;
+- el projectile se crea directamente en coordenadas mundo con intención hacia el centro físico del bloque;
+- el test de pared exige explícitamente que no haya autoaim target;
+- el jugador con shield queda `noGravity`, inmóvil y con lock explícito.
 
-No se modifica producción en esta iteración. Si alguno de estos impactos aislados sigue fallando, se clasifica como bug de implementación/arquitectura y no se amplía el timeout como sustituto de diagnóstico.
+No se modifica producción en esta iteración. Si un bloque absoluto situado dos metros delante sigue sin registrar impacto, se reclasificará como bug de colisión/arquitectura.
