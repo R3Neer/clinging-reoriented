@@ -106,6 +106,7 @@ jobs:
                   'shulker-charge-first-person-held',
                   'shulker-charge-third-person-held',
                   'shulker-charge-projectile-renderer',
+                  'shulker-charge-fixed-3d',
               ],
               'first_person': [
                   'firstperson-gravity-fall-root',
@@ -142,6 +143,8 @@ jobs:
               (('default', 'shulker-charge-inventory-icon'), ('default', 'shulker-charge-first-person-held')),
               (('default', 'shulker-charge-first-person-held'), ('default', 'shulker-charge-third-person-held')),
               (('default', 'shulker-charge-third-person-held'), ('default', 'shulker-charge-projectile-renderer')),
+              (('default', 'shulker-charge-fixed-3d'), ('default', 'shulker-charge-inventory-icon')),
+              (('default', 'shulker-charge-fixed-3d'), ('default', 'shulker-charge-projectile-renderer')),
           ]
           for left, right in distinct:
               if found[left] == found[right]:
