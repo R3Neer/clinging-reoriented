@@ -15,6 +15,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.ai.goal.FollowOwnerGoal;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
@@ -124,10 +125,13 @@ public final class GameFeelAdversarialGameTests {
     public void mountLoanAndPetBreadcrumbOwnershipStayIndependentAcrossTurns(GameTestHelper h){
         var p=managed(h,Direction.DOWN);
         var horse=h.spawn(EntityTypes.HORSE,new BlockPos(8,14,8));horse.teleportTo(p.getX(),p.getY(),p.getZ());horse.setNoAi(true);horse.setOnGround(false);horse.setNoGravity(true);
-        var wolf=h.spawn(EntityTypes.WOLF,new BlockPos(16,14,16));wolf.setNoAi(true);wolf.setOnGround(false);wolf.setNoGravity(true);wolf.tame(p);
+        var wolf=h.spawn(EntityTypes.WOLF,new BlockPos(16,14,16));wolf.setOnGround(false);wolf.setNoGravity(true);wolf.tame(p);
         wolf.addEffect(new MobEffectInstance(Reorientation.EFFECT,1200));
         wolf.teleportTo(p.getX()+8.0D,p.getY(),p.getZ()+8.0D);
         h.assertTrue(p.startRiding(horse,true,true),"fixture could not mount rider");
+        var follow=new FollowOwnerGoal(wolf,1.0D,10.0F,2.0F);
+        h.assertTrue(follow.canUse(),"real follow-owner goal did not acquire mounted owner");
+        follow.start();
         Vec3 momentum=new Vec3(.24,-.36,.18);horse.setDeltaMovement(momentum);
 
         var east=ClingingReoriented.attempt(p,direction(Direction.EAST),GravityTransition.headingFromYaw(Direction.DOWN,p.getYRot()));
@@ -135,7 +139,7 @@ public final class GameFeelAdversarialGameTests {
         h.assertTrue(GravityDirectionUtil.getGravityDirection(horse)==Direction.EAST&&GravityDirectionUtil.getGravityDirection(p)==Direction.EAST,"rider/root hierarchy missed EAST");
         h.assertTrue(horse.getDeltaMovement().equals(momentum),"mounted EAST turn changed root momentum");
         h.assertTrue(MobGravity.state(horse).ownership==MobGravity.Ownership.BORROWED_RIDER,"mount did not record rider loan ownership");
-        wolf.teleportTo(p.getX(),p.getY(),p.getZ());GravityBreadcrumbs.follow(wolf);
+        Vec3 eastStep=p.position();wolf.teleportTo(eastStep.x,eastStep.y,eastStep.z);follow.tick();
         h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.EAST,"pet did not replay first mounted breadcrumb");
         h.assertTrue(MobGravity.state(wolf).ownership==MobGravity.Ownership.OWNED_EFFECT,"pet incorrectly inherited rider-loan ownership");
         wolf.teleportTo(p.getX()+8.0D,p.getY(),p.getZ()+8.0D);
@@ -144,7 +148,7 @@ public final class GameFeelAdversarialGameTests {
         h.assertTrue(north==ClingingReoriented.Result.SUCCESS,"mounted NORTH turn failed: "+north);
         h.assertTrue(GravityDirectionUtil.getGravityDirection(horse)==Direction.NORTH&&GravityDirectionUtil.getGravityDirection(p)==Direction.NORTH,"rider/root hierarchy missed NORTH");
         h.assertTrue(horse.getDeltaMovement().equals(momentum),"mounted NORTH turn changed root momentum");
-        wolf.teleportTo(p.getX(),p.getY(),p.getZ());GravityBreadcrumbs.follow(wolf);
+        Vec3 northStep=p.position();wolf.teleportTo(northStep.x,northStep.y,northStep.z);follow.tick();
         h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.NORTH,"pet did not replay second mounted breadcrumb");
         wolf.teleportTo(p.getX()+8.0D,p.getY(),p.getZ()+8.0D);
 
@@ -153,7 +157,7 @@ public final class GameFeelAdversarialGameTests {
         h.assertTrue(MobGravity.state(horse).ownership==MobGravity.Ownership.NONE,"dismount left mount ownership borrowed/stale");
         h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.NORTH,"retiring mount loan dragged independent pet gravity with it");
         h.assertTrue(MobGravity.state(wolf).ownership==MobGravity.Ownership.OWNED_EFFECT,"retiring mount loan changed pet ownership");
-        GravityBreadcrumbs.clear(p.getUUID());
+        follow.stop();GravityBreadcrumbs.clear(p.getUUID());
         h.succeed();
     }
 
