@@ -1,0 +1,35 @@
+{
+  "palette": {
+    ".": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "d": "66566b",
+    "s": "95808c",
+    "m": "baa39b",
+    "o": "cabb93",
+    "b": "e3d4a4",
+    "l": "f5e8b9",
+    "h": "fff6d6"
+  },
+  "rows": [
+    "................",
+    "......oool......",
+    ".....olhhls.....",
+    ".....blhlms.....",
+    "...oolhhlms.....",
+    "..olllhhlmsoo...",
+    ".olhhllhhlbbos..",
+    ".blhlbbhlbomms..",
+    ".obbmmblbommos..",
+    "..sssmblmmsssd..",
+    "....omlblms.....",
+    "....omlboms.....",
+    ".....obbosd.....",
+    "......sss.......",
+    "................",
+    "................"
+  ]
+}
