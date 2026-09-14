@@ -54,6 +54,14 @@ public final class PlayerData {
     public double gravityFallLandingEtaTicks;
     public long gravityFallSequence;
 
+    // Geometric directional fall segment used by the mace. This deliberately does not use
+    // Gravity Changer's gravity-strength-scaled fallDistance: it is literal blocks travelled in
+    // the current gravity direction since this directional fall began.
+    public Direction maceFallDirection=Direction.DOWN;
+    public Vec3 maceFallLastPosition;
+    public double maceFallDistance;
+    public boolean maceFallActive;
+
     // Safety leash for high-speed free flight. It deliberately survives ordinary support unbinds
     // and gravity turns; only an actual context/lifecycle transfer should discard the safe anchor.
     public Vec3 flightSafePosition;
@@ -66,6 +74,7 @@ public final class PlayerData {
     }
     public void clearLandingCommit(){landingCommitted=false;landingContact=null;landingKind=null;landingEtaTicks=0.0D;landingDeadlineTick=0L;}
     public void clearGravityFall(){gravityFallActive=false;gravityFallLanding=false;gravityFallLandingGravity=Direction.DOWN;gravityFallLandingEtaTicks=0.0D;}
+    public void clearMaceFall(){maceFallDirection=Direction.DOWN;maceFallLastPosition=null;maceFallDistance=0.0D;maceFallActive=false;}
     public void clearFlightSafetyHold(){flightSafetyHolding=false;flightHeldVelocity=Vec3.ZERO;}
     public void clearFlightSafety(){flightSafePosition=null;clearFlightSafetyHold();}
     public interface Holder { PlayerData clinging$data(); }
