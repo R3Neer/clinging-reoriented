@@ -79,6 +79,11 @@ public final class ClingingReoriented implements ModInitializer {
         var old=data(oldPlayer);var next=data(newPlayer);
         next.revision=old.revision+1;
         next.visualSequence=old.visualSequence;
+        // Client Gravity Fall phase ordering is UUID-scoped, so the epoch must survive a
+        // ServerPlayer replacement even though the active/landing presentation itself must not.
+        // Resetting this counter to zero would make a respawned player emit START=1 while the
+        // client still remembers START/LAND=17 for the same UUID and correctly rejects it as stale.
+        next.gravityFallSequence=old.gravityFallSequence;
         if(alive){
             next.owned=old.owned;next.selected=old.selected;
             next.airChangeUsed=old.airChangeUsed;
