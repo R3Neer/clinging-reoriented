@@ -26,6 +26,7 @@ import org.joml.Vector3f;
 public final class GameFeelAdversarialClientGameTest implements FabricClientGameTest {
     private static final double EPS=3.0E-3D;
     private static final float QUAT_EPS=2.0E-4F;
+    private static final double AERO_BODY_MAX_OFFSET_RADIANS=Math.toRadians(10.0D);
 
     @Override public void runTest(ClientGameTestContext context){
         AtomicReference<Vec3> camera=new AtomicReference<>();
@@ -100,7 +101,12 @@ public final class GameFeelAdversarialClientGameTest implements FabricClientGame
                 assertVec(new Vec3(0,-1,0),BodyOrientation.bodyUp(body(mc)),"physical gravity turn rotated body before velocity changed");
                 assertVec(camera.get(),cameraForward(mc),"physical gravity turn moved camera during Gravity Fall");
                 advance(mc,1,new Vec3(0,0,-.20));
-                assertVec(new Vec3(0,0,-1),BodyOrientation.bodyUp(body(mc)),"body did not follow new NORTH velocity after gravity/velocity decoupling");
+                // With aerodynamic look-follow the macro body may spend up to one bounded follow
+                // step chasing the camera. Velocity still owns the primary frame: require the body
+                // to remain within ten degrees of the new NORTH motion rather than demanding the
+                // exact old no-steering quaternion.
+                assertDirectionWithin(new Vec3(0,0,-1),BodyOrientation.bodyUp(body(mc)),AERO_BODY_MAX_OFFSET_RADIANS,
+                    "body stopped being velocity-owned after NORTH reorientation");
                 assertVec(camera.get(),cameraForward(mc),"velocity-owned body turn fed back into camera");
             });
             context.takeScreenshot("s05-gravity-fall-velocity-not-gravity");
@@ -160,6 +166,12 @@ public final class GameFeelAdversarialClientGameTest implements FabricClientGame
     }
 
     private static void assertVec(Vec3 expected,Vec3 actual,String label){if(expected.distanceTo(actual)>EPS)throw new AssertionError(label+": expected="+expected+" actual="+actual);}
+    private static void assertDirectionWithin(Vec3 expected,Vec3 actual,double maxRadians,String label){
+        Vec3 a=expected.normalize(),b=actual.normalize();
+        double dot=Math.max(-1.0D,Math.min(1.0D,a.dot(b)));
+        double angle=Math.acos(dot);
+        if(!Double.isFinite(angle)||angle>maxRadians)throw new AssertionError(label+": angleDeg="+Math.toDegrees(angle)+" expected="+a+" actual="+b);
+    }
     private static void assertQuat(Quaternionf expected,Quaternionf actual,String label){if(!equivalent(expected,actual))throw new AssertionError(label+": expected="+expected+" actual="+actual);}
     private static boolean equivalent(Quaternionf a,Quaternionf b){
         if(a==null||b==null)return false;
