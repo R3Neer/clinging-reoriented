@@ -17,6 +17,6 @@ public abstract class ShulkerDuplicationProbeMixin {
     )
     private float clinging$deterministicDuplicationRoll(RandomSource random){
         Shulker self=(Shulker)(Object)this;
-        return self.getClass().getName().endsWith(FIXTURE_CLASS_SUFFIX)?1.0F:random.nextFloat();
+        return self.getClass().getName().endsWith(FIXTURE_CLASS_SUFFIX)?Float.POSITIVE_INFINITY:random.nextFloat();
     }
 }
