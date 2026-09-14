@@ -4,7 +4,6 @@ import com.moigferdsrte.gravitychanger.util.GravityDirectionUtil;
 import com.moigferdsrte.gravitychanger.util.RotationUtil;
 import io.github.r3neer.clingingreoriented.VisualMovementFrame;
 import io.github.r3neer.clingingreoriented.client.VisualTransitions;
-import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.Entity;
@@ -27,7 +26,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class VisualMovementMixin {
     @Shadow protected static Vec3 getInputVector(Vec3 input,float speed,float yRot){throw new AssertionError();}
 
-    @Unique private static UUID CLINGING_LAST_VISUAL_PLAYER;
+    // The fallback heading is presentation state belonging to one concrete LocalPlayer object,
+    // not durable player identity. Respawn can reuse the UUID while replacing the entity and its
+    // camera/animation state; carrying this vector across that boundary creates a one-frame stale
+    // basis exactly when camera-forward projection is degenerate.
+    @Unique private static Entity CLINGING_LAST_VISUAL_ENTITY;
     @Unique private static Vec3 CLINGING_LAST_VISUAL_FORWARD;
 
     @Inject(method="moveRelative",at=@At("HEAD"),cancellable=true)
@@ -38,14 +41,13 @@ public abstract class VisualMovementMixin {
 
         boolean incompatible=self.isInWater()||self.isInLava()||(self instanceof LivingEntity living&&living.isFallFlying());
         if(!VisualTransitions.owns(self)||incompatible){
-            CLINGING_LAST_VISUAL_PLAYER=null;
+            CLINGING_LAST_VISUAL_ENTITY=null;
             CLINGING_LAST_VISUAL_FORWARD=null;
             return;
         }
 
-        UUID uuid=self.getUUID();
-        if(!uuid.equals(CLINGING_LAST_VISUAL_PLAYER)){
-            CLINGING_LAST_VISUAL_PLAYER=uuid;
+        if(self!=CLINGING_LAST_VISUAL_ENTITY){
+            CLINGING_LAST_VISUAL_ENTITY=self;
             CLINGING_LAST_VISUAL_FORWARD=null;
         }
 
