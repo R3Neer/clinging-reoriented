@@ -9,7 +9,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 /** Test-only determinism seam for vanilla's density-based Shulker duplication roll. */
 @Mixin(Shulker.class)
 public abstract class ShulkerDuplicationProbeMixin {
-    private static final String CLINGING_FORCE_DUPLICATION_TAG="clinging_reoriented_test_force_duplication";
+    private static final String FIXTURE_CLASS_SUFFIX="ShulkerChargeProjectileGameTests$DeterministicTeleportShulker";
 
     @Redirect(
         method="hitByShulkerBullet",
@@ -17,6 +17,6 @@ public abstract class ShulkerDuplicationProbeMixin {
     )
     private float clinging$deterministicDuplicationRoll(RandomSource random){
         Shulker self=(Shulker)(Object)this;
-        return self.getTags().contains(CLINGING_FORCE_DUPLICATION_TAG)?1.0F:random.nextFloat();
+        return self.getClass().getName().endsWith(FIXTURE_CLASS_SUFFIX)?1.0F:random.nextFloat();
     }
 }
