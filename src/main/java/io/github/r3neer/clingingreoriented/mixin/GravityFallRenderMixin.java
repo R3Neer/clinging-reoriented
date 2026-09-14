@@ -2,6 +2,7 @@ package io.github.r3neer.clingingreoriented.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.moigferdsrte.gravitychanger.client.GravityRenderContext;
+import io.github.r3neer.clingingreoriented.BodyRenderMath;
 import io.github.r3neer.clingingreoriented.client.GravityFallVisuals;
 import java.util.ArrayDeque;
 import net.fabricmc.loader.api.FabricLoader;
@@ -51,9 +52,8 @@ public abstract class GravityFallRenderMixin {
                     // camera and lets torso/legs arc through the near plane. Preserve the eye/head
                     // anchor instead. This keeps First Person's camera authority intact while the
                     // rest of the avatar still receives the full Gravity Fall root.
-                    float pivot=clinging$firstPersonBodyPass(mc,player)
-                        ? Math.max(0.0F,player.getEyeHeight())
-                        : Math.max(0.0F,avatar.boundingBoxHeight*0.5F);
+                    float pivot=BodyRenderMath.pivotHeight(
+                        avatar.boundingBoxHeight,player.getEyeHeight(),clinging$firstPersonBodyPass(mc,player));
                     poseStack.translate(0.0F,pivot,0.0F);
                     poseStack.mulPose(extra);
                     poseStack.translate(0.0F,-pivot,0.0F);
