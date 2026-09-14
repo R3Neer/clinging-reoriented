@@ -139,7 +139,7 @@ Production code does not compile against Scale Brews. Scale compatibility remain
 
 First Person is mixin-gated. Fresh Animations/FA Player Extension/EMF/ETF are pinned optional test fixtures. Clinging owns only the macro transform around their animation.
 
-Shulker Charge adds no new runtime dependency. Its 2D asset is original project artwork; the 3D item model references Minecraft's shulker spark texture at runtime without redistributing that texture.
+Shulker Charge adds no new runtime dependency. Its 2D icon/texture and 3D item geometry are project-owned assets; only the launched exact vanilla ShulkerBullet uses Minecraft's own renderer/model/texture at runtime.
 
 ## State summary
 
