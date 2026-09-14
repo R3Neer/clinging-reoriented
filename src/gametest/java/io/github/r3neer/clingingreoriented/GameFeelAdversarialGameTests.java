@@ -127,7 +127,7 @@ public final class GameFeelAdversarialGameTests {
         var horse=h.spawn(EntityTypes.HORSE,new BlockPos(8,14,8));horse.teleportTo(p.getX(),p.getY(),p.getZ());horse.setNoAi(true);horse.setOnGround(false);horse.setNoGravity(true);
         var wolf=h.spawn(EntityTypes.WOLF,new BlockPos(16,14,16));wolf.setOnGround(false);wolf.setNoGravity(true);wolf.tame(p);
         wolf.addEffect(new MobEffectInstance(Reorientation.EFFECT,1200));
-        wolf.teleportTo(p.getX()+8.0D,p.getY(),p.getZ()+8.0D);
+        wolf.setPos(p.getX()+8.0D,p.getY(),p.getZ()+8.0D);
         h.assertTrue(p.startRiding(horse,true,true),"fixture could not mount rider");
         var follow=new FollowOwnerGoal(wolf,1.0D,10.0F,2.0F);
         h.assertTrue(follow.canUse(),"real follow-owner goal did not acquire mounted owner");
@@ -141,7 +141,7 @@ public final class GameFeelAdversarialGameTests {
         h.assertTrue(MobGravity.state(horse).ownership==MobGravity.Ownership.BORROWED_RIDER,"mount did not record rider loan ownership");
         Vec3 eastStep=p.position();
         horse.teleportTo(eastStep.x+4.0D,eastStep.y,eastStep.z);horse.positionRider(p);
-        wolf.teleportTo(eastStep.x,eastStep.y,eastStep.z);follow.tick();
+        wolf.setPos(eastStep);follow.tick();
         h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.EAST,"pet did not replay first mounted breadcrumb");
         h.assertTrue(MobGravity.state(wolf).ownership==MobGravity.Ownership.OWNED_EFFECT,"pet incorrectly inherited rider-loan ownership");
 
@@ -151,7 +151,7 @@ public final class GameFeelAdversarialGameTests {
         h.assertTrue(horse.getDeltaMovement().equals(momentum),"mounted NORTH turn changed root momentum");
         Vec3 northStep=p.position();
         horse.teleportTo(northStep.x+4.0D,northStep.y,northStep.z);horse.positionRider(p);
-        wolf.teleportTo(northStep.x,northStep.y,northStep.z);follow.tick();
+        wolf.setPos(northStep);follow.tick();
         h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.NORTH,"pet did not replay second mounted breadcrumb");
 
         p.stopRiding();MobGravity.tick(horse);
