@@ -20,12 +20,19 @@ jobs:
           java-version: '25'
       - name: Make Gradle executable
         run: chmod +x ./gradlew
-      - name: Build and run server tests without optional Scale Brews
-        run: ./gradlew build runGameTest --no-daemon --console=plain
+      - name: Build and run unit tests without optional Scale Brews
+        run: ./gradlew build --no-daemon --console=plain
+      - name: Run server GameTests without optional Scale Brews
+        run: ./gradlew runGameTest --no-daemon --console=plain
       - name: Run client GameTests without optional mods
         run: xvfb-run -a ./gradlew runClientGameTest --no-daemon --console=plain
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
+      - name: Preserve default client screenshots
+        if: always()
+        run: |
+          mkdir -p build/default-client-screenshots
+          if [ -d build/run/clientGameTest/screenshots ]; then cp -a build/run/clientGameTest/screenshots/. build/default-client-screenshots/; fi
       - name: Fetch optional First Person fixtures
         run: |
           mkdir -p test-libs
@@ -37,6 +44,11 @@ jobs:
         run: xvfb-run -a ./gradlew runClientGameTest -PwithFirstPerson --no-daemon --console=plain
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
+      - name: Preserve First Person screenshots
+        if: always()
+        run: |
+          mkdir -p build/first-person-screenshots
+          if [ -d build/run/clientGameTest/screenshots ]; then cp -a build/run/clientGameTest/screenshots/. build/first-person-screenshots/; fi
       - name: Fetch optional Scale Brews runtime fixture
         run: |
           curl --fail --location --retry 4 --retry-all-errors --retry-delay 2 --connect-timeout 20 --output test-libs/scalebrews-0.1.0-beta.5.jar \
@@ -71,6 +83,67 @@ jobs:
         run: |
           mkdir -p build/fresh-animations-screenshots
           if [ -d build/run/clientGameTest/screenshots ]; then cp -a build/run/clientGameTest/screenshots/. build/fresh-animations-screenshots/; fi
+      - name: Validate S05 snapshot evidence
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, struct
+
+          roots = {
+              'default': Path('build/default-client-screenshots'),
+              'first_person': Path('build/first-person-screenshots'),
+              'fresh_animations': Path('build/fresh-animations-screenshots'),
+          }
+          required = {
+              'default': [
+                  's05-six-turn-retained-camera',
+                  's05-gravity-fall-zero-jitter',
+                  's05-gravity-fall-velocity-not-gravity',
+                  's05-cancelled-landing-holds-partial',
+                  's05-language-falling',
+                  's05-language-elytra',
+              ],
+              'first_person': [
+                  'firstperson-gravity-fall-root',
+                  'firstperson-gravity-fall-landing',
+              ],
+              'fresh_animations': [
+                  'fresh-animations-gravity-fall-sustained-down',
+                  'fresh-animations-gravity-fall-landing-mid',
+                  'fresh-animations-gravity-fall-landing-final',
+              ],
+          }
+          rows = []
+          found = {}
+          for lane, names in required.items():
+              root = roots[lane]
+              for name in names:
+                  matches = sorted(root.glob(f'*_{name}.png'))
+                  if len(matches) != 1:
+                      raise SystemExit(f'{lane}: expected one snapshot for {name}, found {len(matches)}')
+                  path = matches[0]
+                  data = path.read_bytes()
+                  if len(data) < 10000 or data[:8] != b'\x89PNG\r\n\x1a\n' or data[12:16] != b'IHDR':
+                      raise SystemExit(f'{lane}: invalid or implausibly small PNG: {path}')
+                  width, height = struct.unpack('>II', data[16:24])
+                  if width < 320 or height < 180:
+                      raise SystemExit(f'{lane}: snapshot resolution too small: {path} = {width}x{height}')
+                  digest = hashlib.sha256(data).hexdigest()
+                  found[(lane, name)] = digest
+                  rows.append(f'{lane}\t{name}\t{width}x{height}\t{len(data)}\t{digest}\t{path}')
+
+          distinct = [
+              (('default', 's05-language-falling'), ('default', 's05-language-elytra')),
+              (('fresh_animations', 'fresh-animations-gravity-fall-landing-mid'), ('fresh_animations', 'fresh-animations-gravity-fall-landing-final')),
+          ]
+          for left, right in distinct:
+              if found[left] == found[right]:
+                  raise SystemExit(f'semantically distinct snapshots are byte-identical: {left} == {right}')
+
+          out = Path('build/s05-snapshot-manifest.txt')
+          out.write_text('lane\tcheckpoint\tdimensions\tbytes\tsha256\tpath\n' + '\n'.join(rows) + '\n', encoding='utf-8')
+          print(out.read_text(encoding='utf-8'))
+          PY
       - name: Upload artifacts and diagnostics
         if: always()
         uses: actions/upload-artifact@v7
@@ -80,7 +153,10 @@ jobs:
             build/libs/*.jar
             build/run/*/logs/latest.log
             build/run/clientGameTest/screenshots/*.png
+            build/default-client-screenshots/*.png
+            build/first-person-screenshots/*.png
             build/fresh-animations-screenshots/*.png
+            build/s05-snapshot-manifest.txt
             build/test-results/**/*.xml
             build/reports/tests/**
             build/reports/problems/**
