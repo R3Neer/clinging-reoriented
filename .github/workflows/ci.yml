@@ -83,7 +83,7 @@ jobs:
         run: |
           mkdir -p build/fresh-animations-screenshots
           if [ -d build/run/clientGameTest/screenshots ]; then cp -a build/run/clientGameTest/screenshots/. build/fresh-animations-screenshots/; fi
-      - name: Validate S05 snapshot evidence
+      - name: Validate visual snapshot evidence
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -102,6 +102,10 @@ jobs:
                   's05-cancelled-landing-holds-partial',
                   's05-language-falling',
                   's05-language-elytra',
+                  'shulker-charge-inventory-icon',
+                  'shulker-charge-first-person-held',
+                  'shulker-charge-third-person-held',
+                  'shulker-charge-projectile-renderer',
               ],
               'first_person': [
                   'firstperson-gravity-fall-root',
@@ -135,14 +139,18 @@ jobs:
           distinct = [
               (('default', 's05-language-falling'), ('default', 's05-language-elytra')),
               (('fresh_animations', 'fresh-animations-gravity-fall-landing-mid'), ('fresh_animations', 'fresh-animations-gravity-fall-landing-final')),
+              (('default', 'shulker-charge-inventory-icon'), ('default', 'shulker-charge-first-person-held')),
+              (('default', 'shulker-charge-first-person-held'), ('default', 'shulker-charge-third-person-held')),
+              (('default', 'shulker-charge-third-person-held'), ('default', 'shulker-charge-projectile-renderer')),
           ]
           for left, right in distinct:
               if found[left] == found[right]:
                   raise SystemExit(f'semantically distinct snapshots are byte-identical: {left} == {right}')
 
-          out = Path('build/s05-snapshot-manifest.txt')
-          out.write_text('lane\tcheckpoint\tdimensions\tbytes\tsha256\tpath\n' + '\n'.join(rows) + '\n', encoding='utf-8')
-          print(out.read_text(encoding='utf-8'))
+          text='lane\tcheckpoint\tdimensions\tbytes\tsha256\tpath\n' + '\n'.join(rows) + '\n'
+          Path('build/visual-snapshot-manifest.txt').write_text(text, encoding='utf-8')
+          Path('build/s05-snapshot-manifest.txt').write_text(text, encoding='utf-8')
+          print(text)
           PY
       - name: Upload artifacts and diagnostics
         if: always()
@@ -156,6 +164,7 @@ jobs:
             build/default-client-screenshots/*.png
             build/first-person-screenshots/*.png
             build/fresh-animations-screenshots/*.png
+            build/visual-snapshot-manifest.txt
             build/s05-snapshot-manifest.txt
             build/test-results/**/*.xml
             build/reports/tests/**

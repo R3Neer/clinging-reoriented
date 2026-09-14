@@ -19,7 +19,10 @@
       "io.github.r3neer.clingingreoriented.LandingStateGameTests",
       "io.github.r3neer.clingingreoriented.GravityFallStateGameTests",
       "io.github.r3neer.clingingreoriented.GameFeelAdversarialGameTests",
-      "io.github.r3neer.clingingreoriented.GameFeelLifecycleGameTests"
+      "io.github.r3neer.clingingreoriented.GameFeelLifecycleGameTests",
+      "io.github.r3neer.clingingreoriented.ShulkerChargeGameTests",
+      "io.github.r3neer.clingingreoriented.ShulkerChargeLaunchGameTests",
+      "io.github.r3neer.clingingreoriented.ShulkerChargeProjectileGameTests"
     ],
     "fabric-client-gametest": [
       "io.github.r3neer.clingingreoriented.ClingingClientGameTest",
@@ -27,7 +30,8 @@
       "io.github.r3neer.clingingreoriented.WaterClientGameTest",
       "io.github.r3neer.clingingreoriented.EntitySnapClientGameTest",
       "io.github.r3neer.clingingreoriented.GravityFallClientGameTest",
-      "io.github.r3neer.clingingreoriented.GameFeelAdversarialClientGameTest"
+      "io.github.r3neer.clingingreoriented.GameFeelAdversarialClientGameTest",
+      "io.github.r3neer.clingingreoriented.ShulkerChargeClientGameTest"
     ]
   }
 }
