@@ -54,9 +54,14 @@ public final class GravityInputGameTests {
 
     @GameTest(padding=16) public void sidewaysGravityUsesSameSprintLandingPrediction(GameTestHelper h){
         var p=h.makeMockServerPlayerInLevel();clear(h,p.blockPosition(),8);
-        p.snapTo(h.absoluteVec(new Vec3(5.8,8.5,5.5)));ClingingReoriented.write(p,Direction.EAST);
-        var support=BlockPos.containing(p.getBoundingBox().maxX+.20,p.getBoundingBox().getCenter().y,p.getBoundingBox().getCenter().z);
+        var support=h.absolutePos(new BlockPos(8,8,5));
         h.getLevel().setBlockAndUpdate(support,Blocks.STONE.defaultBlockState());
+        // EAST gravity uses the player's position as the +X foot plane. Put that plane 0.20
+        // blocks west of the wall and center the 0.6-wide tangent AABB inside the wall's Y/Z span.
+        p.snapTo(new Vec3(support.getX()-.20D,support.getY()+.5D,support.getZ()+.5D));
+        ClingingReoriented.write(p,Direction.EAST);
+        h.assertTrue(Math.abs(p.getBoundingBox().maxX-(support.getX()-.20D))<1.0E-6D,"EAST fixture foot plane alignment");
+        h.assertTrue(p.level().noCollision(p,p.getBoundingBox().deflate(1.0E-5D)),"EAST fixture must begin collision-free");
         p.setOnGround(false);p.setSprinting(true);p.setDeltaMovement(.15,0,0);
         h.assertTrue(GravityInput.sprintLandingJumpReserved(p),"EAST gravity predicts support along +X rather than world DOWN");
         double normal=GravityInput.landingGraceTicks(p);
