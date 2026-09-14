@@ -57,7 +57,7 @@ Movement deliberately speaks vanilla shulker language: orthogonal/cardinal routi
 
 **Reorientation brewing now consumes a Shulker Charge instead of a Shulker Shell.** Clinging + Shulker Charge produces Reorientation; long Clinging produces long Reorientation, and redstone extends the ordinary Reorientation potion through the registered route. Vanilla splash/lingering conversion remains available.
 
-The inventory icon is original project artwork under GPL-3.0-or-later. The held 3D model references Minecraft's shulker spark texture at runtime; no Mojang texture is redistributed by the project.
+The inventory icon, its texture and the held 3D item model are original project assets under GPL-3.0-or-later. The launched Charge remains the exact vanilla ShulkerBullet entity, so Minecraft uses its own projectile renderer/model/texture at runtime; no Mojang asset is copied into this repository.
 
 ## Landing surfaces are extensible
 
