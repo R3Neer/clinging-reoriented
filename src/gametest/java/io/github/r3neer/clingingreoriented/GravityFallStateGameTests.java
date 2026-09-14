@@ -17,7 +17,9 @@ import net.minecraft.world.phys.Vec3;
 public final class GravityFallStateGameTests {
     private static ServerPlayer managed(GameTestHelper h,int airborneTicks){
         var p=h.makeMockServerPlayerInLevel();
-        p.snapTo(h.absoluteVec(new Vec3(5.5,12,5.5)));
+        // Keep generic Gravity Fall holdouts comfortably outside the new 10-tick landing horizon.
+        // Tests that need imminent support register an explicit provider below.
+        p.snapTo(h.absoluteVec(new Vec3(5.5,30,5.5)));
         p.addEffect(new MobEffectInstance(Reorientation.EFFECT,400));
         ClingingReoriented.write(p,Direction.DOWN);
         var s=ClingingReoriented.data(p);
@@ -42,7 +44,7 @@ public final class GravityFallStateGameTests {
         };
     }
 
-    @GameTest(padding=16)
+    @GameTest(padding=32)
     public void startsAtTwelveAirborneTicksOnlyUnderOwnedPhysics(GameTestHelper h){
         var p=managed(h,GravityFallState.START_AIRBORNE_TICKS-1);var s=ClingingReoriented.data(p);
         GravityFallState.tick(p);
@@ -54,7 +56,7 @@ public final class GravityFallStateGameTests {
         h.succeed();
     }
 
-    @GameTest(padding=16)
+    @GameTest(padding=32)
     public void potionWithoutPhysicsOwnershipNeverStartsGravityFall(GameTestHelper h){
         var p=managed(h,GravityFallState.START_AIRBORNE_TICKS+10);var s=ClingingReoriented.data(p);
         s.owned=false;
@@ -63,11 +65,10 @@ public final class GravityFallStateGameTests {
         h.succeed();
     }
 
-    @GameTest(padding=16)
+    @GameTest(padding=32)
     public void bodyLandingUsesPredictorEvenWhenCameraNeedsNoCommit(GameTestHelper h){
         var p=managed(h,GravityFallState.START_AIRBORNE_TICKS+3);var s=ClingingReoriented.data(p);
         s.gravityFallActive=true;s.gravityFallLanding=false;s.landingCommitted=false;
-        // Camera is already canonical DOWN, so S02/S03 have no reason to lock or rotate it.
         s.visualBaseKnown=true;s.visualBaseDirection=Direction.DOWN;
         var valid=new AtomicBoolean(true);
         var supportNow=new AtomicBoolean(false);
@@ -82,7 +83,7 @@ public final class GravityFallStateGameTests {
         h.succeed();
     }
 
-    @GameTest(padding=16)
+    @GameTest(padding=32)
     public void invalidatedBodyLandingResumesFromCurrentPresentation(GameTestHelper h){
         var p=managed(h,GravityFallState.START_AIRBORNE_TICKS+3);var s=ClingingReoriented.data(p);
         s.gravityFallActive=true;
@@ -101,7 +102,7 @@ public final class GravityFallStateGameTests {
         h.succeed();
     }
 
-    @GameTest(padding=16)
+    @GameTest(padding=32)
     public void realSupportResetsActiveGravityFall(GameTestHelper h){
         var p=managed(h,GravityFallState.START_AIRBORNE_TICKS+3);var s=ClingingReoriented.data(p);
         s.gravityFallActive=true;s.gravityFallLanding=true;s.gravityFallLandingGravity=Direction.DOWN;s.gravityFallLandingEtaTicks=.2D;
@@ -117,7 +118,7 @@ public final class GravityFallStateGameTests {
         h.succeed();
     }
 
-    @GameTest(padding=16)
+    @GameTest(padding=32)
     public void imminentSupportAtThresholdDoesNotFlashStart(GameTestHelper h){
         var p=managed(h,GravityFallState.START_AIRBORNE_TICKS);var s=ClingingReoriented.data(p);
         var valid=new AtomicBoolean(true);
