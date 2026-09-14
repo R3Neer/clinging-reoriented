@@ -15,6 +15,7 @@
   "entrypoints": {
     "main": [
       "io.github.r3neer.clingingreoriented.ClingingReoriented",
+      "io.github.r3neer.clingingreoriented.FlightSafetyInitializer",
       "io.github.r3neer.clingingreoriented.GravityFallInitializer"
     ],
     "client": [
