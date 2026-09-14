@@ -30,12 +30,21 @@ import net.minecraft.world.phys.Vec3;
 public final class ShulkerChargeProjectileGameTests {
     private static final long ROUTE_SEED=0x5EED5EEDL;
 
-    /** Keep only the small corridor around a projectile simulated for the lifetime of these tests. */
+    /** Keep the whole small flight corridor at ENTITY_TICKING level for these tests. */
     private static void keepSimulated(GameTestHelper h,Vec3... points){
+        if(points.length==0)return;
+        int minX=Integer.MAX_VALUE,minZ=Integer.MAX_VALUE,maxX=Integer.MIN_VALUE,maxZ=Integer.MIN_VALUE;
         for(Vec3 point:points){
             ChunkPos chunk=ChunkPos.containing(BlockPos.containing(point));
-            h.getLevel().getChunkSource().addTicketWithRadius(TicketType.PORTAL,chunk,1);
+            minX=Math.min(minX,chunk.x());maxX=Math.max(maxX,chunk.x());
+            minZ=Math.min(minZ,chunk.z());maxZ=Math.max(maxZ,chunk.z());
         }
+        // TicketStorage maps radius 2 to level 31, which is ENTITY_TICKING in 26.2.
+        // Expand one whole chunk because vanilla Shulker routing can take an orthogonal detour.
+        minX--;minZ--;maxX++;maxZ++;
+        var source=h.getLevel().getChunkSource();
+        for(int x=minX;x<=maxX;x++)for(int z=minZ;z<=maxZ;z++)
+            source.addTicketWithRadius(TicketType.PORTAL,new ChunkPos(x,z),2);
     }
 
     private static ShulkerBullet charge(GameTestHelper h,Vec3 relative,Vec3 intent){return chargeAbsolute(h,h.absoluteVec(relative),intent);}
