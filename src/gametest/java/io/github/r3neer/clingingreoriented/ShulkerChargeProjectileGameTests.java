@@ -15,6 +15,7 @@ import net.minecraft.world.entity.projectile.ShulkerBullet;
 import net.minecraft.world.entity.projectile.arrow.Arrow;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.AABB;
@@ -36,9 +37,8 @@ public final class ShulkerChargeProjectileGameTests {
 
     @GameTest(maxTicks=260,padding=48) public void offsetTargetBlockRequiresOrthogonalRouteAndStillHits(GameTestHelper h){
         clear(h,3,7,3,22,11,17);BlockPos target=new BlockPos(18,8,13);h.setBlock(target,Blocks.TARGET);Vec3 origin=new Vec3(5.5,8.5,5.5);Vec3 intent=Vec3.atCenterOf(target).subtract(origin);
-        var bullet=charge(h,origin,intent);Vec3 initial=bullet.getDeltaMovement();
-        h.assertTrue((Math.abs(initial.x)>0.14?1:0)+(Math.abs(initial.y)>0.14?1:0)+(Math.abs(initial.z)>0.14?1:0)==1,"first Shulker route segment is cardinal");
-        h.startSequence().thenWaitUntil(()->h.assertTrue(h.getBlockState(target).getValue(BlockStateProperties.POWER)>0,"multi-axis Target Block route reaches real block")).thenSucceed();
+        var bullet=charge(h,origin,intent);
+        h.startSequence().thenExecuteAfter(1,()->{Vec3 movement=bullet.getDeltaMovement();int axes=(Math.abs(movement.x)>1.0E-4?1:0)+(Math.abs(movement.y)>1.0E-4?1:0)+(Math.abs(movement.z)>1.0E-4?1:0);h.assertTrue(axes==1,"active Shulker route segment is cardinal after first steering tick");}).thenWaitUntil(()->h.assertTrue(h.getBlockState(target).getValue(BlockStateProperties.POWER)>0,"multi-axis Target Block route reaches real block")).thenSucceed();
     }
 
     @GameTest(maxTicks=180,padding=40) public void entityImpactKeepsVanillaDamageAndLevitation(GameTestHelper h){
@@ -57,16 +57,17 @@ public final class ShulkerChargeProjectileGameTests {
         h.startSequence().thenWaitUntil(()->h.assertTrue(!bullet.isAlive(),"Charge reaches ordinary block and is consumed")).thenExecute(()->h.assertTrue(drops(h,new Vec3(9,8,8))==0,"ordinary block impact never returns Charge item")).thenExecute(()->{var discarded=charge(h,new Vec3(7,12,8),new Vec3(0,1,0));discarded.discard();h.assertTrue(drops(h,new Vec3(7,12,8))==0,"plain expiry/discard path returns no item");}).thenSucceed();
     }
 
-    @GameTest(maxTicks=180,padding=50) public void shieldedPlayerNeutralizesChargeWithoutDrop(GameTestHelper h){
-        clear(h,5,7,6,19,12,10);var player=h.makeMockServerPlayerInLevel();player.snapTo(h.absoluteVec(new Vec3(16,8,8)));player.setItemInHand(InteractionHand.OFF_HAND,new ItemStack(Items.SHIELD));player.startUsingItem(InteractionHand.OFF_HAND);
-        Vec3 origin=new Vec3(7.5,player.getEyeY()-h.absoluteVec(Vec3.ZERO).y,8.5);var bullet=charge(h,origin,player.getEyePosition().subtract(h.absoluteVec(origin)));player.lookAt(EntityAnchorArgument.Anchor.EYES,bullet.position());float before=player.getHealth();
-        h.startSequence().thenWaitUntil(()->h.assertTrue(!bullet.isAlive(),"shield encounter consumes Shulker Charge projectile")).thenExecute(()->{h.assertTrue(drops(h,new Vec3(12,8,8))==0,"shield never converts projectile back to item");h.assertTrue(player.getHealth()==before,"shield blocks Shulker Charge damage");}).thenSucceed();
+    @GameTest(maxTicks=120,padding=50) public void shieldedPlayerNeutralizesChargeWithoutDrop(GameTestHelper h){
+        clear(h,8,7,6,19,12,10);var player=h.makeMockServerPlayerInLevel();player.setGameMode(GameType.SURVIVAL);player.snapTo(h.absoluteVec(new Vec3(16,8,8)));player.setItemInHand(InteractionHand.OFF_HAND,new ItemStack(Items.SHIELD));player.startUsingItem(InteractionHand.OFF_HAND);
+        Vec3 origin=new Vec3(12.5,player.getEyeY()-h.absoluteVec(Vec3.ZERO).y,8.5);var bullet=charge(h,origin,player.getEyePosition().subtract(h.absoluteVec(origin)));player.lookAt(EntityAnchorArgument.Anchor.EYES,bullet.position());float before=player.getHealth();
+        h.assertTrue(((ShulkerChargeProjectile)(Object)bullet).clinging$targetEntity()==player,"shield fixture owns the intended player lock");
+        h.startSequence().thenWaitUntil(()->h.assertTrue(!bullet.isAlive(),"shield encounter consumes Shulker Charge projectile")).thenExecute(()->{h.assertTrue(drops(h,new Vec3(14,8,8))==0,"shield never converts projectile back to item");h.assertTrue(player.getHealth()==before,"shield blocks Shulker Charge damage");}).thenSucceed();
     }
 
-    @GameTest(maxTicks=260,padding=60) public void launchedChargePreservesVanillaShulkerDuplication(GameTestHelper h){
+    @GameTest(maxTicks=180,padding=60) public void launchedChargePreservesVanillaShulkerDuplication(GameTestHelper h){
         clear(h,1,7,1,30,20,30);for(int x=2;x<=28;x++)for(int z=2;z<=28;z++)h.setBlock(new BlockPos(x,6,z),Blocks.STONE);
-        Shulker shulker=h.spawn(EntityTypes.SHULKER,new BlockPos(18,7,14));((ShulkerTestAccessor)(Object)shulker).clinging$setRawPeekAmount(100);
-        Vec3 origin=new Vec3(8.5,7.5,14.5);var bullet=charge(h,origin,shulker.getBoundingBox().getCenter().subtract(h.absoluteVec(origin)));
+        Shulker shulker=h.spawn(EntityTypes.SHULKER,new BlockPos(18,7,14));shulker.setNoAi(true);((ShulkerTestAccessor)(Object)shulker).clinging$setRawPeekAmount(100);
+        Vec3 origin=new Vec3(12.5,7.5,14.5);var bullet=charge(h,origin,shulker.getBoundingBox().getCenter().subtract(h.absoluteVec(origin)));
         h.assertTrue(bullet.getType()==EntityTypes.SHULKER_BULLET,"launched Charge keeps exact vanilla type required by Shulker duplication");
         h.startSequence().thenWaitUntil(()->{List<Shulker> all=h.getLevel().getEntitiesOfClass(Shulker.class,new AABB(h.absoluteVec(new Vec3(1,5,1)),h.absoluteVec(new Vec3(30,20,30))),Shulker::isAlive);h.assertTrue(all.size()>=2,"vanilla hitByShulkerBullet path creates a second shulker");}).thenSucceed();
     }

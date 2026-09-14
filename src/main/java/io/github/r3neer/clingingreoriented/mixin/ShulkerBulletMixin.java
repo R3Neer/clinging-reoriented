@@ -78,12 +78,13 @@ public abstract class ShulkerBulletMixin extends Projectile implements ShulkerCh
         if(!clinging$launchedCharge||level().isClientSide()||!isAlive()||!clinging$validBlockTarget())return;
         if(flightSteps>0){--flightSteps;if(flightSteps==0)clinging$selectNextBlockMoveDirection(currentMoveDirection==null?null:currentMoveDirection.getAxis());}
         if(currentMoveDirection==null)return;
-        BlockPos current=blockPosition();Direction.Axis axis=currentMoveDirection.getAxis();
-        if(level().loadedAndEntityCanStandOn(current.relative(currentMoveDirection),this)){
+        BlockPos current=blockPosition();Direction.Axis axis=currentMoveDirection.getAxis();BlockPos target=clinging$targetBlock;
+        if(target==null)return;
+        BlockPos next=current.relative(currentMoveDirection);
+        // A solid cell is normally an obstacle, except when it is the Target Block we intentionally need to hit.
+        if(!next.equals(target)&&level().loadedAndEntityCanStandOn(next,this)){
             clinging$selectNextBlockMoveDirection(axis);return;
         }
-        BlockPos target=clinging$targetBlock;
-        if(target==null)return;
         if((axis==Direction.Axis.X&&current.getX()==target.getX())||(axis==Direction.Axis.Y&&current.getY()==target.getY())||(axis==Direction.Axis.Z&&current.getZ()==target.getZ()))clinging$selectNextBlockMoveDirection(axis);
     }
 

@@ -1,6 +1,6 @@
 # Shulker Charge — plan global
 
-Estado global: **S00–S02 CERRADOS · S03 REABIERTO POR GAP DE COBERTURA · S04 BLOQUEADO EN GATE**.
+Estado global: **S00–S02 CERRADOS · S03 REVALIDANDO CORRECCIÓN DE ROUTING · S04 BLOQUEADO EN GATE**.
 
 Baseline: `v0.1.0-alpha.13` / `be3b47284a71fbf4fcacb2ab2b2cb3776af290d3`.
 
@@ -19,8 +19,8 @@ Baseline: `v0.1.0-alpha.13` / `be3b47284a71fbf4fcacb2ab2b2cb3776af290d3`.
 
 ## S03 — Navegación, impacto, redstone y recaptura
 - [x] Implementación de routing/impacto/duplicación/recaptura.
-- [ ] Revalidar holdouts físicos ahora que las suites están explícitamente registradas.
-- [ ] CI completa verde sobre batería real de Shulker Charge.
+- [x] Detectado y corregido el caso Target Block tratado como obstáculo sólido.
+- [ ] Revalidar 105 GameTests completos y cerrar no-change gate.
 
 ## S04 — Cliente, modelo 3D y lenguaje visual
 - [x] GUI usa icono/modelo 2D definitivo presente en rama.
