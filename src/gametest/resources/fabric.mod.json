@@ -22,7 +22,8 @@
       "io.github.r3neer.clingingreoriented.GameFeelLifecycleGameTests",
       "io.github.r3neer.clingingreoriented.ShulkerChargeGameTests",
       "io.github.r3neer.clingingreoriented.ShulkerChargeLaunchGameTests",
-      "io.github.r3neer.clingingreoriented.ShulkerChargeProjectileGameTests"
+      "io.github.r3neer.clingingreoriented.ShulkerChargeProjectileGameTests",
+      "io.github.r3neer.clingingreoriented.ShulkerChargeAdversarialGameTests"
     ],
     "fabric-client-gametest": [
       "io.github.r3neer.clingingreoriented.ClingingClientGameTest",
