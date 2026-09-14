@@ -42,7 +42,9 @@ public final class LandingState {
 
         GravityTransition.TurnKind kind=kindFor(state,gravity);
         if(kind==null||predicted.isEmpty())return;
-        int neededTicks=kind==GravityTransition.TurnKind.HALF?5:4;
+        // Camera/body LAND now own the whole half-second approach window. SNAP transitions keep
+        // their shorter 180/240 ms timing; only the imminent landing commitment starts earlier.
+        int neededTicks=LandingPrediction.MAX_TICKS;
         if(predicted.get().etaTicks()<=neededTicks+1.0E-6D)commit(player,predicted.get(),kind);
     }
 
