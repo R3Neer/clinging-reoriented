@@ -1,6 +1,6 @@
 # Configuration
 
-Clinging: Reoriented 0.1.0-alpha.15 exposes **no mod-owned configuration file**. The values below are fixed gameplay/presentation semantics rather than user preferences.
+Clinging: Reoriented 0.1.0-alpha.16 exposes **no mod-owned configuration file**. The values below are fixed gameplay/presentation semantics rather than user preferences.
 
 ## Local-player camera and landing
 
@@ -34,7 +34,7 @@ Shulker Charge also uses fixed rules rather than configuration:
 - targetless/invalid-target reacquisition cadence: approximately every **4 ticks**;
 - launched movement stays cardinal/orthogonal and uses the vanilla `SHULKER_BULLET` entity type.
 
-A valid lock remains sticky until it becomes invalid. A directly sighted Target Block has priority during acquisition. These constants are part of the alpha.15 gameplay contract, not settings.
+A valid lock remains sticky until it becomes invalid. A directly sighted Target Block has priority during acquisition. These constants are part of the alpha.16 gameplay contract, not settings.
 
 ## Mounts and pets
 
