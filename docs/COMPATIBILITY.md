@@ -15,7 +15,7 @@ Fabric API 0.159.0+26.2, Fabric Loader 0.19.5 and Java 25 are also required for 
 
 Shulker Charge adds **no new dependency**. A launched Charge keeps the exact vanilla `minecraft:shulker_bullet` entity type. The project layers Charge state and routing onto that entity rather than registering a parallel projectile type, so vanilla projectile impact, levitation and shulker-duplication checks continue to observe the expected type.
 
-The inventory icon is original GPL-3.0-or-later project artwork. The 3D held model references Minecraft's `entity/shulker/spark` texture at runtime; that Mojang texture is not copied into or redistributed by this repository.
+The inventory icon, item texture and project-authored 3D held model are original GPL-3.0-or-later project assets. Minecraft's own shulker-bullet renderer/model/texture remain runtime-owned by Minecraft for the launched vanilla entity and are not copied into or redistributed by this repository.
 
 Reorientation brewing now uses Shulker Charge instead of Shulker Shell. Alex's Mobs Continued remains the source of the Clinging potion/effect used as the base input.
 
