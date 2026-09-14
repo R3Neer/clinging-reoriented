@@ -1,36 +1,46 @@
 # SC-S04 — Cliente y lenguaje visual
 
-Estado: **PLAN CONVERGIDO / IMPLEMENTACIÓN**.
+Estado: **CERRADO / GATE VERDE**.
 
-## Scope
+## Scope cerrado
 
-SC-002, lenguaje visual de SC-030/031 y evidencia visual de lanzamiento, vuelo y adquisición. Los assets 2D/modelos ya presentes en la rama son **definitivos** salvo que un commit posterior del usuario los sustituya o corrija manualmente.
+SC-002 y el lenguaje visual de SC-030/031: icono GUI, presentación 3D en contextos no-GUI y conservación del renderer vanilla de `minecraft:shulker_bullet`. Los assets 2D/modelos presentes en la rama se mantienen como assets definitivos; esta fase no los rediseña.
 
-## Investigación real
+## Implementación estable
 
-- Minecraft 26.2 permite seleccionar item model por `minecraft:display_context` desde `assets/<namespace>/items/<item>.json`.
-- El GUI puede usar `clinging_reoriented:item/shulker_charge_gui` sin afectar al modelo en mano.
-- `ShulkerBulletModel` vanilla está formado por tres cubos/placas ortogonales: 8×8×2, 2×8×8 y 8×2×8. Esta geometría es la referencia del modelo 3D en mano.
-- La bullet en vuelo ya conserva el renderer vanilla porque el EntityType sigue siendo `minecraft:shulker_bullet`; no se reemplaza su renderer.
+- `assets/clinging_reoriented/items/shulker_charge.json` selecciona por `minecraft:display_context`: `gui` usa `shulker_charge_gui` y el resto cae en `shulker_charge_3d`.
+- El modelo 3D conserva las tres placas ortogonales inspiradas en `ShulkerBulletModel` y referencia el recurso vanilla `minecraft:entity/shulker/spark` en vez de redistribuir texturas de Mojang.
+- La entidad lanzada sigue siendo exactamente `EntityTypes.SHULKER_BULLET`; no existe renderer paralelo.
 - No se añade HUD de lock ni homing curvo.
 
-## Plan
+## Evidencia visual
 
-1. Añadir item definition con `minecraft:select` + `minecraft:display_context`.
-2. `gui` usa el icono/modelo 2D definitivo existente.
-3. Primera/tercera persona y fallback usan un modelo 3D de tres placas ortogonales equivalente a la geometría vanilla de la bullet; ground/fixed también pueden conservar la representación 3D.
-4. Referenciar recursos vanilla donde corresponda en vez de redistribuir texturas de Mojang.
-5. Añadir Client GameTest específico y snapshots estables para GUI, primera persona, tercera persona/proyectil cuando el harness lo permita.
-6. Añadir asserts de existencia/resolución del item model; las capturas complementan, no sustituyen, los invariantes.
-7. Revisar escala, orientación y legibilidad contra Wind/Fire Charge y contra la bullet en vuelo. Ajustes visuales reinician snapshots S04.
+Run #626 (`34881091571`), HEAD `f21985c7b20319dedea874f5a8d8339eb03dbe42`, gate completo verde. Artefacto `clinging-reoriented-build` id `10363342754`, digest `sha256:17cdedbf85446efbfc0bab2c84b1999395c8f58c99dbc82bf5035c384c469ed2`.
 
-## Adversarial previo
+Snapshots default validados a 854×480:
+- `shulker-charge-inventory-icon`: GUI 2D.
+- `shulker-charge-first-person-held`: contexto primera persona.
+- `shulker-charge-third-person-held`: contexto tercera persona.
+- `shulker-charge-projectile-renderer`: renderer vanilla de la bullet lanzada.
+- `shulker-charge-fixed-3d`: evidencia aislada del fallback 3D mediante ItemFrame invisible.
 
-- GUI no debe heredar el modelo 3D por fallback accidental.
-- Mano izquierda/derecha no debe invertir una geometría asimétrica de forma rota.
-- Primera persona no debe tapar el centro de pantalla de forma absurda.
-- La bullet lanzada debe seguir usando su renderer vanilla, no el item model.
-- Resource reload no debe producir missing model/texture.
-- First Person/FA no deben alterar el item model de forma incompatible.
+La revisión manual detectó que las capturas en mano no aíslan bien el objeto porque la skin/brazo del jugador ocupa gran parte del encuadre. Se clasificó como **gap de evidencia**, no como fallo del asset. Se añadió por ello el snapshot `FIXED`, sin modificar el arte ni el modelo definitivo. El snapshot aislado confirma que el fallback 3D resuelve y renderiza; también permanece estable bajo Fresh Animations. El validador exige además que sea byte-distinto del icono GUI y del renderer de proyectil.
 
-Gate: client lane + snapshots S04 coherentes y CI completa verde.
+## Compatibilidad validada
+
+- Cliente base.
+- First Person 2.7.2 + Not Enough Animations 1.12.4.
+- Scale Brews beta.5 client load.
+- Fresh Animations 1.10.5 + Player Extension 1.1 + EMF 3.3.5 + ETF 7.2.
+
+## Gate
+
+- [x] GUI no hereda por accidente el fallback 3D.
+- [x] Fallback 3D carga sin missing model/texture.
+- [x] Primera/tercera persona resuelven sin romper el cliente.
+- [x] La bullet lanzada conserva el renderer vanilla.
+- [x] Evidencia 3D aislada y revisada manualmente.
+- [x] Lanes First Person, Scale Brews y Fresh Animations verdes.
+- [x] CI completa + validador de snapshots verdes.
+
+Cualquier cambio posterior de arte/modelo reabre únicamente el gate visual correspondiente; el cierre actual no autoriza modificaciones cosméticas automáticas.
