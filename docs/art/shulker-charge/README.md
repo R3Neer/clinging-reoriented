@@ -15,9 +15,9 @@ The icon was checked at 16x16 with binary alpha, one connected silhouette and ne
 
 ## Approved 3D held model
 
-The integrated held/ground presentation is project-authored geometry derived from the same orthogonal shulker-projectile language, while GUI contexts keep the dedicated 2D icon. The final runtime model references `minecraft:entity/shulker/spark` for its texture instead of copying that Mojang asset into this repository.
+The integrated held/ground presentation is project-authored geometry derived from the same orthogonal shulker-projectile language, while GUI contexts keep the dedicated 2D icon. The definitive runtime model uses the project-owned texture `clinging_reoriented:item/shulker_charge`; it does not sample or redistribute Minecraft's shulker spark texture.
 
-Minecraft's ShulkerBullet model/texture and other vanilla references remain third-party runtime material and are not redistributed. See `THIRD_PARTY_NOTICES.md`.
+The launched projectile remains the exact vanilla `minecraft:shulker_bullet`, so Minecraft's own renderer/model/texture are naturally used for that entity at runtime and remain Mojang material. No vanilla reference image or texture is copied into this repository. See `THIRD_PARTY_NOTICES.md`.
 
 ## Integration status
 
