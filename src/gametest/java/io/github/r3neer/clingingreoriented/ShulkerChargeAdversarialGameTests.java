@@ -7,6 +7,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.projectile.ShulkerBullet;
 import net.minecraft.world.entity.projectile.arrow.Arrow;
@@ -87,7 +88,7 @@ public final class ShulkerChargeAdversarialGameTests {
         h.assertTrue(duck.clinging$targetEntity()==null&&duck.clinging$targetBlock()==null,"late-target fixture must begin in free flight");
         final LivingEntity[] cow={null};
         h.startSequence()
-            .thenExecuteAfter(2,()->{cow[0]=h.spawn(EntityTypes.COW,new BlockPos(18,8,8));cow[0].setNoAi(true);cow[0].setNoGravity(true);})
+            .thenExecuteAfter(2,()->{cow[0]=h.spawn(EntityTypes.COW,new BlockPos(18,8,8));if(cow[0] instanceof Mob mob)mob.setNoAi(true);cow[0].setNoGravity(true);})
             .thenWaitUntil(()->h.assertTrue(duck.clinging$targetEntity()==cow[0],"periodic reacquisition must discover a target that appears after launch; tick="+bullet.tickCount+" target="+duck.clinging$targetEntity()))
             .thenSucceed();
     }
