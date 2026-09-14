@@ -1,8 +1,8 @@
 # Validation
 
-## 0.1.0-alpha.15 Shulker Charge release-candidate validation — 2026-09-14
+## 0.1.0-alpha.16 Shulker Charge release-candidate validation — 2026-09-14
 
-Alpha.15 layers Shulker Charge plus the pet breadcrumb-pursuit fix onto the already published alpha.14 Gravity Fall baseline. The Shulker campaign was developed on `feature/shulker-charge` with temporary SPEC/PLAN/WORKFLOW authority through S05, then synchronized with current `main` before the adversarial gate was allowed to close.
+Alpha.16 layers Shulker Charge onto the already published **0.1.0-alpha.15 pet gravity-breadcrumb pursuit** release, which itself builds on alpha.14's Gravity Fall control/compatibility baseline. The Shulker campaign was developed on `feature/shulker-charge` with temporary SPEC/PLAN/WORKFLOW authority through S05, then synchronized with the moving `main` before the adversarial gate was allowed to close.
 
 ### Shulker Charge invariants
 
@@ -29,12 +29,12 @@ The first S05 failure in run **#701** occurred only in the optional Scale Brews 
 
 Run **#706** then failed before compilation because Modrinth returned HTTP 503 while resolving multiple required dependencies. That failure was classified as **environment**, not implementation/test, and did not trigger code changes.
 
-Run **#710** (`34895769482`) passed the full matrix before the branch was synchronized with current `main`.
+Run **#710** (`34895769482`) passed the full matrix before the branch was synchronized with the then-current `main`.
 
-After merging the published alpha.14 baseline and subsequent pet breadcrumb-pursuit fix into the feature branch, run **#714** (`34897063938`) passed the complete post-merge gate on commit `a16d16faaa2cbd3c4b51678f08310ebc9a8bf681`:
+After merging the alpha.14 baseline and the pet breadcrumb-pursuit implementation into the feature branch, run **#714** (`34897063938`) passed the complete post-merge S05 gate on commit `a16d16faaa2cbd3c4b51678f08310ebc9a8bf681`:
 
 - Gradle build and JUnit;
-- required server GameTests, including the Shulker adversarial holdouts;
+- **121/121 required server GameTests**, including the Shulker adversarial holdouts;
 - default client GameTests;
 - First Person 2.7.2 + Not Enough Animations 1.12.4;
 - Scale Brews beta.5 isolated server and client lanes;
@@ -42,17 +42,24 @@ After merging the published alpha.14 baseline and subsequent pet breadcrumb-purs
 - semantic screenshot validation;
 - artifact/log/report retention.
 
-That post-merge run is the S05 no-change gate. The release-prep/canonicalization commit must itself pass the same matrix before integration, and `main` must then pass it again.
+The exact #714 artifact was `10369304504`, digest `sha256:f0220df2edb45d076302d9849c10e05e662aacd6319d92135720d68e9a0f3869`. Manual review of its five Shulker Charge checkpoints confirmed the project-owned GUI icon and 3D item presentation without missing textures, coherent first-/third-person presentation, and the unchanged vanilla renderer for the launched ShulkerBullet.
+
+That post-merge run is the functional S05 no-change gate. The later publication of pet pursuit as alpha.15 changes only Shulker Charge's release number to alpha.16; the final alpha.16 release-prep tree must still pass the full matrix on the current combined history, and `main` must repeat it after integration.
 
 ### Asset provenance
 
 The Shulker Charge 16x16 GUI icon, item texture and project-authored 3D item geometry are original GPL-3.0-or-later project assets. Editable icon source remains under `docs/art/shulker-charge/`. The launched Charge remains the exact vanilla ShulkerBullet entity, so Minecraft's own projectile renderer/model/texture are used at runtime for that entity and are not redistributed by this project.
 
-## Unreleased pet breadcrumb pursuit — local validation 2026-09-14
+## 0.1.0-alpha.15 pet gravity-breadcrumb pursuit — 2026-09-14
 
-The rebased alpha.14 tree passed locally on Java 25 and Minecraft 26.2: **75/75 JUnit tests** and **95/95 required server GameTests**. New coverage exercises all six movement-plane projections, the vanilla close-distance dead zone, real scheduled wolf traversal to an airborne breadcrumb, bounded arrival, center-aligned grounded replay, ballistic goal release, Gravity Changer navigation replacement, ordered-queue preservation, sitting pause/resume, effect-free behavior and external teleport invalidation.
+Before release, the rebased pet-pursuit tree passed locally on Java 25 and Minecraft 26.2: **75/75 JUnit tests** and **95/95 required server GameTests**. New coverage exercises all six movement-plane projections, the vanilla close-distance dead zone, real scheduled wolf traversal to an airborne breadcrumb, bounded arrival, center-aligned grounded replay, ballistic goal release, Gravity Changer navigation replacement, ordered-queue preservation, sitting pause/resume, effect-free behavior and external teleport invalidation.
 
-This evidence validates deterministic server logic and integration in the GameTest environment. It does not replace live multiplayer/gameplay observation of a naturally equipped pet following a player through several gravity changes.
+The prerelease was then published as **v0.1.0-alpha.15** from target commit `fe74b979179065afa505baa4b2ece75bebc9f4d2` after successful `main` CI run **#720** (`34897652131`). The exact-artifact publisher recorded:
+
+- regular JAR SHA-256: `dc3e2172e441df46202ef45856f1b7af62a6f6f98a65a65d4254bb04ce409e51`;
+- sources JAR SHA-256: `29eae01135e963941ac4590a933b71f45d6e23d1f2ee60ba9eb0ba7773b26b8e`.
+
+That release contains the pet pursuit work only; Shulker Charge follows as alpha.16.
 
 ## 0.1.0-alpha.14 release-candidate validation — 2026-09-14
 
@@ -123,13 +130,13 @@ Every release-gating run executes:
 - semantic screenshot validation;
 - artifact retention for JARs, logs, XML, reports and screenshots.
 
-CI preserves default, First Person and Fresh Animations screenshot sets. Alpha.15 extends the default set with Shulker Charge inventory/held/projectile/fixed-3D checkpoints while retaining the alpha.14 camera/body evidence.
+CI preserves default, First Person and Fresh Animations screenshot sets. Alpha.16 extends the default set with Shulker Charge inventory/held/projectile/fixed-3D checkpoints while retaining the alpha.14 camera/body evidence.
 
 ## Packaging gate
 
 A prerelease is published only from the **exact `main` commit whose complete `Build and test` run succeeded**. The release automation downloads the regular and sources JARs from that exact workflow artifact, records SHA-256 digests in the release notes and creates the prerelease tag against that commit. It never performs a second release build.
 
-Production output must not contain GameTest classes, dependency JARs, temporary planning files or raw validation logs. Temporary Shulker Charge SPEC/PLAN/WORKFLOW documents are removed from the release tree during S06 canonization.
+Production output must not contain GameTest classes, dependency JARs, temporary planning files or raw validation logs. Temporary Shulker Charge SPEC/PLAN/WORKFLOW documents were removed from the release tree during S06 canonization.
 
 ## Manual QA still required
 
