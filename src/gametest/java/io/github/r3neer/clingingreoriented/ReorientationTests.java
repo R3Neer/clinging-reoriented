@@ -106,12 +106,15 @@ public final class ReorientationTests {
         var brewing=h.getLevel().potionBrewing();
         for(boolean extended:new boolean[]{false,true})for(var bottle:new Item[]{Items.POTION,Items.SPLASH_POTION,Items.LINGERING_POTION}) {
             var base=BuiltInRegistries.POTION.get(Identifier.parse(extended?"alexsmobs:long_clinging":"alexsmobs:clinging")).orElseThrow();
-            var result=brewing.mix(new ItemStack(Items.SHULKER_SHELL),PotionContents.createItemStack(bottle,base));
+            var baseStack=PotionContents.createItemStack(bottle,base);
+            var result=brewing.mix(new ItemStack(ShulkerCharges.ITEM),baseStack);
             var potion=result.get(DataComponents.POTION_CONTENTS).potion().orElseThrow();
-            h.assertTrue(potion.equals(extended?Reorientation.LONG_POTION:Reorientation.POTION),"shell recipe retains duration and bottle");
+            h.assertTrue(potion.equals(extended?Reorientation.LONG_POTION:Reorientation.POTION),"Shulker Charge recipe retains duration and bottle");
             h.assertTrue(result.is(bottle),"bottle unchanged");
             h.assertTrue(potion.value().getEffects().size()==1 && potion.value().getEffects().getFirst().getEffect().equals(Reorientation.EFFECT),"single infusible effect");
             h.assertTrue(potion.value().getEffects().getFirst().getDuration()==(extended?9600:3600),"duration");
+            var obsolete=brewing.mix(new ItemStack(Items.SHULKER_SHELL),baseStack.copy());
+            h.assertTrue(obsolete.get(DataComponents.POTION_CONTENTS).potion().orElseThrow().equals(base),"Shulker Shell no longer brews Reorientation");
         }
         var normal=PotionContents.createItemStack(Items.POTION,Reorientation.POTION);
         var longer=brewing.mix(new ItemStack(Items.REDSTONE),normal);

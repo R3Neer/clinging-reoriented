@@ -23,9 +23,10 @@ public final class Reorientation {
             new Potion("clinging_reoriented.reorientation",new MobEffectInstance(EFFECT,ticks)));
     }
     public static void initialize() {
+        ShulkerCharges.initialize();
         FabricPotionBrewingBuilder.BUILD.register(builder -> {
-            builder.addMix(BuiltInRegistries.POTION.get(Identifier.parse("alexsmobs:clinging")).orElseThrow(),Items.SHULKER_SHELL,POTION);
-            builder.addMix(BuiltInRegistries.POTION.get(Identifier.parse("alexsmobs:long_clinging")).orElseThrow(),Items.SHULKER_SHELL,LONG_POTION);
+            builder.addMix(BuiltInRegistries.POTION.get(Identifier.parse("alexsmobs:clinging")).orElseThrow(),ShulkerCharges.ITEM,POTION);
+            builder.addMix(BuiltInRegistries.POTION.get(Identifier.parse("alexsmobs:long_clinging")).orElseThrow(),ShulkerCharges.ITEM,LONG_POTION);
             builder.addMix(POTION,Items.REDSTONE,LONG_POTION);
         });
     }
