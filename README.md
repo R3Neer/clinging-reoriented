@@ -53,7 +53,7 @@ The API intentionally contains no Scale Brews types. A concrete Scale-specific a
 
 ## Mounts and pets
 
-Mounted Reorientation still turns a compatible airborne living root and its passenger hierarchy atomically. Pet replay still follows bounded owner breadcrumbs when the pet has its own compatible effect. Non-player entities keep Clinging's owned **180/240 ms tracked snap** presentation; the 500 ms landing manoeuvre and full-sphere camera are local-player Gravity Fall rules, not generic mob camera concepts.
+Mounted Reorientation still turns a compatible airborne living root and its passenger hierarchy atomically. A pet with its own compatible effect pursues each bounded owner breadcrumb on its current gravity-relative movement plane, replays the turn there, falls under physics and resumes route pursuit after finding support in the new frame. Non-player entities keep Clinging's owned **180/240 ms tracked snap** presentation; the 500 ms landing manoeuvre and full-sphere camera are local-player Gravity Fall rules, not generic mob camera concepts.
 
 Tracked transitions are fenced by entity UUID plus monotonic sequence and continue advancing while off-screen. Foreign Gravity Changer writes remain foreign and retain upstream presentation ownership.
 
