@@ -54,6 +54,13 @@ public final class PlayerData {
     public double gravityFallLandingEtaTicks;
     public long gravityFallSequence;
 
+    // Aerodynamic steering is transient input/presentation state. The client supplies only a
+    // normalized world look vector; the server derives body pose and can only add drag, never thrust.
+    public Vec3 gravityFallLook;
+    public long gravityFallLookSequence=-1L;
+    public long gravityFallLookTick=Long.MIN_VALUE;
+    public BodyOrientation.State gravityFallAeroBody;
+
     // Safety leash for high-speed free flight. It deliberately survives ordinary support unbinds
     // and gravity turns; only an actual context/lifecycle transfer should discard the safe anchor.
     public Vec3 flightSafePosition;
@@ -65,7 +72,10 @@ public final class PlayerData {
         supportHistory.clear();supportSampleSequence=0;lastConsumedSupportSample=-1;pendingMove=null;
     }
     public void clearLandingCommit(){landingCommitted=false;landingContact=null;landingKind=null;landingEtaTicks=0.0D;landingDeadlineTick=0L;}
-    public void clearGravityFall(){gravityFallActive=false;gravityFallLanding=false;gravityFallLandingGravity=Direction.DOWN;gravityFallLandingEtaTicks=0.0D;}
+    public void clearGravityFall(){
+        gravityFallActive=false;gravityFallLanding=false;gravityFallLandingGravity=Direction.DOWN;gravityFallLandingEtaTicks=0.0D;
+        gravityFallLook=null;gravityFallLookSequence=-1L;gravityFallLookTick=Long.MIN_VALUE;gravityFallAeroBody=null;
+    }
     public void clearFlightSafetyHold(){flightSafetyHolding=false;flightHeldVelocity=Vec3.ZERO;}
     public void clearFlightSafety(){flightSafePosition=null;clearFlightSafetyHold();}
     public interface Holder { PlayerData clinging$data(); }
