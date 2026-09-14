@@ -14,8 +14,8 @@ public final class LandingState {
         var state=ClingingReoriented.data(player);
         Direction gravity=GravityDirectionUtil.getGravityDirection(player);
         if(!eligibleContext(player)){
-            // Elytra/water/vehicle/death/etc. own the next presentation. Unlike an invalidated
-            // landing surface, there is no Clinging frame to preserve after this boundary.
+            // Fluids/Elytra/vehicles/death/etc. own the next presentation. Unlike an invalidated
+            // solid landing surface, there is no Clinging landing frame to preserve here.
             transferClear(player);return;
         }
         if(AirChanges.grounded(player)){
@@ -42,14 +42,14 @@ public final class LandingState {
 
         GravityTransition.TurnKind kind=kindFor(state,gravity);
         if(kind==null||predicted.isEmpty())return;
-        int neededTicks=kind==GravityTransition.TurnKind.HALF?5:4;
-        if(predicted.get().etaTicks()<=neededTicks+1.0E-6D)commit(player,predicted.get(),kind);
+        if(predicted.get().etaTicks()<=LandingTiming.PRESENTATION_TICKS+1.0E-6D)commit(player,predicted.get(),kind);
     }
 
     /** Input-side check closes the one-tick gap between real touchdown and END_SERVER_TICK. */
     public static boolean committed(ServerPlayer player){
         var state=ClingingReoriented.data(player);
         if(!state.landingCommitted)return false;
+        if(!eligibleContext(player)){transferClear(player);return false;}
         Direction gravity=GravityDirectionUtil.getGravityDirection(player);
         if(AirChanges.grounded(player)){touchdown(player,gravity);return false;}
         return true;
@@ -69,8 +69,8 @@ public final class LandingState {
     }
 
     /**
-     * Ownership/teleport teardown while the connection remains alive. Release every retained
-     * Clinging camera/landing presentation before another subsystem or spatial context takes over.
+     * Ownership/teleport/fluid teardown while the connection remains alive. Release every retained
+     * Clinging camera/landing presentation before another subsystem or interaction context takes over.
      */
     public static void transferClear(ServerPlayer player){
         var state=ClingingReoriented.data(player);
@@ -105,6 +105,7 @@ public final class LandingState {
     private static boolean same(LandingSurfaces.Contact a,LandingSurfaces.Contact b){return a!=null&&b!=null&&a.gravity()==b.gravity()&&a.key().equals(b.key());}
 
     private static boolean eligibleContext(ServerPlayer player){
-        return player.isAlive()&&!player.isSpectator()&&!player.isSleeping()&&!player.isPassenger()&&!player.isFallFlying()&&!player.isInWater()&&!player.isInLava()&&!player.getAbilities().flying;
+        return player.isAlive()&&!player.isSpectator()&&!player.isSleeping()&&!player.isPassenger()
+            &&!player.isFallFlying()&&!FluidContext.intersects(player)&&!player.getAbilities().flying;
     }
 }

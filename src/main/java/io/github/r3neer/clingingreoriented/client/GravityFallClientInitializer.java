@@ -10,7 +10,15 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 public final class GravityFallClientInitializer implements ClientModInitializer {
     @Override public void onInitializeClient(){
         ClientPlayNetworking.registerGlobalReceiver(GravityFallSync.Visual.TYPE,(packet,context)->GravityFallVisuals.receive(context.client(),packet));
-        ClientTickEvents.END_CLIENT_TICK.register(GravityFallVisuals::tick);
-        ClientPlayConnectionEvents.DISCONNECT.register((handler,client)->GravityFallVisuals.clear());
+        ClientTickEvents.END_CLIENT_TICK.register(client->{
+            GravityFallVisuals.tick(client);
+            GravityFallLookState.tick(client);
+            GravityFallAirSound.tick(client);
+        });
+        ClientPlayConnectionEvents.DISCONNECT.register((handler,client)->{
+            GravityFallLookState.clear();
+            GravityFallAirSound.clear();
+            GravityFallVisuals.clear();
+        });
     }
 }

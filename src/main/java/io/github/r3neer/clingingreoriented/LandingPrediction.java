@@ -12,14 +12,14 @@ import net.minecraft.world.phys.Vec3;
 
 /** Short-horizon, recomputed-every-tick landing forecast. It predicts no more than one visual snap window. */
 public final class LandingPrediction {
-    public static final int MAX_TICKS=5;
+    public static final int MAX_TICKS=LandingTiming.PRESENTATION_TICKS;
     private static final double AIR_HORIZONTAL_DRAG=.91D;
     private static final double AIR_VERTICAL_DRAG=.98D;
     public record Candidate(LandingSurfaces.Contact contact,Direction gravity,double etaTicks) {}
     private LandingPrediction() {}
 
     public static Optional<Candidate> predict(LivingEntity entity,int horizon){
-        if(entity==null||horizon<1||horizon>MAX_TICKS||entity.isPassenger()||entity.isFallFlying()||entity.isInWater()||entity.isInLava())return Optional.empty();
+        if(entity==null||horizon<1||horizon>MAX_TICKS||entity.isPassenger()||entity.isFallFlying()||FluidContext.intersects(entity))return Optional.empty();
         Direction gravity=GravityDirectionUtil.getGravityDirection(entity);
         Vec3 velocity=entity.getDeltaMovement();
         if(!ImpactPhysics.finite(velocity))return Optional.empty();

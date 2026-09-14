@@ -69,6 +69,6 @@ public final class GravityFallState {
 
     private static boolean eligible(ServerPlayer player){
         return player!=null && player.isAlive() && !player.isSpectator() && !player.isSleeping() && !player.isPassenger()
-            && !player.isFallFlying() && !player.isInWater() && !player.isInLava() && !player.getAbilities().flying;
+            && !player.isFallFlying() && !FluidContext.intersects(player) && !player.getAbilities().flying;
     }
 }

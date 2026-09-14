@@ -11,6 +11,9 @@
       "io.github.r3neer.clingingreoriented.AnimalGravityTests",
       "io.github.r3neer.clingingreoriented.HardeningAdversarialTests",
       "io.github.r3neer.clingingreoriented.WaterClingingGameTests",
+      "io.github.r3neer.clingingreoriented.ClimbableGravityGameTests",
+      "io.github.r3neer.clingingreoriented.FluidContextGameTests",
+      "io.github.r3neer.clingingreoriented.DirectionalMaceGameTests",
       "io.github.r3neer.clingingreoriented.EntitySnapGameTests",
       "io.github.r3neer.clingingreoriented.GravityInputGameTests",
       "io.github.r3neer.clingingreoriented.GravityPolishGameTests",
@@ -31,6 +34,7 @@
       "io.github.r3neer.clingingreoriented.WaterClientGameTest",
       "io.github.r3neer.clingingreoriented.EntitySnapClientGameTest",
       "io.github.r3neer.clingingreoriented.GravityFallClientGameTest",
+      "io.github.r3neer.clingingreoriented.GravityFallFullSphereClientGameTest",
       "io.github.r3neer.clingingreoriented.GameFeelAdversarialClientGameTest",
       "io.github.r3neer.clingingreoriented.ShulkerChargeClientGameTest"
     ]

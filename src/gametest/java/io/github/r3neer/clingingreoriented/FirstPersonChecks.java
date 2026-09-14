@@ -79,8 +79,20 @@ public final class FirstPersonChecks {
         context.runOnClient(mc->{
             var player=mc.player;
             GravityFallVisuals.clear();VisualTransitions.clear();
+            ClingingReoriented.data(player).visualFrameOwned=false;
             GravityDirectionUtil.setGravityDirection(player,Direction.DOWN);
             player.setPose(Pose.STANDING);player.setDeltaMovement(new Vec3(.25,0,0));
+            player.setYRot(0.0F);player.yRotO=0.0F;player.setXRot(75.0F);player.xRotO=75.0F;
+        });
+        context.waitTicks(1);
+        context.takeScreenshot("firstperson-baseline-lookdown-75");
+        context.runOnClient(mc->{mc.player.setXRot(89.0F);mc.player.xRotO=89.0F;});
+        context.waitTicks(1);
+        context.takeScreenshot("firstperson-baseline-lookdown-89");
+        context.runOnClient(mc->{mc.player.setXRot(0.0F);mc.player.xRotO=0.0F;});
+        context.waitTicks(1);
+        context.runOnClient(mc->{
+            var player=mc.player;
             cameraBefore.set(cameraForward(mc));
             GravityFallVisuals.receive(mc,new GravityFallSync.Visual(
                 player.getId(),player.getUUID(),GravityFallSync.Phase.START.ordinal(),-1,0.0F,50_001L));
@@ -103,6 +115,22 @@ public final class FirstPersonChecks {
         });
         context.takeScreenshot("firstperson-gravity-fall-root");
 
+        for(float pitch : new float[]{30.0F,45.0F,60.0F,75.0F,89.0F}){
+            final float lookPitch=pitch;
+            context.runOnClient(mc->{
+                var player=mc.player;
+                player.setXRot(lookPitch);player.xRotO=lookPitch;
+                if(!GravityFallVisuals.active(player))throw new AssertionError("Gravity Fall root vanished during look-down reproduction at pitch="+lookPitch);
+                Vec3 bodyUp=BodyOrientation.bodyUp(GravityFallVisuals.body(player,0.0F));
+                if(bodyUp.distanceTo(new Vec3(1,0,0))>3.0E-3D)
+                    throw new AssertionError("Body frame changed while only camera pitch changed at pitch="+lookPitch+": "+bodyUp);
+            });
+            context.waitTicks(2);
+            context.takeScreenshot("firstperson-gravity-fall-lookdown-"+(int)pitch);
+        }
+
+        context.runOnClient(mc->{mc.player.setXRot(0.0F);mc.player.xRotO=0.0F;});
+        context.waitTicks(1);
         context.runOnClient(mc->{
             GravityFallVisuals.receive(mc,new GravityFallSync.Visual(
                 mc.player.getId(),mc.player.getUUID(),GravityFallSync.Phase.LAND.ordinal(),Direction.DOWN.get3DDataValue(),4.0F,50_002L));
@@ -118,6 +146,10 @@ public final class FirstPersonChecks {
         });
         context.takeScreenshot("firstperson-gravity-fall-landing");
 
+        context.runOnClient(mc->{mc.player.setXRot(75.0F);mc.player.xRotO=75.0F;});
+        context.waitTicks(1);
+        context.takeScreenshot("firstperson-gravity-fall-landing-lookdown-75");
+
         context.runOnClient(mc->{
             GravityFallVisuals.receive(mc,new GravityFallSync.Visual(
                 mc.player.getId(),mc.player.getUUID(),GravityFallSync.Phase.RESET.ordinal(),-1,0.0F,50_003L));
@@ -125,6 +157,7 @@ public final class FirstPersonChecks {
             ClingingReoriented.data(mc.player).visualFrameOwned=false;
             VisualTransitions.clear();
             mc.player.setDeltaMovement(Vec3.ZERO);
+            mc.player.setXRot(0.0F);mc.player.xRotO=0.0F;
         });
     }
 

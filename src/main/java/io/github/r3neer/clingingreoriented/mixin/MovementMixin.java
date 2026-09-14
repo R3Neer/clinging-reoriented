@@ -20,9 +20,6 @@ public abstract class MovementMixin {
     @Inject(method="move",at=@At("TAIL"))
     private void clinging$contact(MoverType type,Vec3 delta,CallbackInfo ci){
         Entity self=(Entity)(Object)this;
-        // checkFallDamage is gravity-relative and may not run for an impact whose normal no
-        // longer matches current gravity after a late turn. Finalize the world-space sample
-        // first; its sequence fence makes this free when the normal hook already handled it.
         if(self instanceof LivingEntity living){ImpactDamage.afterMove(living);ImpactState.endMove(living);}
         if(self instanceof Player p)MovingSurface.afterMove(p);
     }
@@ -32,12 +29,21 @@ public abstract class MovementMixin {
     }
     @Inject(method="teleportTo(DDD)V",at=@At("HEAD"))
     private void clinging$teleport(double x,double y,double z,CallbackInfo ci){
-        Entity self=(Entity)(Object)this;MovingSurface.teleported(self);if(self instanceof LivingEntity living)ImpactState.clear(living);
+        Entity self=(Entity)(Object)this;
+        MovingSurface.teleported(self);
+        if(self instanceof LivingEntity living)ImpactState.clear(living);
+        if(self instanceof Player player){
+            var state=ClingingReoriented.data(player);
+            state.clearFlightSafety();state.clearMaceFall();
+        }
     }
     @Inject(method="teleport",at=@At("HEAD"))
     private void clinging$dimension(TeleportTransition transition,CallbackInfoReturnable<Entity> cir){
         Entity self=(Entity)(Object)this;MovingSurface.teleported(self);if(self instanceof LivingEntity living)ImpactState.clear(living);
-        if((Object)this instanceof Player p){var s=ClingingReoriented.data(p);s.retirementPending=false;s.nextRetirementAttempt=0;}
+        if((Object)this instanceof Player p){
+            var s=ClingingReoriented.data(p);
+            s.retirementPending=false;s.nextRetirementAttempt=0;s.clearFlightSafety();s.clearMaceFall();
+        }
     }
     @Inject(method="canCollideWith",at=@At("HEAD"),cancellable=true)
     private void clinging$pair(Entity other,CallbackInfoReturnable<Boolean> cir){
