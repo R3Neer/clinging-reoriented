@@ -15,12 +15,14 @@
   "entrypoints": {
     "main": [
       "io.github.r3neer.clingingreoriented.ClingingReoriented",
+      "io.github.r3neer.clingingreoriented.GravityFallAerodynamicsInitializer",
       "io.github.r3neer.clingingreoriented.FlightSafetyInitializer",
       "io.github.r3neer.clingingreoriented.GravityFallInitializer"
     ],
     "client": [
       "io.github.r3neer.clingingreoriented.client.ClingingClient",
-      "io.github.r3neer.clingingreoriented.client.GravityFallClientInitializer"
+      "io.github.r3neer.clingingreoriented.client.GravityFallClientInitializer",
+      "io.github.r3neer.clingingreoriented.client.GravityFallAerodynamicsClientInitializer"
     ]
   },
   "mixins": ["clinging_reoriented.mixins.json"],
