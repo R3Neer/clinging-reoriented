@@ -133,4 +133,54 @@ public final class ShulkerChargeAdversarialGameTests {
         h.assertTrue(chargeDrops(level,secondAt,4)==1,"foreign melee then owner arrow must produce exactly one Charge drop");
         h.succeed();
     }
+
+    @GameTest(padding=48)
+    public void simultaneousChargesKeepIndependentLocksAndReacquisition(GameTestHelper h){
+        clear(h,4,5,4,26,14,26);
+        var cow=h.spawn(EntityTypes.COW,new BlockPos(20,8,7));cow.setNoAi(true);cow.setNoGravity(true);
+        var pig=h.spawn(EntityTypes.PIG,new BlockPos(8,8,20));pig.setNoAi(true);pig.setNoGravity(true);
+        var east=launched(h,new Vec3(7.5,8.8,7.5),new Vec3(1,0,0));
+        var south=launched(h,new Vec3(8.5,8.8,7.5),new Vec3(0,0,1));
+        var eastDuck=(ShulkerChargeProjectile)(Object)east;
+        var southDuck=(ShulkerChargeProjectile)(Object)south;
+        Vec3 eastIntent=eastDuck.clinging$intent(),southIntent=southDuck.clinging$intent();
+        h.assertTrue(eastDuck.clinging$targetEntity()==cow,"east Charge must own east cow without stealing south target");
+        h.assertTrue(southDuck.clinging$targetEntity()==pig,"south Charge must own south pig without stealing east target");
+
+        cow.discard();
+        var sheep=h.spawn(EntityTypes.SHEEP,new BlockPos(17,8,7));sheep.setNoAi(true);sheep.setNoGravity(true);
+        eastDuck.clinging$forceAcquire();
+        southDuck.clinging$forceAcquire();
+        h.assertTrue(eastDuck.clinging$targetEntity()==sheep,"invalidated east lock must reacquire only the east replacement");
+        h.assertTrue(southDuck.clinging$targetEntity()==pig,"reacquiring another projectile must not disturb a valid south lock");
+        h.assertTrue(eastDuck.clinging$intent().distanceToSqr(eastIntent)<1.0E-12,"east intent must remain stable across independent reacquisition");
+        h.assertTrue(southDuck.clinging$intent().distanceToSqr(southIntent)<1.0E-12,"south intent must remain stable while another Charge reacquires");
+        h.succeed();
+    }
+
+    @GameTest(maxTicks=50,padding=48)
+    public void targetlessRetryStressKeepsChargesAliveAndIndependent(GameTestHelper h){
+        clear(h,3,6,3,24,34,20);
+        var charges=new java.util.ArrayList<ShulkerBullet>();
+        var starts=new java.util.ArrayList<Double>();
+        for(int i=0;i<12;i++){
+            double x=6+(i%4)*3.0,z=6+(i/4)*3.0,y=10;
+            var bullet=launched(h,new Vec3(x,y,z),new Vec3(0,1,0));
+            var duck=(ShulkerChargeProjectile)(Object)bullet;
+            h.assertTrue(duck.clinging$targetEntity()==null&&duck.clinging$targetBlock()==null,"stress Charge must start targetless; index="+i);
+            charges.add(bullet);starts.add(bullet.getY());
+        }
+        h.startSequence()
+            .thenExecuteAfter(24,()->{
+                for(int i=0;i<charges.size();i++){
+                    var bullet=charges.get(i);var duck=(ShulkerChargeProjectile)(Object)bullet;
+                    h.assertTrue(bullet.isAlive(),"targetless retry stress must not consume Charge "+i+" after multiple reacquisition cycles");
+                    h.assertTrue(bullet.tickCount>=20,"stress Charge must have ticked through multiple 4-tick retry windows; index="+i+" ticks="+bullet.tickCount);
+                    h.assertTrue(duck.clinging$targetEntity()==null&&duck.clinging$targetBlock()==null,"targetless retry cycles must not fabricate a lock; index="+i);
+                    h.assertTrue(duck.clinging$intent().distanceToSqr(new Vec3(0,1,0))<1.0E-12,"retry cycles must preserve original intent; index="+i+" intent="+duck.clinging$intent());
+                    h.assertTrue(bullet.getY()>starts.get(i)+0.25D,"targetless Charge must keep flying instead of stalling during retries; index="+i+" y="+bullet.getY());
+                }
+            })
+            .thenSucceed();
+    }
 }
