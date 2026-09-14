@@ -6,6 +6,8 @@ import org.joml.Vector3f;
 
 /** Pure quaternion/pivot composition used by the avatar root mixin. */
 public final class BodyRenderMath {
+    public static final double FIRST_PERSON_CAMERA_PIVOT_BLEND=0.72D;
+
     private BodyRenderMath() {}
 
     /**
@@ -38,6 +40,18 @@ public final class BodyRenderMath {
         Quaternionf inverse=new Quaternionf(visual).normalize().conjugate();
         Vector3f local=inverse.transform(new Vector3f((float)-translatedX,(float)-translatedY,(float)-translatedZ));
         return new Vec3(local.x,local.y,local.z);
+    }
+
+    /**
+     * Exact camera anchoring removes clipping but also hides almost the entire horizontal avatar.
+     * Blend from the ordinary body-centre pivot toward the true camera pivot: enough camera
+     * authority to keep geometry out of the near plane, while retaining First Person's intended
+     * body presence in the lower frame.
+     */
+    public static Vec3 firstPersonPivot(Vec3 cameraPivot,float bodyHeight){
+        if(cameraPivot==null)return new Vec3(0.0D,bodyCenterPivot(bodyHeight),0.0D);
+        Vec3 centre=new Vec3(0.0D,bodyCenterPivot(bodyHeight),0.0D);
+        return centre.add(cameraPivot.subtract(centre).scale(FIRST_PERSON_CAMERA_PIVOT_BLEND));
     }
 
     /** Test/debug helper mirroring the PoseStack rotation order used by the renderer. */
