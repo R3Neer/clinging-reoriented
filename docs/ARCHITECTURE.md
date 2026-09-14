@@ -1,10 +1,10 @@
 # Architecture
 
-Clinging: Reoriented 0.1.0-alpha.14 separates **physical gravity**, **camera ownership**, **body presentation**, **landing authority**, **aerodynamic steering**, **impact damage** and **interaction context** instead of treating a gravity-direction write as one monolithic event.
+Clinging: Reoriented 0.1.0-alpha.15 separates **physical gravity**, **camera ownership**, **body presentation**, **landing authority**, **aerodynamic steering**, **impact damage**, **interaction context** and the independent **Shulker Charge projectile lifecycle** instead of treating a gravity-direction write as one monolithic event.
 
 ## Authority and design rule
 
-The server owns physical gravity, collision, effect/charge state, landing commitment, aerodynamic velocity changes, safety intervention and damage. A voluntary gravity decision changes acceleration while preserving the current **world-space velocity vector**.
+The server owns physical gravity, collision, effect/charge state, landing commitment, aerodynamic velocity changes, safety intervention, damage and Shulker Charge acquisition/capture state. A voluntary gravity decision changes acceleration while preserving the current **world-space velocity vector**.
 
 Presentation may interpolate that decision but cannot invent position, collision or damage. Gravity Fall air-diving is the one deliberate continuous control layer: it redirects existing momentum within a bounded server-authoritative rule and does not create speed/lift.
 
@@ -37,7 +37,7 @@ Gravity Changer remains the gravity-coordinate authority. Clinging records wheth
 
 Payloads are monotonic and connection/identity fenced. A cancellation caused by invalidated landing support may hold the exact current quaternion; a lifecycle/context transfer releases ownership.
 
-Alpha.14 makes local-player LAND use `LandingTiming.PRESENTATION_NANOS = 500_000_000` while ordinary tracked SNAP retains its shorter turn-kind timing. Camera LAND remains independent from physical gravity, which already changed when requested.
+Local-player LAND uses `LandingTiming.PRESENTATION_NANOS = 500_000_000` while ordinary tracked SNAP retains its shorter turn-kind timing. Camera LAND remains independent from physical gravity, which already changed when requested.
 
 ## Full-sphere Gravity Fall camera
 
@@ -105,6 +105,22 @@ Vanilla/Gravity Changer `fallDistance` is unsuitable for mace smash semantics wh
 
 A direction change/new fall begins a fresh segment. `DirectionalMaceMixin` redirects every relevant 26.2 mace `fallDistance` field read to that geometric value. The mixin handles the actual bytecode owners separately: `LivingEntity` for smash eligibility/damage routines and `Entity` for knockback.
 
+## Shulker Charge lifecycle
+
+`ShulkerCharges` registers one stackable item and gives it vanilla `ProjectileItem` dispenser behaviour. `ShulkerChargeItem` launches a `ShulkerChargeBullet` for both manual and dispenser use. That Java subtype is creation-time plumbing only: its `EntityType` remains the exact vanilla `EntityTypes.SHULKER_BULLET`. Its only override prevents generic dispenser shooting from overwriting the cardinal routing already initialized by the Charge.
+
+All persistent Charge state lives on the common vanilla `ShulkerBullet` through `ShulkerBulletMixin` and the `ShulkerChargeProjectile` duck interface. The state records whether a bullet was launched as a Charge, the normalized original launch intent, optional Target Block lock, reacquisition cadence and the one-drop capture fence. Save/load persists launched state, intent and block target; vanilla already persists its entity target.
+
+Capture is server-authoritative in `hurtServer`. Only melee and `AbstractArrow` damage paths can materialize a Charge, and `clinging$captured` fences mixed/racing interceptors to one item. Normal impact/expiry and unrelated damage do not mint an item.
+
+`ShulkerChargeTargeting` owns **selection only**, never movement. Acquisition is bounded to 32 blocks and a 15-degree cone. The central ray gives a directly hit Target Block absolute priority. Living entities require initial line of sight; assisted entities/blocks are ranked by angular error then squared distance. A valid lock is never replaced merely because another candidate later scores better.
+
+When a locked target becomes invalid, `ShulkerBulletMixin` clears only that lock and retries from the Charge's **current position** while reusing the original intent, normally after the four-tick reacquisition interval. With no target it enters cardinal free flight. Entity targets reuse vanilla `selectNextMoveDirection`; Target Blocks use a small orthogonal router that follows the same cardinal shulker language and lets the final projectile collision activate the real block. Continuous curved homing is deliberately absent.
+
+Because the runtime type is vanilla `SHULKER_BULLET`, vanilla projectile hit/levitation behaviour and shulker duplication continue to see the expected entity type. There is no separate custom projectile type to bridge back into those mechanics.
+
+`Reorientation.initialize` makes Shulker Charge the Clinging -> Reorientation ingredient for both normal and long Clinging; redstone extends normal Reorientation. The old Shulker Shell recipe is not registered.
+
 ## Gravity ownership and lifecycle
 
 `PlayerData` separates physical ownership, visual frame, airborne/landing state, Gravity Fall epoch/look/aero state, mace fall segment and safety frontier state. Teleports/transfers clear transient spatial state before context changes. Respawn/replacement preserves monotonic epochs without migrating obsolete entity-instance animation.
@@ -123,9 +139,11 @@ Production code does not compile against Scale Brews. Scale compatibility remain
 
 First Person is mixin-gated. Fresh Animations/FA Player Extension/EMF/ETF are pinned optional test fixtures. Clinging owns only the macro transform around their animation.
 
+Shulker Charge adds no new runtime dependency. Its 2D asset is original project artwork; the 3D item model references Minecraft's shulker spark texture at runtime without redistributing that texture.
+
 ## State summary
 
-The major conceptual states are:
+The major gravity states are:
 
 1. `GROUNDED`: real gravity-relative support outside fluid context;
 2. `AIRBORNE`: gravity can change while the camera frame remains retained;
@@ -133,4 +151,4 @@ The major conceptual states are:
 4. `LANDING_COMMITTED`: 500 ms camera/body landing presentation with voluntary gravity input blocked;
 5. context transfer: fluid/Elytra/vehicle/teleport/lifecycle/foreign ownership releases incompatible presentation.
 
-These states remain orthogonal to effect acquisition, mount loans, pet breadcrumbs and external gravity ownership.
+These states remain orthogonal to effect acquisition, Shulker Charge projectile state, mount loans, pet breadcrumbs and external gravity ownership.

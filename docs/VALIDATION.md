@@ -1,8 +1,56 @@
 # Validation
 
+## 0.1.0-alpha.15 Shulker Charge release-candidate validation — 2026-09-14
+
+Alpha.15 layers Shulker Charge plus the pet breadcrumb-pursuit fix onto the already published alpha.14 Gravity Fall baseline. The Shulker campaign was developed on `feature/shulker-charge` with temporary SPEC/PLAN/WORKFLOW authority through S05, then synchronized with current `main` before the adversarial gate was allowed to close.
+
+### Shulker Charge invariants
+
+Automated coverage verifies the stable feature contract:
+
+- melee and arrow interception, including dispenser arrows, can materialize exactly one Charge;
+- mixed arrow/melee races cannot duplicate the drop;
+- shield/ordinary impact/expiry paths do not mint Charges;
+- player and real dispenser launch use the same exact vanilla `SHULKER_BULLET` entity type and consume one item;
+- direct-ray Target Blocks win acquisition; assisted entities/blocks remain bounded by the 32-block / 15-degree selection contract;
+- initial living-target acquisition requires line of sight;
+- a valid lock is sticky and is not replaced by a later better candidate;
+- invalid/dead/removed/dimension-transferred targets are cleared and reacquired from the Charge's current position while preserving original intent;
+- targetless Charges continue cardinal free flight and retry instead of freezing or inventing curved homing;
+- concurrent Charges keep independent target/retry/capture state;
+- Target Block routing ends in a real projectile collision/redstone response;
+- vanilla shulker-duplication semantics remain available because the runtime entity type is not replaced.
+
+Client snapshot validation adds dedicated checkpoints for the inventory icon, first-person held model, third-person held model, projectile renderer and fixed 3D presentation. These coexist with the existing Gravity Fall/First Person/Fresh Animations snapshot matrix.
+
+### Adversarial campaign and failure classification
+
+The first S05 failure in run **#701** occurred only in the optional Scale Brews lane: `freeFlightAutomaticallyAcquiresTargetThatAppearsLater` reached its late checkpoint with a projectile that had only ticked four times. The same freeze signature had already identified an under-simulated GameTest chunk boundary. The fixture was hardened to keep the entire intended 32-block flight corridor plus margin at `ENTITY_TICKING`; production remained unchanged and no Scale-specific branch was introduced.
+
+Run **#706** then failed before compilation because Modrinth returned HTTP 503 while resolving multiple required dependencies. That failure was classified as **environment**, not implementation/test, and did not trigger code changes.
+
+Run **#710** (`34895769482`) passed the full matrix before the branch was synchronized with current `main`.
+
+After merging the published alpha.14 baseline and subsequent pet breadcrumb-pursuit fix into the feature branch, run **#714** (`34897063938`) passed the complete post-merge gate on commit `a16d16faaa2cbd3c4b51678f08310ebc9a8bf681`:
+
+- Gradle build and JUnit;
+- required server GameTests, including the Shulker adversarial holdouts;
+- default client GameTests;
+- First Person 2.7.2 + Not Enough Animations 1.12.4;
+- Scale Brews beta.5 isolated server and client lanes;
+- Fresh Animations 1.10.5 + FA Player Extension 1.1 + EMF 3.3.5 + ETF 7.2;
+- semantic screenshot validation;
+- artifact/log/report retention.
+
+That post-merge run is the S05 no-change gate. The release-prep/canonicalization commit must itself pass the same matrix before integration, and `main` must then pass it again.
+
+### Asset provenance
+
+The Shulker Charge 16x16 GUI icon and project-authored 3D geometry are original GPL-3.0-or-later project assets. Editable icon source remains under `docs/art/shulker-charge/`. The 3D item model references `minecraft:entity/shulker/spark` at runtime; the Mojang texture itself is not redistributed.
+
 ## Unreleased pet breadcrumb pursuit — local validation 2026-09-14
 
-The rebased alpha.14 tree passes locally on Java 25 and Minecraft 26.2: **75/75 JUnit tests** and **95/95 required server GameTests**. New coverage exercises all six movement-plane projections, the vanilla close-distance dead zone, real scheduled wolf traversal to an airborne breadcrumb, bounded arrival, center-aligned grounded replay, ballistic goal release, Gravity Changer navigation replacement, ordered-queue preservation, sitting pause/resume, effect-free behavior and external teleport invalidation.
+The rebased alpha.14 tree passed locally on Java 25 and Minecraft 26.2: **75/75 JUnit tests** and **95/95 required server GameTests**. New coverage exercises all six movement-plane projections, the vanilla close-distance dead zone, real scheduled wolf traversal to an airborne breadcrumb, bounded arrival, center-aligned grounded replay, ballistic goal release, Gravity Changer navigation replacement, ordered-queue preservation, sitting pause/resume, effect-free behavior and external teleport invalidation.
 
 This evidence validates deterministic server logic and integration in the GameTest environment. It does not replace live multiplayer/gameplay observation of a naturally equipped pet following a player through several gravity changes.
 
@@ -24,7 +72,7 @@ Key green evidence includes:
 - aerodynamics + air-diving on fluid/landing/First-Person/mace main: run **#678** (`34886274878`);
 - final full-sphere camera rebuilt on the post-aerodynamics main: run **#684** (`34887380354`), head `91bb5d0859f088fc0e6eb4fd701903ec0a085350`, merged as PR #21.
 
-Run #684 passed the complete matrix before merge: build/JUnit, required server GameTests, default client, First Person, Scale Brews server/client, Fresh Animations and semantic snapshot validation. After release-prep integration, the exact `main` release commit must pass the same matrix again; the release workflow consumes that successful run's artifact rather than rebuilding separately.
+Run #684 passed the complete matrix before merge: build/JUnit, required server GameTests, default client, First Person, Scale Brews server/client, Fresh Animations and semantic snapshot validation. The published alpha.14 release commit was then validated again on `main`, and its release workflow consumed that successful run's artifact rather than rebuilding separately.
 
 ### Camera and landing
 
@@ -75,21 +123,21 @@ Every release-gating run executes:
 - semantic screenshot validation;
 - artifact retention for JARs, logs, XML, reports and screenshots.
 
-CI preserves default, First Person and Fresh Animations screenshot sets. In addition to the alpha.13 S05 checkpoints, alpha.14 client tests capture full-sphere +120/-120/360 and pre/post canonical exit evidence plus First Person steep look-down checkpoints.
+CI preserves default, First Person and Fresh Animations screenshot sets. Alpha.15 extends the default set with Shulker Charge inventory/held/projectile/fixed-3D checkpoints while retaining the alpha.14 camera/body evidence.
 
 ## Packaging gate
 
 A prerelease is published only from the **exact `main` commit whose complete `Build and test` run succeeded**. The release automation downloads the regular and sources JARs from that exact workflow artifact, records SHA-256 digests in the release notes and creates the prerelease tag against that commit. It never performs a second release build.
 
-Production output must not contain GameTest classes, dependency JARs, temporary planning files or raw validation logs.
+Production output must not contain GameTest classes, dependency JARs, temporary planning files or raw validation logs. Temporary Shulker Charge SPEC/PLAN/WORKFLOW documents are removed from the release tree during S06 canonization.
 
 ## Manual QA still required
 
-- Dedicated multiplayer with realistic latency around rapid Reorientation, air-diving input, landing commitment, fluid entry/exit, teleport and tracking boundaries.
+- Dedicated multiplayer with realistic latency around rapid Reorientation, air-diving input, landing commitment, Shulker Charge capture/relaunch/reacquisition, fluid entry/exit, teleport and tracking boundaries.
 - Human motion-comfort/readability during repeated full-sphere look, gravity reversals and 500 ms 90/180-degree landing manoeuvres.
 - Human tuning assessment of the 35-degree neck cone, 7.5-degree body follow, 6-degree W redirect and posture drag.
 - Audio feel at low/high Gravity Fall speeds and handoff to real Elytra.
-- Long full-pack sessions with First Person + Fresh Animations together, plus mount/pet routes and modded fluids.
+- Long full-pack sessions with First Person + Fresh Animations together, plus mount/pet routes, Shulker Charge use and modded fluids.
 - Uneven-terrain sprint-jump feel with normal and high jump-strength modifiers.
 
 Automated assertions and snapshots are evidence, not a substitute for human gameplay acceptance.

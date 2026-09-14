@@ -1,31 +1,48 @@
 # Configuration
 
-Clinging: Reoriented 0.1.0-alpha.13 exposes **no mod-owned configuration file**. The values below are gameplay/presentation semantics rather than user preferences.
+Clinging: Reoriented 0.1.0-alpha.15 exposes **no mod-owned configuration file**. The values below are fixed gameplay/presentation semantics rather than user preferences.
 
 ## Local-player camera and landing
 
-A voluntary gravity change during free flight does **not** rotate the local camera. The currently rendered world frame is held. Camera rotation is reserved for a physically predicted landing:
+A voluntary gravity change during free flight does **not** rotate the local camera. The currently rendered world frame is held. During a physically predicted landing, local camera LAND and Gravity Fall BODY_LANDING share a **10-tick / 500 ms** presentation window.
 
-- 90-degree landing: **180 ms**;
-- opposite 180-degree landing: **240 ms**;
-- easing: quadratic ease-out (`1 - (1-t)^2`).
+If committed support invalidates while Clinging still owns the flight, the exact currently displayed frame is retained. Transfer to Elytra, any intersecting non-empty fluid, vehicles, teleport/lifecycle or foreign ownership releases obsolete Clinging presentation instead.
 
-If a committed landing invalidates while Clinging still owns the flight, the exact currently displayed frame is retained. Transfer to Elytra, water/lava, vehicles, teleport/lifecycle or foreign ownership releases the obsolete Clinging presentation instead.
+Ordinary tracked non-player SNAP remains separate: quarter turns use the existing **180 ms** timing and opposite half turns **240 ms**.
 
-## Gravity Fall body
+## Gravity Fall body and air
 
 - sustained Gravity Fall entry: **12 airborne ticks**;
-- body-root blend into velocity tracking: **6 ticks**.
+- body-root entry blend: **6 ticks**;
+- body look deadzone: **35 degrees**;
+- maximum macro-body look follow: **7.5 degrees/tick**;
+- maximum extra broadside posture drag: **1.3%/tick**;
+- W air-diving redirect: at most **6 degrees/tick**, with no authority for perpendicular/backward gaze and no added thrust;
+- fast-air sound admission: **0.75 blocks/tick**, with a **10-tick** fade-in;
+- Clinging-controlled airborne world-speed cap: **3.92 blocks/tick**.
 
-These are fixed alpha.13 tuning constants. The body follows world velocity and holds the last reliable frame near zero speed. They do not add air steering or camera following.
+These values are fixed semantics. They do not turn Gravity Fall into creative flight or Elytra.
+
+## Shulker Charge
+
+Shulker Charge also uses fixed rules rather than configuration:
+
+- item stack size: **64**;
+- item cooldown: **0.5 seconds**;
+- acquisition range: **32 blocks**;
+- acquisition cone: approximately **15 degrees**;
+- targetless/invalid-target reacquisition cadence: approximately every **4 ticks**;
+- launched movement stays cardinal/orthogonal and uses the vanilla `SHULKER_BULLET` entity type.
+
+A valid lock remains sticky until it becomes invalid. A directly sighted Target Block has priority during acquisition. These constants are part of the alpha.15 gameplay contract, not settings.
 
 ## Mounts and pets
 
-Clinging-owned non-player entity transitions still use the fixed **180/240 ms** tracked SNAP presentation. This is distinct from the local player's free-flight HOLD/LAND model. Active tracked snaps advance even while the entity is off-screen.
+Clinging-owned non-player transitions use the fixed **180/240 ms** tracked SNAP presentation. This remains distinct from the local player's 500 ms landing model. Active tracked snaps advance even while the entity is off-screen.
 
 ## Water
 
-Normal and held Space remain vanilla swimming input. A second rising edge after a real release within **250 ms** requests Clinging/Reorientation. The detector does not consume or rewrite the vanilla key state. The window is fixed.
+Normal and held Space remain vanilla swimming input. A second rising edge after a real release within **250 ms** requests Clinging/Reorientation. The detector does not consume or rewrite vanilla key state. While owned, water ascent/descent is world-vertical.
 
 ## Sprint-jump reservation
 

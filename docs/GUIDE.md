@@ -1,6 +1,6 @@
 # Player guide
 
-This guide describes Clinging: Reoriented **0.1.0-alpha.14**.
+This guide describes Clinging: Reoriented **0.1.0-alpha.15**.
 
 ## Controls and gravity turns
 
@@ -51,7 +51,7 @@ At speed >= **0.75 blocks/tick**, Gravity Fall reuses vanilla's `ELYTRA_FLYING` 
 
 Clinging predicts a bounded trajectory using the real body, velocity, gravity and landing-surface providers. A candidate floor must be physically valid support under the active gravity.
 
-Alpha.14 reserves a shared **10-tick / 500 ms** landing window. Camera LAND and BODY_LANDING use that same timing when prediction begins early enough. This is intentionally separate from the shorter 180/240 ms tracked SNAP used by non-player entities.
+Alpha.15 retains the shared **10-tick / 500 ms** landing window introduced in alpha.14. Camera LAND and BODY_LANDING use that timing when prediction begins early enough. This is intentionally separate from the shorter 180/240 ms tracked SNAP used by non-player entities.
 
 During `LANDING_COMMITTED`, new gravity requests are discarded rather than queued. If the predicted support disappears while Clinging still owns flight, the exact current presentation becomes the held frame. If another subsystem takes ownership instead, Clinging releases the obsolete landing state.
 
@@ -107,15 +107,43 @@ Usable Elytra owns Space while airborne. It deploys normally instead of turning 
 
 First Person 2.7.2 + Not Enough Animations 1.12.4 is an explicit compatibility target. Gravity Fall uses a blended camera/body pivot for the avatar root so steep look-down angles avoid clipping without solving the problem by hiding the body. The macro root never feeds back into the real camera.
 
+## Shulker Charge
+
+A **Shulker Charge** is a captured shulker bullet. Hit a live shulker projectile with a melee attack or an arrow to materialize one Charge. An arrow fired by a dispenser counts. A capture event is fenced to one item even if damage/interception paths race. Blocking with a shield does not mint a Charge, and ordinary impact, expiry or unrelated destruction does not drop one.
+
+Charges stack to 64. Right-clicking launches one from the player's eye position in the current look direction and consumes the item. Manual use has a **0.5 second cooldown**. A dispenser launches the same projectile from the dispenser face and consumes exactly one item.
+
+The launched entity remains the exact vanilla `minecraft:shulker_bullet` type. It therefore keeps vanilla projectile impact, levitation and shulker-duplication semantics rather than becoming a lookalike custom missile.
+
+### Target acquisition
+
+Acquisition is server-authoritative and uses the launch intent captured at firing time:
+
+- search range: about **32 blocks**;
+- aim cone: about **15 degrees**;
+- a Target Block hit directly by the central launch ray has absolute priority;
+- otherwise living entities and assisted Target Blocks are ranked first by angular error, then by distance;
+- living targets require line of sight when acquired;
+- once a target is validly locked, a later better-looking target does not steal the lock;
+- losing line of sight after lock does not by itself cancel a living target;
+- if the target dies, is removed, changes dimension, or a Target Block is broken/replaced, the Charge reacquires from its current position while preserving the original intent;
+- with no valid target it continues forward using cardinal shulker-style movement and keeps retrying periodically.
+
+Movement stays orthogonal/cardinal with discrete routing turns. It does not continuously curve like a homing rocket. A real collision with a Target Block is still a real projectile hit, so the block produces its normal redstone response.
+
+A relaunched Charge can itself be recaptured by melee or arrow under the same one-item rule.
+
 ## Effects and brewing
 
-Clinging comes from Alex's Mobs Continued and grants one successful voluntary airborne gravity decision before valid support restores it. Add a **shulker shell** to a Clinging potion to brew Reorientation, which removes the airborne turn limit. Redstone, gunpowder and dragon's breath retain their normal extension/splash/lingering routes. Clinging remains available as a tier-two beacon power; Reorientation is not a beacon choice.
+Clinging comes from Alex's Mobs Continued and grants one successful voluntary airborne gravity decision before valid support restores it.
+
+**Reorientation is now brewed with a Shulker Charge, not a Shulker Shell.** Add a Shulker Charge to a Clinging potion to obtain Reorientation; long Clinging maps to long Reorientation, and redstone extends normal Reorientation. Vanilla splash and lingering routes remain available. Clinging remains available as a tier-two beacon power; Reorientation is not a beacon choice.
 
 ## Mounts and pets
 
 Clinging itself does not grant mounted turning. With Reorientation, a fresh Space while a compatible root mount is airborne can turn the complete passenger hierarchy only when destination preflight succeeds for every member. Failure is atomic.
 
-Tamed animals with their own compatible effect can replay bounded owner-turn breadcrumbs while following. Sitting pets do not replay. Non-player entities keep Clinging's tracked **180/240 ms SNAP** presentation rather than inheriting the local player's 500 ms Gravity Fall landing or full-sphere camera.
+Tamed animals with their own compatible effect can replay bounded owner-turn breadcrumbs while following. Sitting pets do not replay. Pets pursue each pending breadcrumb on their current gravity-relative movement plane, replay the turn there, release navigation while unsupported and resume after landing. Non-player entities keep Clinging's tracked **180/240 ms SNAP** presentation rather than inheriting the local player's 500 ms Gravity Fall landing or full-sphere camera.
 
 ## Recovery and lifecycle
 

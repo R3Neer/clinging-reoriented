@@ -1,13 +1,24 @@
-# Shulker Charge: approved 2D icon
+# Shulker Charge artwork
 
-Original 16x16 RGBA pixel artwork, GPL-3.0-or-later under the project licence. The user approved this icon on 2026-09-14. It is ready for GUI integration; the required 3D hand renderer remains a separate integration task.
+## Approved 2D icon
 
-Texture: `assets/clinging_reoriented/textures/item/shulker_charge.png`.
-GUI model: `clinging_reoriented:item/shulker_charge_gui`.
-Editable source: `docs/art/shulker-charge/shulker-charge.piskel` and explicit pixel/palette data in `pixels.json`.
+Original 16x16 RGBA pixel artwork, GPL-3.0-or-later under the project licence. The user approved this icon on 2026-09-14.
 
-Design: warm ivory orthogonal projectile, with muted mauve side shadows and grouped highlights. References inspected in the Minecraft 26.2 client: wind_charge, fire_charge, ender_pearl and entity/shulker/spark textures. The actual ShulkerBulletModel is three intersecting slabs (8x8x2, 2x8x8, 8x2x8), informing the cross-like silhouette. The new sprite is drawn independently, not a recolour or resized copy of a vanilla icon. Vanilla reference images are not distributed here.
+- Texture: `assets/clinging_reoriented/textures/item/shulker_charge.png`.
+- GUI model: `clinging_reoriented:item/shulker_charge_gui`.
+- Editable source: `docs/art/shulker-charge/shulker-charge.piskel`.
+- Explicit pixel/palette source: `docs/art/shulker-charge/pixels.json`.
 
-At the inspected branch commit 8f79fbd, the shulker feature is specified but not registered. Integration should select this generated model in GUI context and retain/adapt the vanilla projectile model in hand as SC-002 requires. No gameplay registration or universal flat item definition is added by this artwork delivery.
+Design: warm ivory orthogonal projectile, with muted mauve side shadows and grouped highlights. References inspected in the Minecraft 26.2 client included wind charge, fire charge, ender pearl and shulker projectile presentation. The sprite is drawn independently, not a recolour or resized copy of a vanilla icon. Vanilla reference images are not distributed here.
 
-Checked: 16x16, binary alpha, one connected silhouette, nearest-neighbour previews against vanilla charge/pearl icons. Visual design approved by the user. In-game presentation remains pending.
+The icon was checked at 16x16 with binary alpha, one connected silhouette and nearest-neighbour previews against vanilla charge/pearl icon scale.
+
+## Approved 3D held model
+
+The integrated held/ground presentation is project-authored geometry derived from the same orthogonal shulker-projectile language, while GUI contexts keep the dedicated 2D icon. The final runtime model references `minecraft:entity/shulker/spark` for its texture instead of copying that Mojang asset into this repository.
+
+Minecraft's ShulkerBullet model/texture and other vanilla references remain third-party runtime material and are not redistributed. See `THIRD_PARTY_NOTICES.md`.
+
+## Integration status
+
+As of 0.1.0-alpha.15 the 2D GUI icon and 3D held model are integrated and covered by semantic client snapshots for inventory, first-person held, third-person held, projectile renderer and fixed 3D presentation. These files remain the editable provenance record for future revisions rather than temporary implementation instructions.

@@ -2,11 +2,45 @@
 
 ## Unreleased
 
+No unreleased changes yet.
+
+## [0.1.0-alpha.15] - 2026-09-14
+
+### Shulker Charge
+
+- Add the stackable **Shulker Charge**, materialized by intercepting a shulker bullet with melee or an arrow, including dispenser-fired arrows.
+- Fence capture to exactly one item across mixed/racing interceptors; shields, ordinary impact, expiry and unrelated destruction do not create drops.
+- Allow captured and relaunched Charges to be captured again under the same one-drop rule.
+- Launch Charges from player look or dispenser facing with one-item consumption and a 0.5 second manual-use cooldown.
+- Keep the runtime projectile as the exact vanilla `SHULKER_BULLET` entity type so vanilla impact, levitation and shulker-duplication semantics remain intact.
+
+### Targeting and routing
+
+- Add server-authoritative bounded acquisition at roughly 32 blocks / 15 degrees.
+- Give a Target Block on the direct launch ray absolute acquisition priority; otherwise rank eligible entities and assisted Target Blocks by angular error then distance.
+- Keep valid locks sticky instead of retargeting to a later better-scoring candidate.
+- Reacquire from the Charge's current position when a target dies, disappears, changes dimension or a Target Block becomes invalid, while preserving the original launch intent.
+- Continue cardinal free flight when no target is available and retry periodically rather than switching to continuous curved homing.
+- Route Target Blocks through discrete orthogonal shulker-style movement and real projectile impact so their normal redstone response remains authoritative.
+
+### Brewing and presentation
+
+- Replace Shulker Shell with Shulker Charge as the Clinging -> Reorientation brewing ingredient for normal and long variants.
+- Integrate the approved original 16x16 GUI icon and project-authored 3D held model; the latter references Minecraft's shulker spark texture only at runtime.
+- Add semantic snapshots for inventory, first-person held, third-person held, projectile renderer and fixed 3D presentation.
+
 ### Pet breadcrumb pursuit
 
 - Make affected tame pets acquire `FollowOwnerGoal` for nearby gravity breadcrumbs even inside vanilla's owner-follow dead zone.
 - Navigate to each breadcrumb projected onto the pet's current gravity-relative movement plane, then replay the owner's turn and release navigation while unsupported.
 - Refresh Gravity Changer's replaced navigation instance, preserve queued breadcrumbs across the bounded internal turn placement, and keep external teleports, sitting, missing effects and foreign gravity ownership fail-closed.
+
+### Validation and release
+
+- Add adversarial Shulker Charge holdouts for real dispenser/redstone semantics, sticky locks, late acquisition, dimension invalidation/reacquisition, mixed arrow/melee races, concurrent Charges and repeated targetless retries.
+- Harden the adversarial fixture so the complete 32-block flight corridor remains `ENTITY_TICKING`; no Scale-specific production workaround is used.
+- Revalidate the combined alpha.14 + Shulker Charge tree across required server tests, default client, First Person, Scale Brews server/client, Fresh Animations and semantic snapshot validation.
+- Publish alpha.15 only from the exact successful `main` CI artifact rather than rebuilding for release.
 
 ## [0.1.0-alpha.14] - 2026-09-14
 
