@@ -1,83 +1,54 @@
 # GF-S03 — Cámara desacoplada y landing snap
 
-Estado: **PLAN CONVERGIDO / IMPLEMENTACIÓN**.
+Estado: **CERRADO / GATE VERDE**.
 
 ## Tesis
 
-Al cerrar S03, todo giro voluntario de jugador cambia física/yaw gauge sin mover la vista mundial; la cámara queda retenida en el quaternion realmente mostrado durante vuelo libre. Sólo `LANDING_COMMITTED` inicia un SLERP hacia el frame canónico del futuro suelo. Invalidar ese landing conserva el frame intermedio, nunca hace snap-back.
+Todo giro voluntario de jugador cambia física/yaw gauge sin mover la vista mundial; la cámara queda retenida en el quaternion realmente mostrado durante vuelo libre. Sólo `LANDING_COMMITTED` inicia un SLERP hacia el frame canónico del futuro suelo. Invalidar ese landing conserva el frame intermedio, nunca hace snap-back.
 
 ## Scope
 
-FR-GF-010..013 y presentación de FR-GF-020..027. Los snaps inmediatos de mobs/monturas y el retirement forzado se conservan salvo regresión; S04 tratará el cuerpo de jugador.
+FR-GF-010..013 y presentación de FR-GF-020..027. Los snaps inmediatos de mobs/monturas se conservan fuera del free-flight del jugador.
 
-## Protocolo visual
-
-Se mantienen tres operaciones diferentes con una única secuencia monotónica de jugador:
+## Protocolo visual final
 
 1. `visual_hold_v1(target, yawDelta, sequence)` — giro físico voluntario en vuelo libre.
-2. `visual_land_v1(target, kind, sequence)` — comienza landing snap; no aplica nuevo yaw gauge.
-3. `visual_cancel_land_v1(sequence)` — cancela sólo la trayectoria de landing y congela el quaternion actualmente mostrado.
+2. `visual_land_v1(target, kind, sequence)` — comienza landing snap; no reaplica yaw gauge.
+3. `visual_cancel_land_v1(sequence)` — cancela sólo la trayectoria de landing y congela el quaternion mostrado.
+4. `visual_transition_v2` — transiciones inmediatas no voluntarias/legacy y entidades que todavía requieren snap propio.
 
-`visual_transition_v2` se conserva para transiciones inmediatas no voluntarias/legacy que todavía necesitan el snap actual.
+### Hold
 
-## Hold
+Captura `VisualTransitions.current(entity)`, compensa el yaw gauge para conservar look mundial y fuerza Gravity Changer al endpoint físico sin dejar interpolación upstream latente. Giros posteriores parten siempre del quaternion retenido actual; nada se encola.
 
-Al recibir `visual_hold_v1`:
+### Land
 
-- captura `VisualTransitions.current(entity)`;
-- calcula `compensatedVisualStart(current, yawDelta)` para que aplicar el yaw gauge lógico no cambie el look mundial compuesto;
-- aplica el mismo yaw gauge al cliente;
-- fuerza el estado interno de Gravity Changer al target físico para que no quede una animación upstream latente;
-- devuelve indefinidamente el quaternion compensado desde `GravitySnapMixin`.
+Parte del quaternion actualmente mostrado y hace shortest-path SLERP a `RotationUtil.getEntityRotationQuaternion(target)` con duraciones nominales 180 ms quarter / 240 ms half. Al completar libera ownership visual dejando Gravity Changer ya asentado en el mismo endpoint.
 
-Una segunda/tercera reorientación parte siempre del quaternion retenido actual y vuelve a compensarlo. Nada se encola.
+### Cancel
 
-## Land
+Captura el quaternion exacto del instante de cancelación y lo convierte en HOLD. No vuelve al frame previo ni al target. El servidor pasa a base visual desconocida y futuros commitments usan la ventana conservadora.
 
-Al recibir `visual_land_v1`:
+### First Person
 
-- toma el quaternion actualmente mostrado, sea cardinal o intermedio;
-- NO vuelve a aplicar yaw gauge;
-- fuerza el endpoint interno de Gravity Changer al target;
-- hace SLERP shortest-path hacia `RotationUtil.getEntityRotationQuaternion(target)`;
-- duración nominal: 180 ms quarter, 240 ms half;
-- al completar, libera ownership visual y deja a Gravity Changer ya asentado en el mismo endpoint.
+Se conserva una única fuente de quaternion visual: Gravity Changer + `GravitySnapMixin`. First Person consume ese frame; no existe una segunda cámara paralela.
 
-## Cancel
+## Checklist de cierre
 
-Durante un landing activo, cancel captura el quaternion del instante exacto y lo convierte en nuevo HOLD. No vuelve al frame previo ni al target.
+- [x] I1 ampliar `Payloads` con Hold/Land/Cancel y secuencia monotónica común.
+- [x] I2 refactorizar `VisualTransitions` con modos HOLD/LAND/SNAP_IMMEDIATE.
+- [x] I3 usar Hold en giros voluntarios y mantener snaps inmediatos donde corresponde.
+- [x] I4 publicar Land al crear `LandingState.commit`.
+- [x] I5 publicar Cancel si el commitment publicado se invalida.
+- [x] I6 suprimir feedback de error para `LANDING_COMMITTED`.
+- [x] I7 client tests de free-flight hold, multi-turn, landing settle, cancel, stale sequence y First Person.
+- [x] I8 snapshots semánticos de pre-turn, hold y landing.
+- [x] I9 holdout multigiro y revisión cruzada posterior en S04–S05.
 
-El servidor marca entonces `visualBaseKnown=false`; un compromiso posterior usa la ventana conservadora de 240 ms porque el frame ya no es cardinal.
+## Holdout revelado
 
-## First Person
+La secuencia `DOWN→EAST→UP→WEST` sin landing cambia tres veces la dirección lógica y el yaw gauge, pero mantiene continuo el forward mundial renderizado. Un Land posterior recorre una sola trayectoria desde el frame retenido actual, no una cola de snaps acumulados.
 
-Se conserva una sola fuente de quaternion visual: Gravity Changer + `GravitySnapMixin`. First Person sigue consumiendo ese frame; no se crea una cámara alternativa.
+## Evidencia acumulada
 
-## Plan
-
-- [ ] I1 ampliar `Payloads` con Hold/Land/Cancel y secuencia monotónica común;
-- [ ] I2 refactorizar `VisualTransitions` con modos HOLD/LAND/SNAP_IMMEDIATE;
-- [ ] I3 usar Hold en `ClingingReoriented.attempt` voluntario; mantener snap inmediato en retirement y mounted path por ahora;
-- [ ] I4 publicar Land exactamente al crear `LandingState.commit`;
-- [ ] I5 publicar Cancel si un commitment ya publicado se invalida físicamente;
-- [ ] I6 suprimir feedback de error para `LANDING_COMMITTED`;
-- [ ] I7 client tests: 90/180 free-flight hold, multi-turn world-look continuity, landing settle, cancel mid-snap, sequence stale, First Person;
-- [ ] I8 snapshots semánticos iniciales: pre-turn, post-physical-turn held, landing start/mid/end;
-- [ ] I9 holdout adversarial + revisión cero-cambios.
-
-## Modelo adversarial previo
-
-- payload Hold llega antes/después del atributo de gravedad;
-- varios Holds antes de que llegue el target lógico anterior;
-- Land llega cuando Gravity Changer aún cree estar animando otro target;
-- Cancel exactamente al completar Land;
-- stale sequence Hold/Land/Cancel;
-- muerte/respawn cambia instancia de animation;
-- First Person offset no puede generar un segundo roll;
-- pitch casi vertical y 180°;
-- world-look debe ser continuo aunque yaw local cambie mucho;
-- retirement forzado no puede quedar congelado por un HOLD olvidado.
-
-### Holdout reservado
-
-Secuencia de tres giros físicos `DOWN→EAST→UP→WEST` sin landing: la dirección lógica y el yaw gauge deben cambiar tres veces, pero el forward mundial renderizado antes/después de cada Hold debe ser continuo dentro de epsilon. Después un Land a WEST debe recorrer una sola trayectoria desde ese frame retenido, no tres snaps acumulados.
+S04 y S05 construyen encima del mismo ownership de cámara. La campaña S05 incluye además pérdida de ownership, agua/Elytra, teleports, respawn, tracking y multigiro, por lo que cualquier regresión estructural de S03 reaparece allí.
