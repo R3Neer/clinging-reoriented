@@ -2,8 +2,8 @@
   "ambientocclusion": false,
   "gui_light": "front",
   "textures": {
-    "spark": "minecraft:entity/shulker/spark",
-    "particle": "minecraft:entity/shulker/spark"
+    "spark": "clinging_reoriented:item/shulker_charge",
+    "particle": "clinging_reoriented:item/shulker_charge"
   },
   "elements": [
     {
