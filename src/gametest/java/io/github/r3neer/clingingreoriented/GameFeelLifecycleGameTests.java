@@ -46,6 +46,17 @@ public final class GameFeelLifecycleGameTests {
     }
 
     @GameTest(padding=20)
+    public void trackingSnapshotCreatesFreshEpochEvenWhenGravityFallPhaseDidNotChange(GameTestHelper h){
+        var p=managed(h);var s=ClingingReoriented.data(p);
+        s.gravityFallActive=true;s.gravityFallLanding=false;s.gravityFallSequence=80;
+        GravityFallSync.sendSnapshot(p,p);
+        h.assertTrue(s.gravityFallSequence==81,"first tracking snapshot replayed the original Gravity Fall sequence");
+        GravityFallSync.sendSnapshot(p,p);
+        h.assertTrue(s.gravityFallSequence==82,"retracking the same active phase did not allocate a fresh Gravity Fall epoch");
+        h.succeed();
+    }
+
+    @GameTest(padding=20)
     public void sameDimensionTeleportReleasesLandingAndGravityFallPresentation(GameTestHelper h){
         var p=managed(h);var s=ClingingReoriented.data(p);
         s.airborneTicks=40;s.visualBaseKnown=true;s.visualBaseDirection=Direction.DOWN;
