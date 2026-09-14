@@ -6,13 +6,15 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.DispenserBlock;
 
 /** Registration seam for the capturable Shulker Charge item. */
 public final class ShulkerCharges {
     public static final ResourceKey<Item> KEY=ResourceKey.create(Registries.ITEM,Identifier.fromNamespaceAndPath(ClingingReoriented.ID,"shulker_charge"));
     public static final Item ITEM=Registry.register(BuiltInRegistries.ITEM,KEY,
         new ShulkerChargeItem(new Item.Properties().setId(KEY).stacksTo(64).useCooldown(0.5F)));
+    private static boolean initialized;
 
     private ShulkerCharges() {}
-    public static void initialize() { /* force class initialization before brewing registration */ }
+    public static synchronized void initialize(){if(initialized)return;initialized=true;DispenserBlock.registerProjectileBehavior(ITEM);}
 }
