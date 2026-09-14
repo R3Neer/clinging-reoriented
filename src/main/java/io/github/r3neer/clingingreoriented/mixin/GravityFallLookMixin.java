@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Vanilla clamps Entity.turn pitch to +/-90 degrees. During local Gravity Fall camera ownership,
+ * Vanilla clamps Entity.turn pitch to +/-90 degrees. During local Gravity Fall ownership,
  * keep the exact vanilla mouse/vehicle turn pipeline but remove only that vertical neck stop.
  */
 @Mixin(Entity.class)
@@ -47,6 +47,9 @@ public abstract class GravityFallLookMixin {
         Entity self=(Entity)(Object)this;
         if(!(self instanceof Player player))return false;
         Minecraft mc=Minecraft.getInstance();
-        return mc.player==player&&mc.getCameraEntity()==player&&GravityFallVisuals.active(player);
+        // Local-player ownership is the meaningful fence. CameraEntity can transiently lag the
+        // input call (notably in client GameTest and camera-mode transitions), while the look state
+        // still belongs to this player. Third person should get the same free-look semantics too.
+        return mc.player==player&&GravityFallVisuals.active(player);
     }
 }
