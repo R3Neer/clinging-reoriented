@@ -10,9 +10,10 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
-/** Short-horizon, recomputed-every-tick landing forecast. It predicts no more than one visual snap window. */
+/** Short-horizon, recomputed-every-tick landing forecast. It predicts no more than one visual landing window. */
 public final class LandingPrediction {
-    public static final int MAX_TICKS=5;
+    /** Half a second at the authoritative 20 TPS simulation rate. */
+    public static final int MAX_TICKS=10;
     private static final double AIR_HORIZONTAL_DRAG=.91D;
     private static final double AIR_VERTICAL_DRAG=.98D;
     public record Candidate(LandingSurfaces.Contact contact,Direction gravity,double etaTicks) {}
