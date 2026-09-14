@@ -127,7 +127,7 @@ public final class GameFeelAdversarialGameTests {
         var wolf=h.spawn(EntityTypes.WOLF,p.blockPosition());wolf.setNoAi(true);wolf.setOnGround(false);wolf.setNoGravity(true);wolf.tame(p);
         wolf.addEffect(new MobEffectInstance(Reorientation.EFFECT,1200));
         wolf.teleportTo(p.getX()+8.0D,p.getY(),p.getZ()+8.0D);
-        h.assertTrue(p.startRiding(horse,true,true),"fixture could not mount rider");horse.positionRider(p);
+        h.assertTrue(p.startRiding(horse,true,true),"fixture could not mount rider");
         Vec3 momentum=new Vec3(.24,-.36,.18);horse.setDeltaMovement(momentum);
 
         var east=ClingingReoriented.attempt(p,direction(Direction.EAST),GravityTransition.headingFromYaw(Direction.DOWN,p.getYRot()));
