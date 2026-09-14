@@ -20,8 +20,11 @@ public abstract class MovementMixin {
     @Inject(method="move",at=@At("TAIL"))
     private void clinging$contact(MoverType type,Vec3 delta,CallbackInfo ci){
         Entity self=(Entity)(Object)this;
+        // checkFallDamage is gravity-relative and may not run for an impact whose normal no
+        // longer matches current gravity after a late turn. Finalize the world-space sample
+        // first; its sequence fence makes this free when the normal hook already handled it.
+        if(self instanceof LivingEntity living){ImpactDamage.afterMove(living);ImpactState.endMove(living);}
         if(self instanceof Player p)MovingSurface.afterMove(p);
-        if(self instanceof LivingEntity living)ImpactState.endMove(living);
     }
     @Inject(method="checkFallDamage",at=@At("HEAD"),cancellable=true)
     private void clinging$impact(double ya,boolean onGround,BlockState onState,BlockPos pos,CallbackInfo ci){
