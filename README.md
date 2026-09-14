@@ -2,7 +2,7 @@
 
 The floor is wherever you decide it is.
 
-**Clinging: Reoriented** turns the Clinging effect from Alex's Mobs into an airborne gravity ability for Minecraft 26.2 on Fabric. Leave your local floor, release **Space**, look toward another world-cardinal direction and press Space again. Clinging grants one voluntary airborne gravity decision; **Reorientation** removes that one-turn limit. Alpha.15 also adds the **Shulker Charge**, a capturable and relaunchable shulker projectile that becomes Reorientation's brewing ingredient.
+**Clinging: Reoriented** turns the Clinging effect from Alex's Mobs into an airborne gravity ability for Minecraft 26.2 on Fabric. Leave your local floor, release **Space**, look toward another world-cardinal direction and press Space again. Clinging grants one voluntary airborne gravity decision; **Reorientation** removes that one-turn limit. Alpha.16 also adds the **Shulker Charge**, a capturable and relaunchable shulker projectile that becomes Reorientation's brewing ingredient.
 
 [![Minecraft 26.2](https://img.shields.io/badge/Minecraft-26.2-62B47A)](https://www.minecraft.net/)
 [![Fabric](https://img.shields.io/badge/Loader-Fabric-DDBD3B)](https://fabricmc.net/)
@@ -67,7 +67,7 @@ The API intentionally contains no Scale Brews types. A concrete Scale-specific a
 
 ## Mounts and pets
 
-Mounted Reorientation turns a compatible airborne living root and its passenger hierarchy atomically. A pet with its own compatible effect pursues each bounded owner breadcrumb on its current gravity-relative movement plane, replays the turn there, falls under physics and resumes route pursuit after finding support in the new frame. Non-player entities keep Clinging's owned **180/240 ms tracked snap** presentation; the 500 ms landing manoeuvre and full-sphere camera are local-player Gravity Fall rules, not generic mob camera concepts.
+Mounted Reorientation turns a compatible airborne living root and its passenger hierarchy atomically. A pet with its own compatible effect pursues each bounded owner breadcrumb on its current gravity-relative movement plane, including inside vanilla's normal follow-start dead zone; it replays the turn only after reaching that projected step, releases navigation while unsupported and resumes the queued route after finding support in the new frame. Sitting pauses pursuit, external teleports invalidate the trail, and foreign gravity ownership remains foreign. Non-player entities keep Clinging's owned **180/240 ms tracked snap** presentation; the 500 ms landing manoeuvre and full-sphere camera are local-player Gravity Fall rules, not generic mob camera concepts.
 
 Tracked transitions are fenced by entity UUID plus monotonic sequence and continue advancing while off-screen. Foreign Gravity Changer writes remain foreign and retain upstream presentation ownership.
 
@@ -95,7 +95,7 @@ This is an **alpha**. Back up important worlds before updating and use matching 
 
 ## Project status
 
-**0.1.0-alpha.15** is the Shulker Charge and pet-pursuit prerelease built on alpha.14's Gravity Fall control/compatibility baseline. Its release gate covers build/JUnit, required server GameTests including the Shulker adversarial campaign, default client, First Person, optional Scale Brews server/client, pinned Fresh Animations/Player Extension and semantic screenshot validation. The prerelease is published only from the exact `main` commit that passes that complete matrix.
+**0.1.0-alpha.16** is the Shulker Charge prerelease built on the published alpha.15 pet-pursuit follow-up and alpha.14 Gravity Fall baseline. Its release gate covers build/JUnit, required server GameTests including the Shulker adversarial campaign, default client, First Person, optional Scale Brews server/client, pinned Fresh Animations/Player Extension and semantic screenshot validation. The prerelease is published only from the exact `main` commit that passes that complete matrix.
 
 Automated assertions are evidence, not human gameplay acceptance. Dedicated multiplayer latency, motion comfort/readability and long full-pack sessions remain manual QA.
 
