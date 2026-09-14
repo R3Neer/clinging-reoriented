@@ -1,0 +1,12 @@
+{
+  "work_per_damage": 30.0,
+  "sources": [
+    {
+      "type": "event",
+      "event": "clinging_reoriented:gravity_turn",
+      "work": 4.0
+    }
+  ],
+  "requires_mod": "alexsmobs",
+  "requires_effect": "alexsmobs:clinging"
+}
