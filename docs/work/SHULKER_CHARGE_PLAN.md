@@ -1,6 +1,6 @@
 # Shulker Charge — plan global
 
-Estado global: **S00 CERRADO · S01 EN CURSO**.
+Estado global: **S00–S01 CERRADOS · S02 EN CURSO**.
 
 Baseline: `v0.1.0-alpha.13` / `be3b47284a71fbf4fcacb2ab2b2cb3776af290d3`.
 
@@ -11,11 +11,11 @@ Baseline: `v0.1.0-alpha.13` / `be3b47284a71fbf4fcacb2ab2b2cb3776af290d3`.
 - [x] Fijar arquitectura de item, projectile, targeting y recaptura sin textura final.
 
 ## S01 — Item, captura y brewing
-- [ ] Registrar Shulker Charge stack 64 con placeholder técnico no final.
-- [ ] Captura melee y flecha de bullet natural, incluido dispenser-arrow.
-- [ ] Escudo/impacto/expiry sin drop y fence anti-doble-drop.
-- [ ] Reorientation usa Shulker Charge y rechaza Shulker Shell.
-- [ ] Unit + GameTests del dominio.
+- [x] Registrar Shulker Charge stack 64.
+- [x] Captura melee y flecha de bullet natural, incluido dispenser-arrow.
+- [x] Fence anti-doble-drop y rechazo de destrucción genérica; shield/impact/expiry end-to-end reservados como holdouts S03.
+- [x] Reorientation usa Shulker Charge y rechaza Shulker Shell.
+- [x] CI completa #475 verde sobre `e9e49c2`.
 
 ## S02 — Lanzamiento, dispenser y adquisición
 - [ ] Uso manual con cooldown inicial 0,5 s y consumo exacto.
@@ -33,7 +33,7 @@ Baseline: `v0.1.0-alpha.13` / `be3b47284a71fbf4fcacb2ab2b2cb3776af290d3`.
 - [ ] Tests de concurrencia y no-duplicación.
 
 ## S04 — Cliente, modelo 3D y lenguaje visual
-- [ ] Render in-hand con representación 3D; inventario queda con placeholder hasta recibir arte 2D final.
+- [ ] Render in-hand con representación 3D; usar el icono 2D aprobado ya incorporado en la rama para inventario/GUI.
 - [ ] Mantener lenguaje visual de bullet, sin homing curvo ni HUD de lock.
 - [ ] Client GameTests y snapshots de vuelo libre, lock, reacquire, Target Block e intercepción cuando sean observables.
 
@@ -46,6 +46,6 @@ Baseline: `v0.1.0-alpha.13` / `be3b47284a71fbf4fcacb2ab2b2cb3776af290d3`.
 ## S06 — Canonización e integración
 - [ ] Actualizar README/GUIDE/ARCHITECTURE/COMPATIBILITY/VALIDATION/CHANGELOG.
 - [ ] Añadir capturas nuevas al README sólo si explican mejor la feature y existe arte estable.
-- [ ] Documentar deuda exclusiva: textura 2D final suministrada por usuario.
+- [ ] Documentar licencia/origen del icono 2D aprobado y del modelo 3D reutilizado.
 - [ ] Retirar `docs/work/*` tras migración.
 - [ ] Bump de versión, CI exacta de rama, integración a main, CI main y prerelease si el cambio se publica como nueva alpha.
