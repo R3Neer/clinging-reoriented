@@ -46,23 +46,17 @@ public abstract class GravityFallRenderMixin {
                 if(extra!=null){
                     poseStack.pushPose();
                     if(clinging$firstPersonBodyPass(mc,player)){
-                        // First Person extracts the local avatar at a temporary translated entity
-                        // position while the real camera remains fixed. At this injection point the
-                        // current pose is T(entity-camera + rendererOffset) * R_visual. Rotate the
-                        // Gravity Fall root around the exact camera point in that local frame,
-                        // rather than around a guessed eye-height scalar.
                         @SuppressWarnings({"rawtypes","unchecked"})
                         EntityRenderer renderer=((EntityRenderDispatcher)(Object)this).getRenderer(renderState);
                         Vec3 renderOffset=renderer.getRenderOffset(renderState);
                         Quaternionf visual=((GravityRenderState)renderState).gravitychanger$getGravityRotation();
-                        Vec3 pivot=BodyRenderMath.localCameraPivot(
+                        Vec3 cameraPivot=BodyRenderMath.localCameraPivot(
                             x+renderOffset.x,y+renderOffset.y,z+renderOffset.z,visual);
+                        Vec3 pivot=BodyRenderMath.firstPersonPivot(cameraPivot,avatar.boundingBoxHeight);
                         poseStack.translate(pivot.x,pivot.y,pivot.z);
                         poseStack.mulPose(extra);
                         poseStack.translate(-pivot.x,-pivot.y,-pivot.z);
                     }else{
-                        // Third person keeps the displayed body centre fixed so the avatar does not
-                        // orbit around its feet while velocity changes its macroscopic orientation.
                         float pivot=BodyRenderMath.bodyCenterPivot(avatar.boundingBoxHeight);
                         poseStack.translate(0.0F,pivot,0.0F);
                         poseStack.mulPose(extra);
