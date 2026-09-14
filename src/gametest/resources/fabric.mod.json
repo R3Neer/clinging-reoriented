@@ -28,6 +28,7 @@
       "io.github.r3neer.clingingreoriented.ClingingClientGameTest",
       "io.github.r3neer.clingingreoriented.GravityControlsClientTest",
       "io.github.r3neer.clingingreoriented.WaterClientGameTest",
+      "io.github.r3neer.clingingreoriented.WaterCameraHoldRegressionClientGameTest",
       "io.github.r3neer.clingingreoriented.EntitySnapClientGameTest",
       "io.github.r3neer.clingingreoriented.GravityFallClientGameTest",
       "io.github.r3neer.clingingreoriented.GravityFallFullSphereClientGameTest",
