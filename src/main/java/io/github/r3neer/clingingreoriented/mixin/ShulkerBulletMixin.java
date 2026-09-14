@@ -1,8 +1,8 @@
 package io.github.r3neer.clingingreoriented.mixin;
 
-import io.github.r3neer.clingingreoriented.ShulkerChargeProjectile;
-import io.github.r3neer.clingingreoriented.ShulkerChargeTargeting;
-import io.github.r3neer.clingingreoriented.ShulkerCharges;
+import io.github.r3neer.clingingreoriented.GravityChargeProjectile;
+import io.github.r3neer.clingingreoriented.GravityChargeTargeting;
+import io.github.r3neer.clingingreoriented.GravityCharges;
 import java.util.ArrayList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -33,7 +33,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(ShulkerBullet.class)
-public abstract class ShulkerBulletMixin extends Projectile implements ShulkerChargeProjectile {
+public abstract class ShulkerBulletMixin extends Projectile implements GravityChargeProjectile {
     @Shadow private @Nullable EntityReference<Entity> finalTarget;
     @Shadow private @Nullable Direction currentMoveDirection;
     @Shadow private int flightSteps;
@@ -53,7 +53,7 @@ public abstract class ShulkerBulletMixin extends Projectile implements ShulkerCh
     protected ShulkerBulletMixin(EntityType<? extends Projectile> type,Level level){super(type,level);}
 
     @Override public void clinging$initializeCharge(Vec3 rawIntent){
-        Vec3 intent=ShulkerChargeTargeting.safeIntent(rawIntent);clinging$launchedCharge=true;clinging$captured=false;
+        Vec3 intent=GravityChargeTargeting.safeIntent(rawIntent);clinging$launchedCharge=true;clinging$captured=false;
         clinging$intentX=intent.x;clinging$intentY=intent.y;clinging$intentZ=intent.z;setNoGravity(true);clinging$reacquireTicks=0;
         if(level() instanceof ServerLevel)clinging$acquireOrFly();else clinging$setFreeFlight(intent);
     }
@@ -90,24 +90,24 @@ public abstract class ShulkerBulletMixin extends Projectile implements ShulkerCh
 
     @Inject(method="addAdditionalSaveData",at=@At("TAIL"))
     private void clinging$saveCharge(ValueOutput output,CallbackInfo ci){
-        output.putBoolean("ClingingCharge",clinging$launchedCharge);output.putBoolean("ClingingCaptured",clinging$captured);
+        output.putBoolean("GravityCharge",clinging$launchedCharge);output.putBoolean("GravityChargeCaptured",clinging$captured);
         if(!clinging$launchedCharge)return;
-        output.putDouble("ClingingIntentX",clinging$intentX);output.putDouble("ClingingIntentY",clinging$intentY);output.putDouble("ClingingIntentZ",clinging$intentZ);
-        if(clinging$targetBlock!=null)output.store("ClingingTargetBlock",BlockPos.CODEC,clinging$targetBlock);
+        output.putDouble("GravityChargeIntentX",clinging$intentX);output.putDouble("GravityChargeIntentY",clinging$intentY);output.putDouble("GravityChargeIntentZ",clinging$intentZ);
+        if(clinging$targetBlock!=null)output.store("GravityChargeTargetBlock",BlockPos.CODEC,clinging$targetBlock);
     }
     @Inject(method="readAdditionalSaveData",at=@At("TAIL"))
     private void clinging$loadCharge(ValueInput input,CallbackInfo ci){
-        clinging$launchedCharge=input.getBooleanOr("ClingingCharge",false);clinging$captured=input.getBooleanOr("ClingingCaptured",false);
+        clinging$launchedCharge=input.getBooleanOr("GravityCharge",false);clinging$captured=input.getBooleanOr("GravityChargeCaptured",false);
         if(!clinging$launchedCharge)return;
-        Vec3 intent=ShulkerChargeTargeting.safeIntent(new Vec3(input.getDoubleOr("ClingingIntentX",0.0D),input.getDoubleOr("ClingingIntentY",0.0D),input.getDoubleOr("ClingingIntentZ",1.0D)));
-        clinging$intentX=intent.x;clinging$intentY=intent.y;clinging$intentZ=intent.z;clinging$targetBlock=input.read("ClingingTargetBlock",BlockPos.CODEC).orElse(null);setNoGravity(true);
+        Vec3 intent=GravityChargeTargeting.safeIntent(new Vec3(input.getDoubleOr("GravityChargeIntentX",0.0D),input.getDoubleOr("GravityChargeIntentY",0.0D),input.getDoubleOr("GravityChargeIntentZ",1.0D)));
+        clinging$intentX=intent.x;clinging$intentY=intent.y;clinging$intentZ=intent.z;clinging$targetBlock=input.read("GravityChargeTargetBlock",BlockPos.CODEC).orElse(null);setNoGravity(true);
     }
 
     @Inject(method="hurtServer",at=@At("HEAD"))
     private void clinging$dropCapturedCharge(ServerLevel level,DamageSource source,float damage,CallbackInfoReturnable<Boolean> cir){
         if(clinging$captured)return;Entity direct=source.getDirectEntity();
         boolean arrow=direct instanceof AbstractArrow;boolean melee=!source.is(DamageTypeTags.IS_PROJECTILE)&&direct instanceof LivingEntity;
-        if(!arrow&&!melee)return;clinging$captured=true;spawnAtLocation(level,ShulkerCharges.ITEM);
+        if(!arrow&&!melee)return;clinging$captured=true;spawnAtLocation(level,GravityCharges.ITEM);
     }
 
     @Unique private boolean clinging$hasValidTarget(){return clinging$validEntityTarget()||clinging$validBlockTarget();}
@@ -118,7 +118,7 @@ public abstract class ShulkerBulletMixin extends Projectile implements ShulkerCh
     }
     @Unique private @Nullable Entity clinging$resolveEntityTarget(){return finalTarget==null?null:EntityReference.getEntity(finalTarget,level());}
     @Unique private void clinging$acquireOrFly(){
-        if(!(level() instanceof ServerLevel server))return;Vec3 intent=clinging$intent();var acquisition=ShulkerChargeTargeting.acquire(server,(ShulkerBullet)(Object)this,intent);
+        if(!(level() instanceof ServerLevel server))return;Vec3 intent=clinging$intent();var acquisition=GravityChargeTargeting.acquire(server,(ShulkerBullet)(Object)this,intent);
         clinging$reacquireTicks=4;
         if(acquisition.entity()!=null){clinging$targetBlock=null;finalTarget=EntityReference.of(acquisition.entity());selectNextMoveDirection(null,acquisition.entity());return;}
         if(acquisition.block()!=null){finalTarget=null;clinging$targetBlock=acquisition.block();clinging$selectNextBlockMoveDirection(null);return;}
@@ -145,7 +145,7 @@ public abstract class ShulkerBulletMixin extends Projectile implements ShulkerCh
         needsSync=true;flightSteps=10+random.nextInt(5)*10;
     }
     @Unique private void clinging$setFreeFlight(Vec3 vector){
-        Vec3 safe=ShulkerChargeTargeting.safeIntent(vector);Direction direction=Direction.getApproximateNearest(safe.x,safe.y,safe.z);currentMoveDirection=direction;flightSteps=10;
+        Vec3 safe=GravityChargeTargeting.safeIntent(vector);Direction direction=Direction.getApproximateNearest(safe.x,safe.y,safe.z);currentMoveDirection=direction;flightSteps=10;
         Vec3 delta=new Vec3(direction.getStepX(),direction.getStepY(),direction.getStepZ()).scale(0.15D);targetDeltaX=delta.x;targetDeltaY=delta.y;targetDeltaZ=delta.z;setDeltaMovement(delta);needsSync=true;
     }
 }

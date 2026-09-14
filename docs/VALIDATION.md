@@ -1,126 +1,66 @@
 # Validation
 
-## 0.1.0-alpha.16 Shulker Charge release-candidate validation — 2026-09-14
+## 0.1.0-beta.1 — Gravity Charge beta gate
 
-Alpha.16 layers Shulker Charge onto the already published **0.1.0-alpha.15 pet gravity-breadcrumb pursuit** release, which itself builds on alpha.14's Gravity Fall control/compatibility baseline. The Shulker campaign was developed on `feature/shulker-charge` with temporary SPEC/PLAN/WORKFLOW authority through S05, then synchronized with the moving `main` before the adversarial gate was allowed to close.
+Gravity Charge is the feature that moves Clinging: Reoriented from alpha to beta. The beta label does **not** weaken validation: the feature must pass the complete matrix on the final branch HEAD, then again on the exact integrated `main` commit before `v0.1.0-beta.1` can be published.
 
-### Shulker Charge invariants
+### Final public/internal naming
 
-Automated coverage verifies the stable feature contract:
+Before first publication, the provisional development name “Shulker Charge” was replaced completely by:
 
-- melee and arrow interception, including dispenser arrows, can materialize exactly one Charge;
+- display name: **Gravity Charge**;
+- Spanish (`es_es`): **Carga de gravedad**;
+- registry ID: `clinging_reoriented:gravity_charge`;
+- implementation/tests/assets: `GravityCharge*`, `gravity_charge*`, snapshots `gravity-charge-*`;
+- sprint namespace: `GC-S00` … `GC-S06`.
+
+No released world or artifact ever used `clinging_reoriented:shulker_charge`, so beta.1 intentionally carries no legacy alias. CI also validates exact `en_us`/`es_es` key parity and non-empty Spanish values.
+
+### Gravity Charge invariants
+
+Automated coverage verifies:
+
+- melee and arrow interception, including dispenser arrows, can materialize exactly one Gravity Charge;
 - mixed arrow/melee races cannot duplicate the drop;
-- shield/ordinary impact/expiry paths do not mint Charges;
+- shield, ordinary impact, expiry and unrelated destruction do not mint items;
 - player and real dispenser launch use the same exact vanilla `SHULKER_BULLET` entity type and consume one item;
-- direct-ray Target Blocks win acquisition; assisted entities/blocks remain bounded by the 32-block / 15-degree selection contract;
+- direct-ray Target Blocks win acquisition; assisted entities/blocks stay within 32 blocks / 15 degrees;
 - initial living-target acquisition requires line of sight;
-- a valid lock is sticky and is not replaced by a later better candidate;
-- invalid/dead/removed/dimension-transferred targets are cleared and reacquired from the Charge's current position while preserving original intent;
-- targetless Charges continue cardinal free flight and retry instead of freezing or inventing curved homing;
-- concurrent Charges keep independent target/retry/capture state;
-- Target Block routing ends in a real projectile collision/redstone response;
-- vanilla shulker-duplication semantics remain available because the runtime entity type is not replaced.
+- valid locks are sticky and are not replaced by a later better candidate;
+- dead/removed/dimension-transferred entity targets and invalid Target Blocks are cleared and reacquired from current projectile position while preserving original intent;
+- targetless Gravity Charges continue cardinal free flight and retry instead of freezing or inventing curved homing;
+- concurrent Gravity Charges keep independent target/retry/capture state;
+- Target Block routing ends in real projectile collision/redstone response;
+- vanilla shulker-duplication semantics remain available because runtime entity type is unchanged;
+- Reorientation brewing accepts Gravity Charge and explicitly rejects Shulker Shell as the old ingredient.
 
-Client snapshot validation adds dedicated checkpoints for the inventory icon, first-person held model, third-person held model, projectile renderer and fixed 3D presentation. These coexist with the existing Gravity Fall/First Person/Fresh Animations snapshot matrix.
+### Client evidence
 
-### Adversarial campaign and failure classification
+The default client snapshot matrix includes:
 
-The first S05 failure in run **#701** occurred only in the optional Scale Brews lane: `freeFlightAutomaticallyAcquiresTargetThatAppearsLater` reached its late checkpoint with a projectile that had only ticked four times. The same freeze signature had already identified an under-simulated GameTest chunk boundary. The fixture was hardened to keep the entire intended 32-block flight corridor plus margin at `ENTITY_TICKING`; production remained unchanged and no Scale-specific branch was introduced.
+- `gravity-charge-inventory-icon`;
+- `gravity-charge-first-person-held`;
+- `gravity-charge-third-person-held`;
+- `gravity-charge-projectile-renderer`;
+- `gravity-charge-fixed-3d`.
 
-Run **#706** then failed before compilation because Modrinth returned HTTP 503 while resolving multiple required dependencies. That failure was classified as **environment**, not implementation/test, and did not trigger code changes.
+The item GUI/held assets are original project assets using the project-owned `gravity_charge` texture. The projectile snapshot intentionally exercises Minecraft's vanilla ShulkerBullet renderer because the runtime entity remains vanilla.
 
-Run **#710** (`34895769482`) passed the full matrix before the branch was synchronized with the then-current `main`.
+### Adversarial campaign history
 
-After merging the alpha.14 baseline and the pet breadcrumb-pursuit implementation into the feature branch, run **#714** (`34897063938`) passed the complete post-merge S05 gate on commit `a16d16faaa2cbd3c4b51678f08310ebc9a8bf681`:
+Run **#701** exposed a GameTest fixture problem in the optional Scale Brews lane: a late-target projectile stopped ticking after leaving the simulated chunk region. The fixture was hardened to keep the full 32-block flight corridor plus margin at `ENTITY_TICKING`; production remained unchanged and no Scale-specific code path was introduced.
 
-- Gradle build and JUnit;
-- **121/121 required server GameTests**, including the Shulker adversarial holdouts;
-- default client GameTests;
-- First Person 2.7.2 + Not Enough Animations 1.12.4;
-- Scale Brews beta.5 isolated server and client lanes;
-- Fresh Animations 1.10.5 + FA Player Extension 1.1 + EMF 3.3.5 + ETF 7.2;
-- semantic screenshot validation;
-- artifact/log/report retention.
+Run **#706** then failed before compilation because Modrinth returned HTTP 503 for multiple required dependencies. It was classified as **environment** and caused no code change.
 
-The exact #714 artifact was `10369304504`, digest `sha256:f0220df2edb45d076302d9849c10e05e662aacd6319d92135720d68e9a0f3869`. Manual review of its five Shulker Charge checkpoints confirmed the project-owned GUI icon and 3D item presentation without missing textures, coherent first-/third-person presentation, and the unchanged vanilla renderer for the launched ShulkerBullet.
+Run **#710** (`34895769482`) passed the complete matrix before the alpha.14 synchronization. Run **#714** (`34897063938`) passed the complete post-merge matrix on `a16d16faaa2cbd3c4b51678f08310ebc9a8bf681`, including build/JUnit, server GameTests, default client, First Person, Scale Brews server/client, Fresh Animations and semantic screenshots.
 
-That post-merge run is the functional S05 no-change gate. The later publication of pet pursuit as alpha.15 changes only Shulker Charge's release number to alpha.16; the final alpha.16 release-prep tree must still pass the full matrix on the current combined history, and `main` must repeat it after integration.
+Alpha.15 was subsequently published from exact `main` commit `fe74b979179065afa505baa4b2ece75bebc9f4d2` after its own full validation. Beta.1 therefore revalidates Gravity Charge on top of the **published last-alpha baseline**, rather than inheriting an older green run by assumption.
 
-### Asset provenance
+## Compatibility matrix
 
-The Shulker Charge 16x16 GUI icon, item texture and project-authored 3D item geometry are original GPL-3.0-or-later project assets. Editable icon source remains under `docs/art/shulker-charge/`. The launched Charge remains the exact vanilla ShulkerBullet entity, so Minecraft's own projectile renderer/model/texture are used at runtime for that entity and are not redistributed by this project.
+Every beta release-gating run executes:
 
-## 0.1.0-alpha.15 pet gravity-breadcrumb pursuit — 2026-09-14
-
-Before release, the rebased pet-pursuit tree passed locally on Java 25 and Minecraft 26.2: **75/75 JUnit tests** and **95/95 required server GameTests**. New coverage exercises all six movement-plane projections, the vanilla close-distance dead zone, real scheduled wolf traversal to an airborne breadcrumb, bounded arrival, center-aligned grounded replay, ballistic goal release, Gravity Changer navigation replacement, ordered-queue preservation, sitting pause/resume, effect-free behavior and external teleport invalidation.
-
-The prerelease was then published as **v0.1.0-alpha.15** from target commit `fe74b979179065afa505baa4b2ece75bebc9f4d2` after successful `main` CI run **#720** (`34897652131`). The exact-artifact publisher recorded:
-
-- regular JAR SHA-256: `dc3e2172e441df46202ef45856f1b7af62a6f6f98a65a65d4254bb04ce409e51`;
-- sources JAR SHA-256: `29eae01135e963941ac4590a933b71f45d6e23d1f2ee60ba9eb0ba7773b26b8e`.
-
-That release contains the pet pursuit work only; Shulker Charge follows as alpha.16.
-
-## 0.1.0-alpha.14 release-candidate validation — 2026-09-14
-
-Alpha.14 is the Gravity Fall control/compatibility campaign. It preserves alpha.13's world-momentum and absorbed-collision foundations while adding a 500 ms landing manoeuvre, full-sphere camera look, bounded body aerodynamics/W air-diving, Elytra-style airflow audio, generic fluid context, world-vertical water/climbable policies, First Person look-down hardening, directional mace height and server flight-safety fences.
-
-### Integration strategy
-
-Each risky subsystem was developed through a separate TM branch and required a full matrix before integration. Conflict-dirty branches were not force-merged; functionality was rebuilt on the current `main` when neighbouring policy had changed.
-
-Key green evidence includes:
-
-- generic fluid context: run **#655** (`34882827200`);
-- 500 ms landing manoeuvre: run **#664** (`34884020691`);
-- First Person look-down hotfix: run **#668** (`34884904594`);
-- directional mace geometry: run **#669** (`34885200233`);
-- full-sphere camera TM: run **#671** (`34885705114`);
-- aerodynamics + air-diving on fluid/landing/First-Person/mace main: run **#678** (`34886274878`);
-- final full-sphere camera rebuilt on the post-aerodynamics main: run **#684** (`34887380354`), head `91bb5d0859f088fc0e6eb4fd701903ec0a085350`, merged as PR #21.
-
-Run #684 passed the complete matrix before merge: build/JUnit, required server GameTests, default client, First Person, Scale Brews server/client, Fresh Animations and semantic snapshot validation. The published alpha.14 release commit was then validated again on `main`, and its release workflow consumed that successful run's artifact rather than rebuilding separately.
-
-### Camera and landing
-
-Client holdouts cross +120 and -120 degrees of pitch, complete a 360-degree vertical loop, compare entity look with the rendered camera quaternion beyond both poles, and verify that Gravity Fall exit returns to vanilla's +/-90-degree pitch representation **without changing the look vector**.
-
-Landing tests use the shared `LandingTiming` contract: 10 ticks / 500 ms for local camera LAND and Gravity Fall BODY_LANDING. Predictor/commitment validity, input rejection, support revalidation and partial-frame cancellation remain covered.
-
-First Person testing keeps the real camera independent while applying the macro body root through a blended camera/body pivot. Baseline and Gravity Fall look-down screenshots exercise steep angles where the old body-center pivot clipped.
-
-### Body aerodynamics and air-diving
-
-Pure tests verify the 35-degree body look deadzone, 7.5-degree/tick follow cap, drag factor bounds and zero extra drag when streamlined.
-
-W steering tests verify that momentum is redirected by at most 6 degrees/tick, scales with the positive velocity/look dot product, preserves speed before drag and gives zero authority for perpendicular/backward gaze or zero input. The server remains authoritative through bounded monotonic world-look/forward samples.
-
-The adversarial client holdout continues to require the body to remain velocity-owned while allowing the new bounded look-follow offset. Camera continuity is checked independently.
-
-### Sound and flight safety
-
-Gravity Fall fast-air sound has unit coverage for its Elytra-derived speed-squared volume/high-speed pitch mapping and 10-tick admission fade semantics. Runtime ownership ends the loop on Gravity Fall release or real Elytra flight.
-
-Flight-safety tests cover the 3.92 blocks/tick directional speed cap, loaded-frontier hold/resume and hard-boundary recovery. Safety intervention clears impact state so the rescue cannot become synthetic damage.
-
-### Fluids, water and climbables
-
-Server GameTests exercise generic non-empty fluid intersection rather than only water/lava. A submerged entity touching a solid seabed remains in fluid context and cannot regain Clinging support or start a landing reorientation.
-
-Water tests preserve the passive 250 ms double-Space gesture and verify world +Y/-Y ascent/descent under owned non-DOWN gravity.
-
-Climbable tests cover DOWN vanilla behaviour, lateral-gravity ignore and mirrored UP world-Y climbing.
-
-### Impact and directional mace
-
-Alpha.13 absorbed-collision impact tests remain in the suite: high-speed late turns still damage, genuine braking can reduce damage, tangential motion stays harmless and multi-axis absorption is charged once.
-
-Directional mace GameTests verify literal fall geometry independently from vanilla/Gravity Changer `fallDistance`: four EAST blocks count as four, a gravity change starts at zero, one SOUTH block does not arm smash, two do, and changing gravity strength does not alter those two geometric blocks. Mixin coverage targets the actual 26.2 `LivingEntity`/`Entity` field owners used by mace bytecode.
-
-### Compatibility matrix
-
-Every release-gating run executes:
-
+- localization key/value parity (`en_us` ↔ `es_es`);
 - Gradle build and JUnit;
 - required server GameTests;
 - default client GameTests;
@@ -130,31 +70,28 @@ Every release-gating run executes:
 - semantic screenshot validation;
 - artifact retention for JARs, logs, XML, reports and screenshots.
 
-CI preserves default, First Person and Fresh Animations screenshot sets. Alpha.16 extends the default set with Shulker Charge inventory/held/projectile/fixed-3D checkpoints while retaining the alpha.14 camera/body evidence.
-
 ## Packaging gate
 
-A prerelease is published only from the **exact `main` commit whose complete `Build and test` run succeeded**. The release automation downloads the regular and sources JARs from that exact workflow artifact, records SHA-256 digests in the release notes and creates the prerelease tag against that commit. It never performs a second release build.
+A prerelease is published only from the **exact `main` commit whose complete `Build and test` run succeeded**. `release-beta1.yml` downloads the regular and sources JARs from that exact workflow artifact, verifies one of each, records SHA-256 digests and creates `v0.1.0-beta.1` against the same commit. It never performs a second release build.
 
-Production output must not contain GameTest classes, dependency JARs, temporary planning files or raw validation logs. Temporary Shulker Charge SPEC/PLAN/WORKFLOW documents were removed from the release tree during S06 canonization.
+Production output must not contain GameTest classes, dependency JARs, temporary planning files or raw validation logs.
+
+## Asset provenance
+
+The Gravity Charge 16x16 GUI icon, item texture and project-authored 3D geometry are original GPL-3.0-or-later assets. Editable icon source lives under `docs/art/gravity-charge/`. Minecraft's ShulkerBullet renderer/resources remain third-party runtime material and are not redistributed.
 
 ## Manual QA still required
 
-- Dedicated multiplayer with realistic latency around rapid Reorientation, air-diving input, landing commitment, Shulker Charge capture/relaunch/reacquisition, fluid entry/exit, teleport and tracking boundaries.
-- Human motion-comfort/readability during repeated full-sphere look, gravity reversals and 500 ms 90/180-degree landing manoeuvres.
-- Human tuning assessment of the 35-degree neck cone, 7.5-degree body follow, 6-degree W redirect and posture drag.
-- Audio feel at low/high Gravity Fall speeds and handoff to real Elytra.
-- Long full-pack sessions with First Person + Fresh Animations together, plus mount/pet routes, Shulker Charge use and modded fluids.
-- Uneven-terrain sprint-jump feel with normal and high jump-strength modifiers.
+- Dedicated multiplayer with realistic latency around rapid Reorientation, Gravity Charge capture/relaunch/reacquisition, landing commitment, fluid entry/exit, teleport and tracking boundaries.
+- Human motion-comfort/readability during repeated full-sphere look, gravity reversals and 500 ms landing manoeuvres.
+- Long full-pack sessions with First Person + Fresh Animations together, mount/pet routes, Gravity Charge use and modded fluids.
+- Human feel review of Gravity Charge targeting readability and dispenser/build interactions.
 
 Automated assertions and snapshots are evidence, not a substitute for human gameplay acceptance.
 
-## Historical release validation
+## Historical releases
 
-### 0.1.0-alpha.13 — 2026-09-14
-
-Alpha.13 introduced retained free-flight camera, velocity-owned Gravity Fall body presentation, physically committed landing snaps, absorbed-collision impact damage and the landing-surface provider API. Its final matrix included 86 server GameTests plus default client, First Person, Scale Brews and pinned Fresh Animations lanes.
-
-### 0.1.0-alpha.12 and earlier
-
-Alpha.12 added underwater double-Space arbitration, gravity-relative recharge, jump-aware sprint-landing reservation and tracked mount/pet snaps. Alpha.11 established selection-vs-navigation intent and monotonic visual epochs. Earlier alphas established ownership, recovery and the one-turn Clinging budget.
+- **0.1.0-alpha.15**: pet gravity-breadcrumb pursuit; last alpha.
+- **0.1.0-alpha.14**: Gravity Fall control/camera, 500 ms landing, full-sphere look, aerodynamics, fluid/climbable policy, safety and directional mace.
+- **0.1.0-alpha.13**: retained camera, Gravity Fall body, absorbed-collision impact and landing-surface API.
+- **0.1.0-alpha.12 and earlier**: underwater input arbitration, recharge, jump reservation, tracked mount/pet snaps and original airborne gravity ownership foundations.

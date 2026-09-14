@@ -9,10 +9,10 @@ Clinging: Reoriented interoperates with the projects below. Their code and asset
 - [CodxLib](https://modrinth.com/mod/codxlib) and [Cloth Config API](https://modrinth.com/mod/cloth-config), required by the runtime dependency stack.
 - [Alchemical Leather](https://github.com/R3Neer/alchemical-leather), [Scale Brews](https://github.com/R3Neer/scale-brews), First Person and Scale Visual Compat, which are optional integrations.
 
-## Shulker Charge artwork and vanilla references
+## Gravity Charge artwork and vanilla projectile resources
 
-The Shulker Charge 2D inventory icon, its texture and the project-authored 3D item model geometry are original Clinging: Reoriented assets and are licensed **GPL-3.0-or-later** with the project. Editable source for the icon is retained under `docs/art/shulker-charge/`.
+The Gravity Charge 2D inventory icon, 3D item geometry and item texture are original Clinging: Reoriented assets and are licensed **GPL-3.0-or-later** with the project. Editable source for the icon is retained under `docs/art/gravity-charge/`.
 
-The launched Charge intentionally remains the exact vanilla `minecraft:shulker_bullet` entity type, so Minecraft's ShulkerBullet renderer/model/texture are used by Minecraft itself at runtime. Those Mojang assets and the vanilla reference images inspected during design are **not redistributed** by this repository.
+The item model itself uses the project-owned `clinging_reoriented:item/gravity_charge` texture. A launched Gravity Charge deliberately retains the vanilla `minecraft:shulker_bullet` entity type, so Minecraft's own ShulkerBullet renderer/model/texture are used by Minecraft at runtime. Those Mojang assets are **not copied into or redistributed by this repository**.
 
 All names and trademarks belong to their respective owners. Refer to each project's distribution for its license and terms.

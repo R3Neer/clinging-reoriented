@@ -7,13 +7,13 @@
         "when": ["gui"],
         "model": {
           "type": "minecraft:model",
-          "model": "clinging_reoriented:item/shulker_charge_gui"
+          "model": "clinging_reoriented:item/gravity_charge_gui"
         }
       }
     ],
     "fallback": {
       "type": "minecraft:model",
-      "model": "clinging_reoriented:item/shulker_charge_3d"
+      "model": "clinging_reoriented:item/gravity_charge_3d"
     }
   }
 }

@@ -6,7 +6,7 @@ import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
 /** Runtime duck implemented by vanilla ShulkerBullet through the common mixin. */
-public interface ShulkerChargeProjectile {
+public interface GravityChargeProjectile {
     void clinging$initializeCharge(Vec3 intent);
     boolean clinging$isLaunchedCharge();
     Vec3 clinging$intent();

@@ -23,10 +23,10 @@
       "io.github.r3neer.clingingreoriented.GravityFallStateGameTests",
       "io.github.r3neer.clingingreoriented.GameFeelAdversarialGameTests",
       "io.github.r3neer.clingingreoriented.GameFeelLifecycleGameTests",
-      "io.github.r3neer.clingingreoriented.ShulkerChargeGameTests",
-      "io.github.r3neer.clingingreoriented.ShulkerChargeLaunchGameTests",
-      "io.github.r3neer.clingingreoriented.ShulkerChargeProjectileGameTests",
-      "io.github.r3neer.clingingreoriented.ShulkerChargeAdversarialGameTests"
+      "io.github.r3neer.clingingreoriented.GravityChargeGameTests",
+      "io.github.r3neer.clingingreoriented.GravityChargeLaunchGameTests",
+      "io.github.r3neer.clingingreoriented.GravityChargeProjectileGameTests",
+      "io.github.r3neer.clingingreoriented.GravityChargeAdversarialGameTests"
     ],
     "fabric-client-gametest": [
       "io.github.r3neer.clingingreoriented.ClingingClientGameTest",
@@ -36,7 +36,7 @@
       "io.github.r3neer.clingingreoriented.GravityFallClientGameTest",
       "io.github.r3neer.clingingreoriented.GravityFallFullSphereClientGameTest",
       "io.github.r3neer.clingingreoriented.GameFeelAdversarialClientGameTest",
-      "io.github.r3neer.clingingreoriented.ShulkerChargeClientGameTest"
+      "io.github.r3neer.clingingreoriented.GravityChargeClientGameTest"
     ]
   }
 }

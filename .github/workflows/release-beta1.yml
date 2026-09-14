@@ -1,4 +1,4 @@
-name: Publish alpha.16 prerelease
+name: Publish beta.1 prerelease
 
 on:
   workflow_run:
@@ -23,7 +23,7 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
-      - name: Admit only alpha.16 once
+      - name: Admit only beta.1 once
         id: gate
         env:
           GH_TOKEN: ${{ github.token }}
@@ -31,14 +31,14 @@ jobs:
         run: |
           set -euo pipefail
           version="$(sed -n 's/^mod_version=//p' gradle.properties)"
-          if [[ "$version" != "0.1.0-alpha.16" ]]; then
+          if [[ "$version" != "0.1.0-beta.1" ]]; then
             echo "eligible=false" >> "$GITHUB_OUTPUT"
-            echo "Validated main is $version, not alpha.16; nothing to publish."
+            echo "Validated main is $version, not beta.1; nothing to publish."
             exit 0
           fi
-          if gh release view v0.1.0-alpha.16 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+          if gh release view v0.1.0-beta.1 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "eligible=false" >> "$GITHUB_OUTPUT"
-            echo "alpha.16 already exists; refusing to republish."
+            echo "beta.1 already exists; refusing to republish."
             exit 0
           fi
           echo "eligible=true" >> "$GITHUB_OUTPUT"
@@ -63,15 +63,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t regular < <(find release-artifact -type f -name 'clinging-reoriented-0.1.0-alpha.16.jar')
-          mapfile -t sources < <(find release-artifact -type f -name 'clinging-reoriented-0.1.0-alpha.16-sources.jar')
+          mapfile -t regular < <(find release-artifact -type f -name 'clinging-reoriented-0.1.0-beta.1.jar')
+          mapfile -t sources < <(find release-artifact -type f -name 'clinging-reoriented-0.1.0-beta.1-sources.jar')
           [[ ${#regular[@]} -eq 1 ]] || { echo "Expected exactly one regular JAR, found ${#regular[@]}"; exit 1; }
           [[ ${#sources[@]} -eq 1 ]] || { echo "Expected exactly one sources JAR, found ${#sources[@]}"; exit 1; }
           regular_sha="$(sha256sum "${regular[0]}" | awk '{print $1}')"
           sources_sha="$(sha256sum "${sources[0]}" | awk '{print $1}')"
           echo "regular=${regular[0]}" >> "$GITHUB_OUTPUT"
           echo "sources=${sources[0]}" >> "$GITHUB_OUTPUT"
-          awk '/^## \[0\.1\.0-alpha\.16\]/{capture=1; next} capture && /^## \[/{exit} capture{print}' CHANGELOG.md > release-notes.md
+          awk '/^## \[0\.1\.0-beta\.1\]/{capture=1; next} capture && /^## \[/{exit} capture{print}' CHANGELOG.md > release-notes.md
           cat >> release-notes.md <<EOF
 
           ---
@@ -81,7 +81,7 @@ jobs:
           Sources JAR SHA-256: $sources_sha
           EOF
 
-      - name: Create alpha.16 prerelease from validated artifact
+      - name: Create beta.1 prerelease from validated artifact
         if: steps.gate.outputs.eligible == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -91,9 +91,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh release create v0.1.0-alpha.16 "$REGULAR" "$SOURCES" \
+          gh release create v0.1.0-beta.1 "$REGULAR" "$SOURCES" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$TARGET_SHA" \
-            --title 'Clinging: Reoriented 0.1.0-alpha.16' \
+            --title 'Clinging: Reoriented 0.1.0-beta.1' \
             --prerelease \
             --notes-file release-notes.md

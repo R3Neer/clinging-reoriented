@@ -24,8 +24,8 @@ import net.minecraft.world.level.portal.TeleportTransition;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
-/** Reserved SC-S05 attacks against integration boundaries and state ownership. */
-public final class ShulkerChargeAdversarialGameTests {
+/** Reserved GC-S05 attacks against integration boundaries and state ownership. */
+public final class GravityChargeAdversarialGameTests {
     private static void clear(GameTestHelper h,int minX,int minY,int minZ,int maxX,int maxY,int maxZ){
         for(int x=minX;x<=maxX;x++)for(int y=minY;y<=maxY;y++)for(int z=minZ;z<=maxZ;z++)h.setBlock(new BlockPos(x,y,z),Blocks.AIR);
     }
@@ -39,8 +39,6 @@ public final class ShulkerChargeAdversarialGameTests {
             minX=Math.min(minX,chunk.x());maxX=Math.max(maxX,chunk.x());
             minZ=Math.min(minZ,chunk.z());maxZ=Math.max(maxZ,chunk.z());
         }
-        // Match the stable routing fixtures: radius 2 maps to ENTITY_TICKING in 26.2,
-        // and one extra chunk protects a routing step across an arbitrary GameTest boundary.
         minX--;minZ--;maxX++;maxZ++;
         var source=h.getLevel().getChunkSource();
         for(int x=minX;x<=maxX;x++)for(int z=minZ;z<=maxZ;z++)
@@ -48,19 +46,19 @@ public final class ShulkerChargeAdversarialGameTests {
     }
 
     private static ShulkerBullet launched(GameTestHelper h,Vec3 relative,Vec3 intent){
-        var bullet=new ShulkerChargeBullet(h.getLevel());
+        var bullet=new GravityChargeBullet(h.getLevel());
         Vec3 at=h.absoluteVec(relative);
         Vec3 routeEnd=intent.lengthSqr()>1.0E-12?at.add(intent.normalize().scale(32.0D)):at;
         keepSimulated(h,at,routeEnd);
         bullet.snapTo(at.x,at.y,at.z,0,0);
-        ((ShulkerChargeProjectile)(Object)bullet).clinging$initializeCharge(intent);
-        h.assertTrue(h.getLevel().addFreshEntity(bullet),"adversarial Charge must enter server entity manager");
+        ((GravityChargeProjectile)(Object)bullet).clinging$initializeCharge(intent);
+        h.assertTrue(h.getLevel().addFreshEntity(bullet),"adversarial Gravity Charge must enter server entity manager");
         return bullet;
     }
 
     private static long chargeDrops(ServerLevel level,Vec3 at,double radius){
         AABB area=new AABB(at,at).inflate(radius);
-        return level.getEntitiesOfClass(ItemEntity.class,area,e->e.getItem().is(ShulkerCharges.ITEM)).size();
+        return level.getEntitiesOfClass(ItemEntity.class,area,e->e.getItem().is(GravityCharges.ITEM)).size();
     }
 
     @GameTest(maxTicks=80,padding=40)
@@ -72,18 +70,18 @@ public final class ShulkerChargeAdversarialGameTests {
         level.setBlock(dispenser,state,3);
         h.assertTrue(level.getBlockEntity(dispenser) instanceof DispenserBlockEntity,"real dispenser fixture must create its block entity");
         var be=(DispenserBlockEntity)level.getBlockEntity(dispenser);
-        be.setItem(0,new ItemStack(ShulkerCharges.ITEM,2));
+        be.setItem(0,new ItemStack(GravityCharges.ITEM,2));
         level.setBlock(dispenser.above(),Blocks.REDSTONE_BLOCK.defaultBlockState(),3);
         Vec3 center=Vec3.atCenterOf(dispenser);
 
         h.startSequence()
             .thenExecuteAfter(6,()->{
-                List<ShulkerBullet> charges=level.getEntitiesOfClass(ShulkerBullet.class,new AABB(center,center).inflate(12),e->((ShulkerChargeProjectile)(Object)e).clinging$isLaunchedCharge());
-                h.assertTrue(charges.size()==1,"one powered dispenser activation must launch exactly one Shulker Charge; found="+charges.size());
-                var bullet=charges.getFirst();var duck=(ShulkerChargeProjectile)(Object)bullet;
+                List<ShulkerBullet> charges=level.getEntitiesOfClass(ShulkerBullet.class,new AABB(center,center).inflate(12),e->((GravityChargeProjectile)(Object)e).clinging$isLaunchedCharge());
+                h.assertTrue(charges.size()==1,"one powered dispenser activation must launch exactly one Gravity Charge; found="+charges.size());
+                var bullet=charges.getFirst();var duck=(GravityChargeProjectile)(Object)bullet;
                 h.assertTrue(duck.clinging$intent().distanceToSqr(new Vec3(1,0,0))<1.0E-6,"registered projectile behavior must preserve dispenser EAST facing; intent="+duck.clinging$intent());
-                h.assertTrue(bullet.getOwner()==null,"dispenser Charge must remain ownerless");
-                h.assertTrue(be.getItem(0).getCount()==1,"real dispenser behavior must consume exactly one Charge; count="+be.getItem(0).getCount());
+                h.assertTrue(bullet.getOwner()==null,"dispenser Gravity Charge must remain ownerless");
+                h.assertTrue(be.getItem(0).getCount()==1,"real dispenser behavior must consume exactly one Gravity Charge; count="+be.getItem(0).getCount());
             })
             .thenSucceed();
     }
@@ -93,7 +91,7 @@ public final class ShulkerChargeAdversarialGameTests {
         clear(h,4,5,4,25,13,12);
         var cow=h.spawn(EntityTypes.COW,new BlockPos(18,8,8));cow.setNoAi(true);cow.setNoGravity(true);
         var bullet=launched(h,new Vec3(7.5,8.8,8.5),new Vec3(1,0,0));
-        var duck=(ShulkerChargeProjectile)(Object)bullet;
+        var duck=(GravityChargeProjectile)(Object)bullet;
         h.assertTrue(duck.clinging$targetEntity()==cow,"fixture must acquire original farther cow");
         var pig=h.spawn(EntityTypes.PIG,new BlockPos(12,8,8));pig.setNoAi(true);pig.setNoGravity(true);
         duck.clinging$forceAcquire();
@@ -105,7 +103,7 @@ public final class ShulkerChargeAdversarialGameTests {
     public void freeFlightAutomaticallyAcquiresTargetThatAppearsLater(GameTestHelper h){
         clear(h,4,5,4,30,13,12);
         var bullet=launched(h,new Vec3(7.5,8.8,8.5),new Vec3(1,0,0));
-        var duck=(ShulkerChargeProjectile)(Object)bullet;
+        var duck=(GravityChargeProjectile)(Object)bullet;
         h.assertTrue(duck.clinging$targetEntity()==null&&duck.clinging$targetBlock()==null,"late-target fixture must begin in free flight");
         final LivingEntity[] cow={null};
         h.startSequence()
@@ -120,7 +118,7 @@ public final class ShulkerChargeAdversarialGameTests {
         ServerLevel overworld=h.getLevel();
         var cow=h.spawn(EntityTypes.COW,new BlockPos(18,8,8));cow.setNoAi(true);cow.setNoGravity(true);
         var bullet=launched(h,new Vec3(7.5,8.8,8.5),new Vec3(1,0,0));
-        var duck=(ShulkerChargeProjectile)(Object)bullet;
+        var duck=(GravityChargeProjectile)(Object)bullet;
         h.assertTrue(duck.clinging$targetEntity()==cow,"dimension fixture must own cow before transfer");
         Vec3 originalIntent=duck.clinging$intent();
         var pig=h.spawn(EntityTypes.PIG,new BlockPos(14,8,8));pig.setNoAi(true);pig.setNoGravity(true);
@@ -145,13 +143,13 @@ public final class ShulkerChargeAdversarialGameTests {
         var foreignArrow=new Arrow(level,other,new ItemStack(Items.ARROW),null);
         first.hurtServer(level,level.damageSources().arrow(foreignArrow,other),1.0F);
         first.hurtServer(level,level.damageSources().playerAttack(owner),1.0F);
-        h.assertTrue(chargeDrops(level,firstAt,4)==1,"foreign arrow then owner melee must produce exactly one Charge drop");
+        h.assertTrue(chargeDrops(level,firstAt,4)==1,"foreign arrow then owner melee must produce exactly one Gravity Charge drop");
 
         var second=launched(h,new Vec3(18,8,11),new Vec3(1,0,0));second.setOwner(owner);Vec3 secondAt=second.position();
         var ownerArrow=new Arrow(level,owner,new ItemStack(Items.ARROW),null);
         second.hurtServer(level,level.damageSources().playerAttack(other),1.0F);
         second.hurtServer(level,level.damageSources().arrow(ownerArrow,owner),1.0F);
-        h.assertTrue(chargeDrops(level,secondAt,4)==1,"foreign melee then owner arrow must produce exactly one Charge drop");
+        h.assertTrue(chargeDrops(level,secondAt,4)==1,"foreign melee then owner arrow must produce exactly one Gravity Charge drop");
         h.succeed();
     }
 
@@ -162,11 +160,11 @@ public final class ShulkerChargeAdversarialGameTests {
         var pig=h.spawn(EntityTypes.PIG,new BlockPos(8,8,20));pig.setNoAi(true);pig.setNoGravity(true);
         var east=launched(h,new Vec3(7.5,8.8,7.5),new Vec3(1,0,0));
         var south=launched(h,new Vec3(8.5,8.8,7.5),new Vec3(0,0,1));
-        var eastDuck=(ShulkerChargeProjectile)(Object)east;
-        var southDuck=(ShulkerChargeProjectile)(Object)south;
+        var eastDuck=(GravityChargeProjectile)(Object)east;
+        var southDuck=(GravityChargeProjectile)(Object)south;
         Vec3 eastIntent=eastDuck.clinging$intent(),southIntent=southDuck.clinging$intent();
-        h.assertTrue(eastDuck.clinging$targetEntity()==cow,"east Charge must own east cow without stealing south target");
-        h.assertTrue(southDuck.clinging$targetEntity()==pig,"south Charge must own south pig without stealing east target");
+        h.assertTrue(eastDuck.clinging$targetEntity()==cow,"east Gravity Charge must own east cow without stealing south target");
+        h.assertTrue(southDuck.clinging$targetEntity()==pig,"south Gravity Charge must own south pig without stealing east target");
 
         cow.discard();
         var sheep=h.spawn(EntityTypes.SHEEP,new BlockPos(17,8,7));sheep.setNoAi(true);sheep.setNoGravity(true);
@@ -175,7 +173,7 @@ public final class ShulkerChargeAdversarialGameTests {
         h.assertTrue(eastDuck.clinging$targetEntity()==sheep,"invalidated east lock must reacquire only the east replacement");
         h.assertTrue(southDuck.clinging$targetEntity()==pig,"reacquiring another projectile must not disturb a valid south lock");
         h.assertTrue(eastDuck.clinging$intent().distanceToSqr(eastIntent)<1.0E-12,"east intent must remain stable across independent reacquisition");
-        h.assertTrue(southDuck.clinging$intent().distanceToSqr(southIntent)<1.0E-12,"south intent must remain stable while another Charge reacquires");
+        h.assertTrue(southDuck.clinging$intent().distanceToSqr(southIntent)<1.0E-12,"south intent must remain stable while another Gravity Charge reacquires");
         h.succeed();
     }
 
@@ -187,19 +185,19 @@ public final class ShulkerChargeAdversarialGameTests {
         for(int i=0;i<12;i++){
             double x=6+(i%4)*3.0,z=6+(i/4)*3.0,y=10;
             var bullet=launched(h,new Vec3(x,y,z),new Vec3(0,1,0));
-            var duck=(ShulkerChargeProjectile)(Object)bullet;
-            h.assertTrue(duck.clinging$targetEntity()==null&&duck.clinging$targetBlock()==null,"stress Charge must start targetless; index="+i);
+            var duck=(GravityChargeProjectile)(Object)bullet;
+            h.assertTrue(duck.clinging$targetEntity()==null&&duck.clinging$targetBlock()==null,"stress Gravity Charge must start targetless; index="+i);
             charges.add(bullet);starts.add(bullet.getY());
         }
         h.startSequence()
             .thenExecuteAfter(24,()->{
                 for(int i=0;i<charges.size();i++){
-                    var bullet=charges.get(i);var duck=(ShulkerChargeProjectile)(Object)bullet;
-                    h.assertTrue(bullet.isAlive(),"targetless retry stress must not consume Charge "+i+" after multiple reacquisition cycles");
-                    h.assertTrue(bullet.tickCount>=20,"stress Charge must have ticked through multiple 4-tick retry windows; index="+i+" ticks="+bullet.tickCount);
+                    var bullet=charges.get(i);var duck=(GravityChargeProjectile)(Object)bullet;
+                    h.assertTrue(bullet.isAlive(),"targetless retry stress must not consume Gravity Charge "+i+" after multiple reacquisition cycles");
+                    h.assertTrue(bullet.tickCount>=20,"stress Gravity Charge must have ticked through multiple 4-tick retry windows; index="+i+" ticks="+bullet.tickCount);
                     h.assertTrue(duck.clinging$targetEntity()==null&&duck.clinging$targetBlock()==null,"targetless retry cycles must not fabricate a lock; index="+i);
                     h.assertTrue(duck.clinging$intent().distanceToSqr(new Vec3(0,1,0))<1.0E-12,"retry cycles must preserve original intent; index="+i+" intent="+duck.clinging$intent());
-                    h.assertTrue(bullet.getY()>starts.get(i)+0.25D,"targetless Charge must keep flying instead of stalling during retries; index="+i+" y="+bullet.getY());
+                    h.assertTrue(bullet.getY()>starts.get(i)+0.25D,"targetless Gravity Charge must keep flying instead of stalling during retries; index="+i+" y="+bullet.getY());
                 }
             })
             .thenSucceed();

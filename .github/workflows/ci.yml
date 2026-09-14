@@ -20,6 +20,21 @@ jobs:
           java-version: '25'
       - name: Make Gradle executable
         run: chmod +x ./gradlew
+      - name: Validate English / Spanish localization parity
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path('src/main/resources/assets/clinging_reoriented/lang')
+          en = json.loads((root / 'en_us.json').read_text(encoding='utf-8'))
+          es = json.loads((root / 'es_es.json').read_text(encoding='utf-8'))
+          missing = sorted(set(en) - set(es))
+          extra = sorted(set(es) - set(en))
+          empty = sorted(k for k in en if not isinstance(es.get(k), str) or not es[k].strip())
+          if missing or extra or empty:
+              raise SystemExit(f'localization parity failed: missing_es={missing} extra_es={extra} empty_es={empty}')
+          print(f'Localization parity OK: {len(en)} keys in en_us and es_es')
+          PY
       - name: Build and run unit tests without optional Scale Brews
         run: ./gradlew build --no-daemon --console=plain
       - name: Run server GameTests without optional Scale Brews
@@ -102,11 +117,11 @@ jobs:
                   's05-cancelled-landing-holds-partial',
                   's05-language-falling',
                   's05-language-elytra',
-                  'shulker-charge-inventory-icon',
-                  'shulker-charge-first-person-held',
-                  'shulker-charge-third-person-held',
-                  'shulker-charge-projectile-renderer',
-                  'shulker-charge-fixed-3d',
+                  'gravity-charge-inventory-icon',
+                  'gravity-charge-first-person-held',
+                  'gravity-charge-third-person-held',
+                  'gravity-charge-projectile-renderer',
+                  'gravity-charge-fixed-3d',
               ],
               'first_person': [
                   'firstperson-gravity-fall-root',
@@ -140,11 +155,11 @@ jobs:
           distinct = [
               (('default', 's05-language-falling'), ('default', 's05-language-elytra')),
               (('fresh_animations', 'fresh-animations-gravity-fall-landing-mid'), ('fresh_animations', 'fresh-animations-gravity-fall-landing-final')),
-              (('default', 'shulker-charge-inventory-icon'), ('default', 'shulker-charge-first-person-held')),
-              (('default', 'shulker-charge-first-person-held'), ('default', 'shulker-charge-third-person-held')),
-              (('default', 'shulker-charge-third-person-held'), ('default', 'shulker-charge-projectile-renderer')),
-              (('default', 'shulker-charge-fixed-3d'), ('default', 'shulker-charge-inventory-icon')),
-              (('default', 'shulker-charge-fixed-3d'), ('default', 'shulker-charge-projectile-renderer')),
+              (('default', 'gravity-charge-inventory-icon'), ('default', 'gravity-charge-first-person-held')),
+              (('default', 'gravity-charge-first-person-held'), ('default', 'gravity-charge-third-person-held')),
+              (('default', 'gravity-charge-third-person-held'), ('default', 'gravity-charge-projectile-renderer')),
+              (('default', 'gravity-charge-fixed-3d'), ('default', 'gravity-charge-inventory-icon')),
+              (('default', 'gravity-charge-fixed-3d'), ('default', 'gravity-charge-projectile-renderer')),
           ]
           for left, right in distinct:
               if found[left] == found[right]:

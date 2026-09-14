@@ -107,9 +107,9 @@ public final class ReorientationTests {
         for(boolean extended:new boolean[]{false,true})for(var bottle:new Item[]{Items.POTION,Items.SPLASH_POTION,Items.LINGERING_POTION}) {
             var base=BuiltInRegistries.POTION.get(Identifier.parse(extended?"alexsmobs:long_clinging":"alexsmobs:clinging")).orElseThrow();
             var baseStack=PotionContents.createItemStack(bottle,base);
-            var result=brewing.mix(new ItemStack(ShulkerCharges.ITEM),baseStack);
+            var result=brewing.mix(new ItemStack(GravityCharges.ITEM),baseStack);
             var potion=result.get(DataComponents.POTION_CONTENTS).potion().orElseThrow();
-            h.assertTrue(potion.equals(extended?Reorientation.LONG_POTION:Reorientation.POTION),"Shulker Charge recipe retains duration and bottle");
+            h.assertTrue(potion.equals(extended?Reorientation.LONG_POTION:Reorientation.POTION),"Gravity Charge recipe retains duration and bottle");
             h.assertTrue(result.is(bottle),"bottle unchanged");
             h.assertTrue(potion.value().getEffects().size()==1 && potion.value().getEffects().getFirst().getEffect().equals(Reorientation.EFFECT),"single infusible effect");
             h.assertTrue(potion.value().getEffects().getFirst().getDuration()==(extended?9600:3600),"duration");

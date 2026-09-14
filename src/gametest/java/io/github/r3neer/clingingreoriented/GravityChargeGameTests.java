@@ -11,7 +11,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
-public final class ShulkerChargeGameTests {
+public final class GravityChargeGameTests {
     private static ShulkerBullet bullet(GameTestHelper h,Vec3 relative){
         var level=h.getLevel();var p=h.absoluteVec(relative);
         var bullet=new ShulkerBullet(EntityTypes.SHULKER_BULLET,level);
@@ -19,17 +19,17 @@ public final class ShulkerChargeGameTests {
     }
     private static long drops(GameTestHelper h,Vec3 relative){
         Vec3 p=h.absoluteVec(relative);AABB box=new AABB(p.x-2,p.y-2,p.z-2,p.x+2,p.y+2,p.z+2);
-        return h.getLevel().getEntitiesOfClass(ItemEntity.class,box,e->e.getItem().is(ShulkerCharges.ITEM)).size();
+        return h.getLevel().getEntitiesOfClass(ItemEntity.class,box,e->e.getItem().is(GravityCharges.ITEM)).size();
     }
 
     @GameTest public void itemStacksToSixtyFour(GameTestHelper h){
-        h.assertTrue(new ItemStack(ShulkerCharges.ITEM).getMaxStackSize()==64,"Shulker Charge stacks to 64");h.succeed();
+        h.assertTrue(new ItemStack(GravityCharges.ITEM).getMaxStackSize()==64,"Gravity Charge stacks to 64");h.succeed();
     }
 
     @GameTest(padding=8) public void meleeCapturesNaturalBulletExactlyOnce(GameTestHelper h){
         Vec3 at=new Vec3(3,4,3);var bullet=bullet(h,at);var player=h.makeMockServerPlayerInLevel();
         bullet.hurtServer(h.getLevel(),h.getLevel().damageSources().playerAttack(player),1.0F);
-        h.assertTrue(drops(h,at)==1,"melee interception drops exactly one Shulker Charge");
+        h.assertTrue(drops(h,at)==1,"melee interception drops exactly one Gravity Charge");
         bullet.hurtServer(h.getLevel(),h.getLevel().damageSources().playerAttack(player),1.0F);
         h.assertTrue(drops(h,at)==1,"a second damage event cannot duplicate the captured Charge");h.succeed();
     }

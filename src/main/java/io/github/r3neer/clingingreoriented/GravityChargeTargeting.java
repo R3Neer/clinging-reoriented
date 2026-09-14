@@ -17,14 +17,14 @@ import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
 
 /** Bounded acquisition kernel. It owns selection only, never projectile movement. */
-public final class ShulkerChargeTargeting {
+public final class GravityChargeTargeting {
     public static final double RANGE=32.0D;
     public static final double CONE_DEGREES=15.0D;
     private static final double COS_CONE=Math.cos(Math.toRadians(CONE_DEGREES));
     private static final int FAN_RADIUS=2;
     private static final double FAN_TAN=Math.tan(Math.toRadians(CONE_DEGREES));
 
-    private ShulkerChargeTargeting() {}
+    private GravityChargeTargeting() {}
 
     public record Score(double angularError,double distanceSq) implements Comparable<Score>{
         @Override public int compareTo(Score other){
