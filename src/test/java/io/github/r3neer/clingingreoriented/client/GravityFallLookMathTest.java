@@ -13,7 +13,7 @@ final class GravityFallLookMathTest {
 
     @Test void wrapsWholeTurnsWithoutChangingLocalDelta(){
         assertEquals(360.0F,GravityFallLookMath.normalizationShift(180.0F),0.0F);
-        assertEquals(360.0F,GravityFallLookMath.normalizationShift(540.0F),0.0F);
+        assertEquals(720.0F,GravityFallLookMath.normalizationShift(540.0F),0.0F);
         assertEquals(-360.0F,GravityFallLookMath.normalizationShift(-180.1F),0.0F);
         assertEquals(-720.0F,GravityFallLookMath.normalizationShift(-540.1F),0.0F);
     }
