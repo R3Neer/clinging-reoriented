@@ -21,4 +21,4 @@ The launched projectile remains the exact vanilla `minecraft:shulker_bullet`, so
 
 ## Integration status
 
-As of 0.1.0-alpha.15 the 2D GUI icon and 3D held model are integrated and covered by semantic client snapshots for inventory, first-person held, third-person held, projectile renderer and fixed 3D presentation. These files remain the editable provenance record for future revisions rather than temporary implementation instructions.
+As of 0.1.0-alpha.16 the 2D GUI icon and 3D held model are integrated and covered by semantic client snapshots for inventory, first-person held, third-person held, projectile renderer and fixed 3D presentation. These files remain the editable provenance record for future revisions rather than temporary implementation instructions.
