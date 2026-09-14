@@ -126,6 +126,7 @@ public final class GameFeelAdversarialGameTests {
         var horse=h.spawn(EntityTypes.HORSE,p.blockPosition());horse.setNoAi(true);horse.setOnGround(false);horse.setNoGravity(true);
         var wolf=h.spawn(EntityTypes.WOLF,p.blockPosition());wolf.setNoAi(true);wolf.setOnGround(false);wolf.setNoGravity(true);wolf.tame(p);
         wolf.addEffect(new MobEffectInstance(Reorientation.EFFECT,1200));
+        wolf.teleportTo(p.getX()+8.0D,p.getY(),p.getZ()+8.0D);
         h.assertTrue(p.startRiding(horse,true,true),"fixture could not mount rider");horse.positionRider(p);
         Vec3 momentum=new Vec3(.24,-.36,.18);horse.setDeltaMovement(momentum);
 
@@ -137,6 +138,7 @@ public final class GameFeelAdversarialGameTests {
         wolf.teleportTo(p.getX(),p.getY(),p.getZ());GravityBreadcrumbs.follow(wolf);
         h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.EAST,"pet did not replay first mounted breadcrumb");
         h.assertTrue(MobGravity.state(wolf).ownership==MobGravity.Ownership.OWNED_EFFECT,"pet incorrectly inherited rider-loan ownership");
+        wolf.teleportTo(p.getX()+8.0D,p.getY(),p.getZ()+8.0D);
 
         var north=ClingingReoriented.attempt(p,direction(Direction.NORTH),GravityTransition.headingFromYaw(Direction.EAST,p.getYRot()));
         h.assertTrue(north==ClingingReoriented.Result.SUCCESS,"mounted NORTH turn failed: "+north);
@@ -144,6 +146,7 @@ public final class GameFeelAdversarialGameTests {
         h.assertTrue(horse.getDeltaMovement().equals(momentum),"mounted NORTH turn changed root momentum");
         wolf.teleportTo(p.getX(),p.getY(),p.getZ());GravityBreadcrumbs.follow(wolf);
         h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.NORTH,"pet did not replay second mounted breadcrumb");
+        wolf.teleportTo(p.getX()+8.0D,p.getY(),p.getZ()+8.0D);
 
         p.stopRiding();MobGravity.tick(horse);
         h.assertTrue(GravityDirectionUtil.getGravityDirection(horse)==Direction.DOWN,"dismount did not retire borrowed mount frame");
