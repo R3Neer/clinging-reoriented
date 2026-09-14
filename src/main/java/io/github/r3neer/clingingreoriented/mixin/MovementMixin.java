@@ -32,12 +32,18 @@ public abstract class MovementMixin {
     }
     @Inject(method="teleportTo(DDD)V",at=@At("HEAD"))
     private void clinging$teleport(double x,double y,double z,CallbackInfo ci){
-        Entity self=(Entity)(Object)this;MovingSurface.teleported(self);if(self instanceof LivingEntity living)ImpactState.clear(living);
+        Entity self=(Entity)(Object)this;
+        MovingSurface.teleported(self);
+        if(self instanceof LivingEntity living)ImpactState.clear(living);
+        if(self instanceof Player player)ClingingReoriented.data(player).clearFlightSafety();
     }
     @Inject(method="teleport",at=@At("HEAD"))
     private void clinging$dimension(TeleportTransition transition,CallbackInfoReturnable<Entity> cir){
         Entity self=(Entity)(Object)this;MovingSurface.teleported(self);if(self instanceof LivingEntity living)ImpactState.clear(living);
-        if((Object)this instanceof Player p){var s=ClingingReoriented.data(p);s.retirementPending=false;s.nextRetirementAttempt=0;}
+        if((Object)this instanceof Player p){
+            var s=ClingingReoriented.data(p);
+            s.retirementPending=false;s.nextRetirementAttempt=0;s.clearFlightSafety();
+        }
     }
     @Inject(method="canCollideWith",at=@At("HEAD"),cancellable=true)
     private void clinging$pair(Entity other,CallbackInfoReturnable<Boolean> cir){
