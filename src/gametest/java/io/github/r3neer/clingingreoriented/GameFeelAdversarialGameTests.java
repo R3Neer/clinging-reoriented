@@ -153,4 +153,61 @@ public final class GameFeelAdversarialGameTests {
         GravityBreadcrumbs.clear(p.getUUID());
         h.succeed();
     }
+
+    /** Reserved S05 holdout, revealed only after the visible matrix existed. */
+    @GameTest(padding=40)
+    public void reservedCompositeSequenceLeavesNoDeferredTurnOrStaleLandingState(GameTestHelper h){
+        var p=managed(h,Direction.DOWN);var s=ClingingReoriented.data(p);
+        Vec3 eastMomentum=new Vec3(.62,0,0);p.setDeltaMovement(eastMomentum);p.fallDistance=9.0F;
+        GravityFallState.tick(p);
+        h.assertTrue(s.gravityFallActive,"reserved holdout did not begin sustained Gravity Fall");
+
+        Direction current=Direction.DOWN;
+        Direction[] physical={Direction.UP,Direction.NORTH,Direction.DOWN,Direction.WEST,Direction.UP};
+        for(Direction target:physical){
+            var result=ClingingReoriented.attempt(p,direction(target),GravityTransition.headingFromYaw(current,p.getYRot()));
+            h.assertTrue(result==ClingingReoriented.Result.SUCCESS,"reserved physical sequence rejected "+current+" -> "+target+": "+result);
+            h.assertTrue(p.getDeltaMovement().equals(eastMomentum),"reserved physical sequence rewrote EAST momentum at "+target);
+            h.assertTrue(s.gravityFallActive,"physical turn unexpectedly retired sustained Gravity Fall at "+target);
+            current=target;
+        }
+        h.assertTrue(GravityDirectionUtil.getGravityDirection(p)==Direction.UP,"reserved physical sequence ended on wrong gravity");
+
+        // Cross zero without changing physics ownership. The client-side S05 holdout verifies that
+        // body orientation holds through this same presentation condition instead of inventing twist.
+        p.setDeltaMovement(Vec3.ZERO);GravityFallState.tick(p);
+        h.assertTrue(s.gravityFallActive&&!s.gravityFallLanding,"zero crossing retired/landed Gravity Fall without support");
+        p.setDeltaMovement(eastMomentum);
+
+        var valid=new AtomicBoolean(false);
+        var reg=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","s05_reserved"),fixture(p,valid));
+        try{
+            valid.set(true);
+            LandingState.tick(p);GravityFallState.tick(p);
+            h.assertTrue(s.landingCommitted,"appearing support did not create landing commitment in reserved holdout");
+            h.assertTrue(s.gravityFallLanding&&s.gravityFallLandingGravity==Direction.UP,"appearing support did not enter BODY_LANDING toward physical UP");
+
+            var blocked=ClingingReoriented.attempt(p,direction(Direction.WEST),GravityTransition.headingFromYaw(Direction.UP,p.getYRot()));
+            h.assertTrue(blocked==ClingingReoriented.Result.LANDING_COMMITTED,"reserved input escaped landing commitment: "+blocked);
+            h.assertTrue(GravityDirectionUtil.getGravityDirection(p)==Direction.UP,"blocked reserved input changed physical gravity");
+
+            valid.set(false);
+            LandingState.tick(p);GravityFallState.tick(p);
+            h.assertFalse(s.landingCommitted,"destroyed support left landing commitment active");
+            h.assertFalse(s.gravityFallLanding,"destroyed support left BODY_LANDING active");
+            h.assertTrue(GravityDirectionUtil.getGravityDirection(p)==Direction.UP&&s.selected==Direction.UP,"destroyed support replayed blocked WEST input");
+
+            // Give the normal machinery another opportunity to expose a hidden queued request.
+            ClingingReoriented.reconcile(p);LandingState.tick(p);GravityFallState.tick(p);
+            h.assertTrue(GravityDirectionUtil.getGravityDirection(p)==Direction.UP&&s.selected==Direction.UP,"blocked WEST input replayed one tick after cancellation");
+
+            p.setItemSlot(EquipmentSlot.CHEST,new ItemStack(Items.ELYTRA));
+            h.assertTrue(p.tryToStartFallFlying(),"reserved holdout could not hand ownership to Elytra");
+            LandingState.tick(p);GravityFallState.tick(p);
+            h.assertTrue(p.isFallFlying(),"reserved Elytra handoff did not remain active");
+            h.assertFalse(s.landingCommitted||s.gravityFallActive||s.gravityFallLanding,"Elytra handoff left stale landing/Gravity Fall state");
+            h.assertTrue(GravityDirectionUtil.getGravityDirection(p)==Direction.UP&&s.selected==Direction.UP,"Elytra cleanup changed physical gravity or replayed blocked input");
+        }finally{reg.close();}
+        h.succeed();
+    }
 }
