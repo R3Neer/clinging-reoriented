@@ -10,10 +10,10 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.projectile.ShulkerBullet;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.storage.TagValueInput;
 import net.minecraft.world.level.storage.TagValueOutput;
-import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 public final class ShulkerChargeLaunchGameTests {
@@ -24,10 +24,10 @@ public final class ShulkerChargeLaunchGameTests {
     private static ShulkerChargeProjectile duck(ShulkerBullet bullet){return (ShulkerChargeProjectile)(Object)bullet;}
 
     @GameTest(padding=40) public void manualUseConsumesOneAndSpawnsOwnedVanillaBullet(GameTestHelper h){
-        var player=h.makeMockServerPlayerInLevel();player.snapTo(h.absoluteVec(new Vec3(8,10,8)));player.setYRot(-90);player.setXRot(0);
+        var player=h.makeMockServerPlayerInLevel();player.setGameMode(GameType.SURVIVAL);player.snapTo(h.absoluteVec(new Vec3(8,10,8)));player.setYRot(-90);player.setXRot(0);
         var stack=new ItemStack(ShulkerCharges.ITEM,2);player.setItemInHand(InteractionHand.MAIN_HAND,stack);
         ShulkerCharges.ITEM.use(h.getLevel(),player,InteractionHand.MAIN_HAND);
-        h.assertTrue(stack.getCount()==1,"manual launch consumes exactly one Charge");
+        h.assertTrue(stack.getCount()==1,"manual launch consumes exactly one Charge for a survival player");
         var cooldown=stack.get(DataComponents.USE_COOLDOWN);h.assertTrue(cooldown!=null&&Math.abs(cooldown.seconds()-0.5F)<1.0E-6F,"item carries 0.5 s cooldown component");
         var bullets=h.getLevel().getEntitiesOfClass(ShulkerBullet.class,player.getBoundingBox().inflate(4),b->duck(b).clinging$isLaunchedCharge());
         h.assertTrue(bullets.size()==1,"manual launch creates one marked bullet");var bullet=bullets.getFirst();
