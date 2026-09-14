@@ -13,6 +13,7 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -116,6 +117,40 @@ public final class GameFeelAdversarialGameTests {
         h.assertTrue(s.gravityFallLandingEtaTicks==0.0D,"Elytra left stale body-landing ETA");
         h.assertTrue(GravityDirectionUtil.getGravityDirection(p)==Direction.WEST,"presentation reset changed physical gravity");
         h.assertTrue(p.getDeltaMovement().equals(momentum),"presentation reset changed world momentum");
+        h.succeed();
+    }
+
+    @GameTest(padding=36)
+    public void mountLoanAndPetBreadcrumbOwnershipStayIndependentAcrossTurns(GameTestHelper h){
+        var p=managed(h,Direction.DOWN);
+        var horse=h.spawn(EntityTypes.HORSE,p.blockPosition());horse.setNoAi(true);horse.setOnGround(false);horse.setNoGravity(true);
+        var wolf=h.spawn(EntityTypes.WOLF,p.blockPosition());wolf.setNoAi(true);wolf.setOnGround(false);wolf.setNoGravity(true);wolf.tame(p);
+        wolf.addEffect(new MobEffectInstance(Reorientation.EFFECT,1200));
+        h.assertTrue(p.startRiding(horse,true,true),"fixture could not mount rider");horse.positionRider(p);
+        Vec3 momentum=new Vec3(.24,-.36,.18);horse.setDeltaMovement(momentum);
+
+        var east=ClingingReoriented.attempt(p,direction(Direction.EAST),GravityTransition.headingFromYaw(Direction.DOWN,p.getYRot()));
+        h.assertTrue(east==ClingingReoriented.Result.SUCCESS,"mounted EAST turn failed: "+east);
+        h.assertTrue(GravityDirectionUtil.getGravityDirection(horse)==Direction.EAST&&GravityDirectionUtil.getGravityDirection(p)==Direction.EAST,"rider/root hierarchy missed EAST");
+        h.assertTrue(horse.getDeltaMovement().equals(momentum),"mounted EAST turn changed root momentum");
+        h.assertTrue(MobGravity.state(horse).ownership==MobGravity.Ownership.BORROWED_RIDER,"mount did not record rider loan ownership");
+        wolf.teleportTo(p.getX(),p.getY(),p.getZ());GravityBreadcrumbs.follow(wolf);
+        h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.EAST,"pet did not replay first mounted breadcrumb");
+        h.assertTrue(MobGravity.state(wolf).ownership==MobGravity.Ownership.OWNED_EFFECT,"pet incorrectly inherited rider-loan ownership");
+
+        var north=ClingingReoriented.attempt(p,direction(Direction.NORTH),GravityTransition.headingFromYaw(Direction.EAST,p.getYRot()));
+        h.assertTrue(north==ClingingReoriented.Result.SUCCESS,"mounted NORTH turn failed: "+north);
+        h.assertTrue(GravityDirectionUtil.getGravityDirection(horse)==Direction.NORTH&&GravityDirectionUtil.getGravityDirection(p)==Direction.NORTH,"rider/root hierarchy missed NORTH");
+        h.assertTrue(horse.getDeltaMovement().equals(momentum),"mounted NORTH turn changed root momentum");
+        wolf.teleportTo(p.getX(),p.getY(),p.getZ());GravityBreadcrumbs.follow(wolf);
+        h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.NORTH,"pet did not replay second mounted breadcrumb");
+
+        p.stopRiding();MobGravity.tick(horse);
+        h.assertTrue(GravityDirectionUtil.getGravityDirection(horse)==Direction.DOWN,"dismount did not retire borrowed mount frame");
+        h.assertTrue(MobGravity.state(horse).ownership==MobGravity.Ownership.NONE,"dismount left mount ownership borrowed/stale");
+        h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.NORTH,"retiring mount loan dragged independent pet gravity with it");
+        h.assertTrue(MobGravity.state(wolf).ownership==MobGravity.Ownership.OWNED_EFFECT,"retiring mount loan changed pet ownership");
+        GravityBreadcrumbs.clear(p.getUUID());
         h.succeed();
     }
 }
