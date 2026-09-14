@@ -47,6 +47,30 @@ jobs:
         run: xvfb-run -a ./gradlew runClientGameTest -PwithScaleBrews --no-daemon --console=plain
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
+      - name: Fetch exact VanillaPlus Fresh Animations fixtures
+        run: |
+          mkdir -p test-libs test-resourcepacks
+          curl --fail --location --output test-libs/entity_model_features-3.3.5-26.2-fabric.jar \
+            https://cdn.modrinth.com/data/4I1XuqiY/versions/p8M0c1vN/entity_model_features-3.3.5-26.2-fabric.jar
+          curl --fail --location --output test-libs/entity_texture_features-7.2-26.2-fabric.jar \
+            https://cdn.modrinth.com/data/BVzZfTc1/versions/URB7DuXS/entity_texture_features-7.2-26.2-fabric.jar
+          curl --fail --location --output test-resourcepacks/FreshAnimations_v1.10.5.zip \
+            https://cdn.modrinth.com/data/50dA9Sha/versions/RGIzA5em/FreshAnimations_v1.10.5.zip
+          curl --fail --location --output 'test-resourcepacks/FA+Player-v1.1.zip' \
+            'https://cdn.modrinth.com/data/TAIMVZCL/versions/Wj7NeGjP/FA%2BPlayer-v1.1.zip'
+          echo 'ee598e0703cb15166ed35f93e2d19e69d5bee160721c50ccde2001afecee24470744bd2efe9125e908211e58f60a54074e915f2b726cb6ee70dc3e98f4698c7b  test-libs/entity_model_features-3.3.5-26.2-fabric.jar' | sha512sum -c -
+          echo '58da97a72614a41c28d8639fa63a98f775d6a5f101ac30c33213ee63a25b5d41e50c77fc24e269a19e2a54f2dfb4083a8d4e51411eac2ee6efe099e7bf93fa88  test-libs/entity_texture_features-7.2-26.2-fabric.jar' | sha512sum -c -
+          echo 'f4f2a1d294c2e0afe245b6987fea4a84ff120f131a7f2cfb16779e9cc5d0a00b3d49bf1585ac827d6690c36421e8dda203b0c6e642bb0c6aa067c5921dd8dc30  test-resourcepacks/FreshAnimations_v1.10.5.zip' | sha512sum -c -
+          echo 'd2a5c46ae53e4bb6355604a1ade253ab49f1deb205f5ee69085014965241d3c9623204951ab174a5dbdaf24d9b25ecae9a1638cc6a13d780b398a6d70d157a4e  test-resourcepacks/FA+Player-v1.1.zip' | sha512sum -c -
+      - name: Run Fresh Animations Gravity Fall client lane
+        run: xvfb-run -a ./gradlew runClientGameTest -PwithFreshAnimations --no-daemon --console=plain
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+      - name: Preserve Fresh Animations screenshots
+        if: always()
+        run: |
+          mkdir -p build/fresh-animations-screenshots
+          if [ -d build/run/clientGameTest/screenshots ]; then cp -a build/run/clientGameTest/screenshots/. build/fresh-animations-screenshots/; fi
       - name: Upload artifacts and diagnostics
         if: always()
         uses: actions/upload-artifact@v7
@@ -56,6 +80,7 @@ jobs:
             build/libs/*.jar
             build/run/*/logs/latest.log
             build/run/clientGameTest/screenshots/*.png
+            build/fresh-animations-screenshots/*.png
             build/test-results/**/*.xml
             build/reports/tests/**
             build/reports/problems/**
