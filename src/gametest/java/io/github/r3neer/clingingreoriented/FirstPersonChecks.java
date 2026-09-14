@@ -123,7 +123,7 @@ public final class FirstPersonChecks {
         }
 
         context.runOnClient(mc->{
-            mc.player.setXRot(75.0F);mc.player.xRotO=75.0F;
+            mc.player.setXRot(0.0F);mc.player.xRotO=0.0F;
             GravityFallVisuals.receive(mc,new GravityFallSync.Visual(
                 mc.player.getId(),mc.player.getUUID(),GravityFallSync.Phase.LAND.ordinal(),Direction.DOWN.get3DDataValue(),4.0F,50_002L));
             GravityFallVisuals.tick(mc);
@@ -131,8 +131,15 @@ public final class FirstPersonChecks {
         });
         context.waitTicks(2);
         context.runOnClient(mc->{
+            Vec3 after=cameraForward(mc);
+            if(after.distanceTo(cameraBefore.get())>2.0E-3D)
+                throw new AssertionError("First Person BODY_LANDING fed avatar root rotation back into camera: before="+cameraBefore.get()+" after="+after);
             if(!GravityFallVisuals.landing(mc.player))throw new AssertionError("First Person BODY_LANDING ended before partial landing checkpoint");
         });
+        context.takeScreenshot("firstperson-gravity-fall-landing");
+
+        context.runOnClient(mc->{mc.player.setXRot(75.0F);mc.player.xRotO=75.0F;});
+        context.waitTicks(1);
         context.takeScreenshot("firstperson-gravity-fall-landing-lookdown-75");
 
         context.runOnClient(mc->{
