@@ -3,7 +3,6 @@ package io.github.r3neer.clingingreoriented.mixin;
 import io.github.r3neer.clingingreoriented.client.GravityFallLookMath;
 import io.github.r3neer.clingingreoriented.client.GravityFallVisuals;
 import net.minecraft.client.Minecraft;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Mixin;
@@ -11,35 +10,42 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Vanilla clamps Entity.turn pitch to +/-90 degrees. During local Gravity Fall ownership,
- * keep the exact vanilla mouse/vehicle turn pipeline but remove only that vertical neck stop.
+ * Vanilla Entity.turn clamps both current and previous pitch to +/-90 degrees. During local
+ * Gravity Fall, reproduce the same turn pipeline without those two clamps, then periodically
+ * rebase whole 360-degree turns so interpolation remains numerically well behaved.
  */
 @Mixin(Entity.class)
 public abstract class GravityFallLookMixin {
     @Shadow public float xRotO;
+    @Shadow public float yRotO;
     @Shadow public abstract float getXRot();
+    @Shadow public abstract float getYRot();
     @Shadow public abstract void setXRot(float value);
+    @Shadow public abstract void setYRot(float value);
 
-    @Redirect(
-        method="turn(DD)V",
-        at=@At(value="INVOKE",target="Lnet/minecraft/util/Mth;clamp(FFF)F")
-    )
-    private float clinging$allowFullSpherePitch(float value,float min,float max){
-        return clinging$ownsFullSphereLook()?value:Mth.clamp(value,min,max);
-    }
-
-    @Inject(method="turn(DD)V",at=@At("TAIL"))
-    private void clinging$normalizeFullSpherePitch(double yaw,double pitch,CallbackInfo ci){
+    @Inject(method="turn(DD)V",at=@At("HEAD"),cancellable=true)
+    private void clinging$fullSphereTurn(double xo,double yo,CallbackInfo ci){
         if(!clinging$ownsFullSphereLook())return;
-        float current=getXRot();
-        float shift=GravityFallLookMath.normalizationShift(current);
-        if(shift==0.0F)return;
-        setXRot(current-shift);
-        xRotO-=shift;
+        ci.cancel();
+
+        float xDelta=(float)yo*0.15F;
+        float yDelta=(float)xo*0.15F;
+        setXRot(getXRot()+xDelta);
+        setYRot(getYRot()+yDelta);
+        xRotO+=xDelta;
+        yRotO+=yDelta;
+
+        float shift=GravityFallLookMath.normalizationShift(getXRot());
+        if(shift!=0.0F){
+            setXRot(getXRot()-shift);
+            xRotO-=shift;
+        }
+
+        Entity self=(Entity)(Object)this;
+        if(self.getVehicle()!=null)self.getVehicle().onPassengerTurned(self);
     }
 
     @Unique
@@ -47,9 +53,6 @@ public abstract class GravityFallLookMixin {
         Entity self=(Entity)(Object)this;
         if(!(self instanceof Player player))return false;
         Minecraft mc=Minecraft.getInstance();
-        // Local-player ownership is the meaningful fence. CameraEntity can transiently lag the
-        // input call (notably in client GameTest and camera-mode transitions), while the look state
-        // still belongs to this player. Third person should get the same free-look semantics too.
         return mc.player==player&&GravityFallVisuals.active(player);
     }
 }
