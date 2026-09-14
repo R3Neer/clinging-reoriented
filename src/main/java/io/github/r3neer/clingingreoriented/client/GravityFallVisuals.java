@@ -4,6 +4,7 @@ import com.moigferdsrte.gravitychanger.util.RotationUtil;
 import io.github.r3neer.clingingreoriented.BodyOrientation;
 import io.github.r3neer.clingingreoriented.BodyRenderMath;
 import io.github.r3neer.clingingreoriented.GravityFallSync;
+import io.github.r3neer.clingingreoriented.LandingTiming;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -21,9 +22,6 @@ import org.joml.Quaternionf;
 public final class GravityFallVisuals {
     public static final int ENTRY_BLEND_TICKS=6;
     private static final int UNRESOLVED_TTL_TICKS=80;
-    private static final float QUARTER_CAP_TICKS=3.6F; // 180 ms
-    private static final float HALF_CAP_TICKS=4.8F;    // 240 ms
-    private static final float HALF_ANGLE_RADIANS=(float)(Math.PI*0.75D);
 
     private enum Mode { SUSTAIN, LAND }
 
@@ -98,7 +96,7 @@ public final class GravityFallVisuals {
         if(current==null)current=VisualTransitions.current(entity);
         active.landStart=new Quaternionf(current).normalize();
         active.landTarget=RotationUtil.getEntityRotationQuaternion(target);
-        active.landDurationTicks=landingDuration(active.landStart,active.landTarget,etaTicks);
+        active.landDurationTicks=landingDuration(etaTicks);
         active.initialized=true;
     }
 
@@ -125,7 +123,7 @@ public final class GravityFallVisuals {
             Quaternionf current=VisualTransitions.current(entity);
             active.landStart=new Quaternionf(current).normalize();
             active.landTarget=RotationUtil.getEntityRotationQuaternion(active.landGravity);
-            active.landDurationTicks=landingDuration(active.landStart,active.landTarget,active.requestedEtaTicks);
+            active.landDurationTicks=landingDuration(active.requestedEtaTicks);
             active.landTicks=0.0F;active.initialized=true;
         }else initializeSustain(active,entity,VisualTransitions.current(entity));
     }
@@ -194,12 +192,9 @@ public final class GravityFallVisuals {
         return new Quaternionf(active.blendStart).slerp(target,smoothstep(progress)).normalize();
     }
 
-    private static float landingDuration(Quaternionf start,Quaternionf target,float etaTicks){
+    private static float landingDuration(float etaTicks){
         if(!Float.isFinite(etaTicks)||etaTicks<=0.0F)return 0.0F;
-        float dot=Math.min(1.0F,Math.abs(new Quaternionf(start).normalize().dot(new Quaternionf(target).normalize())));
-        float angle=2.0F*(float)Math.acos(dot);
-        float cap=angle>=HALF_ANGLE_RADIANS?HALF_CAP_TICKS:QUARTER_CAP_TICKS;
-        return Math.min(etaTicks,cap);
+        return Math.min(etaTicks,LandingTiming.PRESENTATION_TICKS);
     }
 
     private static Entity resolve(Minecraft client,Active active){
