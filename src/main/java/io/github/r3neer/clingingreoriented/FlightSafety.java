@@ -54,14 +54,14 @@ public final class FlightSafety {
             if(!withinHardBounds(player,probe,gravity)){
                 state.clearFlightSafetyHold();
                 player.setDeltaMovement(Vec3.ZERO);
-                player.fallDistance=0.0F;
+                ImpactState.clear(player);
             }else if(chunksReady(player,probe,gravity)){
                 state.clearFlightSafetyHold();
                 player.setDeltaMovement(held);
                 state.flightSafePosition=current;
             }else{
                 player.setDeltaMovement(Vec3.ZERO);
-                player.fallDistance=0.0F;
+                ImpactState.clear(player);
                 return;
             }
         }
@@ -83,7 +83,7 @@ public final class FlightSafety {
             if(readyAt(player,previous,gravity))safe=previous;
             else{
                 player.setDeltaMovement(Vec3.ZERO);
-                player.fallDistance=0.0F;
+                ImpactState.clear(player);
                 return;
             }
         }
@@ -95,7 +95,9 @@ public final class FlightSafety {
         Vec3 frontier=furthestReady(safe,current,accepted);
         teleport(player,frontier,Vec3.ZERO);
         state.flightSafePosition=frontier;
-        player.fallDistance=0.0F;
+        // A safety correction is not a physical collision. Erase any armed impact/fall sample so
+        // the rescue itself can never become lethal on the following tick.
+        ImpactState.clear(player);
 
         if(hardBreach){
             // There is nothing to load beyond a hard border/build limit. Do not keep a latent
