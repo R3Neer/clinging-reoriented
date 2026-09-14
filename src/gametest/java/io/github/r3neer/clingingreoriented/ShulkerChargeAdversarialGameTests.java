@@ -40,7 +40,7 @@ public final class ShulkerChargeAdversarialGameTests {
             minZ=Math.min(minZ,chunk.z());maxZ=Math.max(maxZ,chunk.z());
         }
         // Match the stable routing fixtures: radius 2 maps to ENTITY_TICKING in 26.2,
-        // and one extra chunk protects a cardinal step across an arbitrary GameTest boundary.
+        // and one extra chunk protects a routing step across an arbitrary GameTest boundary.
         minX--;minZ--;maxX++;maxZ++;
         var source=h.getLevel().getChunkSource();
         for(int x=minX;x<=maxX;x++)for(int z=minZ;z<=maxZ;z++)
@@ -49,7 +49,9 @@ public final class ShulkerChargeAdversarialGameTests {
 
     private static ShulkerBullet launched(GameTestHelper h,Vec3 relative,Vec3 intent){
         var bullet=new ShulkerChargeBullet(h.getLevel());
-        Vec3 at=h.absoluteVec(relative);keepSimulated(h,at);
+        Vec3 at=h.absoluteVec(relative);
+        Vec3 routeEnd=intent.lengthSqr()>1.0E-12?at.add(intent.normalize().scale(32.0D)):at;
+        keepSimulated(h,at,routeEnd);
         bullet.snapTo(at.x,at.y,at.z,0,0);
         ((ShulkerChargeProjectile)(Object)bullet).clinging$initializeCharge(intent);
         h.assertTrue(h.getLevel().addFreshEntity(bullet),"adversarial Charge must enter server entity manager");
