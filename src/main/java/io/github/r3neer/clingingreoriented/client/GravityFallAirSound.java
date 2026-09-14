@@ -14,7 +14,7 @@ import net.minecraft.util.Mth;
  * presentation ownership.
  */
 public final class GravityFallAirSound extends AbstractTickableSoundInstance {
-    private static final double START_SPEED_SQR=0.75D*0.75D;
+    static final double START_SPEED_SQR=0.75D*0.75D;
     private static GravityFallAirSound active;
 
     private final LocalPlayer player;
@@ -57,12 +57,19 @@ public final class GravityFallAirSound extends AbstractTickableSoundInstance {
         // ElytraOnPlayerSoundInstance uses velocity squared / 4 for volume and raises pitch
         // above the 0.8-volume region. Preserve that familiar mapping so Gravity Fall speaks
         // vanilla's existing "fast air" language instead of inventing a second one.
-        float speedSqr=(float)player.getDeltaMovement().lengthSqr();
-        volume=speedSqr>=1.0E-7F?Mth.clamp(speedSqr/4.0F,0.0F,1.0F):0.0F;
+        volume=volumeForSpeedSqr((float)player.getDeltaMovement().lengthSqr());
 
         // Shorter admission fade than Elytra's takeoff silence: Gravity Fall itself already has
         // a 12-tick airborne gate plus a 6-tick body blend before this feedback can normally start.
         if(time<10)volume*=time/10.0F;
-        pitch=volume>0.8F?1.0F+(volume-0.8F):1.0F;
+        pitch=pitchForVolume(volume);
+    }
+
+    static float volumeForSpeedSqr(float speedSqr){
+        return speedSqr>=1.0E-7F?Mth.clamp(speedSqr/4.0F,0.0F,1.0F):0.0F;
+    }
+
+    static float pitchForVolume(float volume){
+        return volume>0.8F?1.0F+(volume-0.8F):1.0F;
     }
 }
