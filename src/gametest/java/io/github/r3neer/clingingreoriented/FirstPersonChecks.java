@@ -6,12 +6,16 @@ import com.moigferdsrte.gravitychanger.util.RotationUtil;
 import dev.tr7zw.firstperson.FirstPersonModelCore;
 import dev.tr7zw.firstperson.api.FirstPersonAPI;
 import dev.tr7zw.firstperson.api.PlayerOffsetHandler;
+import io.github.r3neer.clingingreoriented.client.GravityFallVisuals;
 import io.github.r3neer.clingingreoriented.client.VisualTransitions;
+import java.util.concurrent.atomic.AtomicReference;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.minecraft.client.CameraType;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Vector3f;
 
 /** Runs against the installed First Person binary without requiring Scale Brews. */
 public final class FirstPersonChecks {
@@ -70,6 +74,48 @@ public final class FirstPersonChecks {
             context.waitTicks(5);
             context.takeScreenshot("firstperson-" + direction.getName());
         }
-        context.runOnClient(mc->{ClingingReoriented.data(mc.player).visualFrameOwned=false;VisualTransitions.clear();});
+
+        // S04 holdout: First Person may render the Gravity Fall body, but the avatar root
+        // is presentation-only and must never become camera roll/yaw/pitch input.
+        AtomicReference<Vec3> cameraBefore=new AtomicReference<>();
+        context.runOnClient(mc->{
+            var player=mc.player;
+            GravityFallVisuals.clear();VisualTransitions.clear();
+            GravityDirectionUtil.setGravityDirection(player,Direction.DOWN);
+            player.setPose(Pose.STANDING);player.setDeltaMovement(new Vec3(.25,0,0));
+            cameraBefore.set(cameraForward(mc));
+            GravityFallVisuals.receive(mc,new GravityFallSync.Visual(
+                player.getId(),player.getUUID(),GravityFallSync.Phase.START.ordinal(),-1,0.0F,50_001L));
+            for(int i=0;i<8;i++){
+                player.setDeltaMovement(new Vec3(.25,0,0));
+                GravityFallVisuals.tick(mc);
+            }
+            player.setDeltaMovement(Vec3.ZERO);
+            if(!GravityFallVisuals.active(player))throw new AssertionError("Gravity Fall did not activate in First Person holdout");
+            if(GravityFallVisuals.extraRoot(player,0.0F)==null)throw new AssertionError("First Person holdout has no Gravity Fall avatar root");
+            Vec3 bodyUp=BodyOrientation.bodyUp(GravityFallVisuals.body(player,0.0F));
+            if(bodyUp.distanceTo(new Vec3(1,0,0))>3.0E-3D)throw new AssertionError("First Person holdout body was not visibly velocity-aligned: "+bodyUp);
+        });
+        context.waitTicks(3);
+        context.runOnClient(mc->{
+            Vec3 after=cameraForward(mc);
+            if(after.distanceTo(cameraBefore.get())>2.0E-3D)
+                throw new AssertionError("Gravity Fall avatar root fed back into First Person camera: before="+cameraBefore.get()+" after="+after);
+            if(!GravityFallVisuals.active(mc.player))throw new AssertionError("Gravity Fall root vanished before First Person render checkpoint");
+        });
+        context.takeScreenshot("firstperson-gravity-fall-root");
+        context.runOnClient(mc->{
+            GravityFallVisuals.receive(mc,new GravityFallSync.Visual(
+                mc.player.getId(),mc.player.getUUID(),GravityFallSync.Phase.RESET.ordinal(),-1,0.0F,50_002L));
+            GravityFallVisuals.clear();
+            ClingingReoriented.data(mc.player).visualFrameOwned=false;
+            VisualTransitions.clear();
+            mc.player.setDeltaMovement(Vec3.ZERO);
+        });
+    }
+
+    private static Vec3 cameraForward(Minecraft mc){
+        Vector3f forward=mc.gameRenderer.mainCamera().rotation().transform(new Vector3f(0,0,-1));
+        return new Vec3(forward.x,forward.y,forward.z).normalize();
     }
 }
