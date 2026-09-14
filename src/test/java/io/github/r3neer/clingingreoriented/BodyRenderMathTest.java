@@ -43,6 +43,16 @@ final class BodyRenderMathTest {
         assertTrue(residual.length()<2.0E-6D,"camera anchor residual="+residual+" pivot="+pivot);
     }
 
+    @Test void firstPersonDisplayPivotStaysBetweenBodyCentreAndExactCamera(){
+        Vec3 camera=new Vec3(-.25D,1.62D,.4D);
+        Vec3 centre=new Vec3(0.0D,.9D,0.0D);
+        Vec3 pivot=BodyRenderMath.firstPersonPivot(camera,1.8F);
+        Vec3 expected=centre.add(camera.subtract(centre).scale(BodyRenderMath.FIRST_PERSON_CAMERA_PIVOT_BLEND));
+        assertTrue(pivot.distanceTo(expected)<1.0E-9D,"unexpected blended pivot "+pivot);
+        assertTrue(pivot.distanceTo(camera)>1.0E-3D,"blend collapsed to exact camera and would hide the body again");
+        assertTrue(pivot.distanceTo(centre)>1.0E-3D,"blend collapsed to body centre and would reintroduce clipping");
+    }
+
     @Test void identityVisualPivotIsJustVectorBackToCamera(){
         Vec3 pivot=BodyRenderMath.localCameraPivot(.25D,.0D,-.4D,new Quaternionf());
         assertTrue(pivot.distanceTo(new Vec3(-.25D,.0D,.4D))<1.0E-6D,"unexpected identity pivot "+pivot);
