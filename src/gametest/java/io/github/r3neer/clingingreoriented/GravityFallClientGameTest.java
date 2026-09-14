@@ -2,10 +2,14 @@ package io.github.r3neer.clingingreoriented;
 
 import com.moigferdsrte.gravitychanger.util.RotationUtil;
 import io.github.r3neer.clingingreoriented.client.GravityFallVisuals;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
@@ -17,16 +21,19 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
-/** S04 visual campaign: every screenshot has a neighboring numerical invariant. */
+/** S04/S05 visual campaign: every screenshot has a neighboring numerical invariant. */
 public final class GravityFallClientGameTest implements FabricClientGameTest {
     private static final double VEC_EPS=3.0E-3D;
     private static final float QUAT_EPS=2.0E-4F;
+    private static final String FA_PACK="FreshAnimations_v1.10.5.zip";
+    private static final String FA_PLAYER_PACK="FA+Player-v1.1.zip";
 
     @Override public void runTest(ClientGameTestContext context){
         AtomicLong sequence=new AtomicLong(10_000L);
         AtomicReference<Vec3> cameraStart=new AtomicReference<>();
         AtomicReference<Quaternionf> eastBody=new AtomicReference<>();
         AtomicReference<Quaternionf> westBody=new AtomicReference<>();
+        FreshAnimationsFixture fresh=FreshAnimationsFixture.enableIfPresent(context);
 
         try(var world=context.worldBuilder().create()){
             world.getServer().runOnServer(server->{
@@ -49,8 +56,9 @@ public final class GravityFallClientGameTest implements FabricClientGameTest {
                 cameraStart.set(cameraForward(mc));
                 if(GravityFallVisuals.active(mc.player))throw new AssertionError("Gravity Fall active before START");
                 if(GravityFallVisuals.body(mc.player,0.0F)!=null)throw new AssertionError("Inactive player already has a Gravity Fall body quaternion");
+                fresh.assertStillSelected(mc);
             });
-            context.takeScreenshot("gravity-fall-pre-start");
+            context.takeScreenshot(fresh.active()?"fresh-animations-gravity-fall-pre-start":"gravity-fall-pre-start");
 
             context.runOnClient(mc->{
                 mc.player.setDeltaMovement(new Vec3(0,-.20,0));
@@ -73,8 +81,9 @@ public final class GravityFallClientGameTest implements FabricClientGameTest {
                 assertVec(new Vec3(0,-1,0),BodyOrientation.bodyUp(body(mc)),"sustained DOWN velocity body axis");
                 assertCamera(cameraStart.get(),mc,"body blend fed back into camera");
                 if(GravityFallVisuals.extraRoot(mc.player,0.0F)==null)throw new AssertionError("active Gravity Fall has no avatar root transform");
+                fresh.assertStillSelected(mc);
             });
-            context.takeScreenshot("gravity-fall-sustained-down");
+            context.takeScreenshot(fresh.active()?"fresh-animations-gravity-fall-sustained-down":"gravity-fall-sustained-down");
 
             context.runOnClient(mc->{
                 advance(mc,1,new Vec3(.20,0,0));
@@ -125,7 +134,7 @@ public final class GravityFallClientGameTest implements FabricClientGameTest {
                 Quaternionf target=RotationUtil.getEntityRotationQuaternion(Direction.DOWN);
                 if(equivalent(mid,target)||equivalent(mid,westBody.get()))throw new AssertionError("BODY_LANDING one-tick midpoint collapsed to an endpoint");
             });
-            context.takeScreenshot("gravity-fall-landing-mid");
+            context.takeScreenshot(fresh.active()?"fresh-animations-gravity-fall-landing-mid":"gravity-fall-landing-mid");
 
             // Separate fresh partial-LAND epoch for the RESUME continuity invariant. Keeping LAND
             // and RESUME in one client callback prevents screenshot/render ticks from changing the
@@ -155,8 +164,9 @@ public final class GravityFallClientGameTest implements FabricClientGameTest {
                 advance(mc,6,Vec3.ZERO);
                 assertQuat(RotationUtil.getEntityRotationQuaternion(Direction.DOWN),body(mc),"BODY_LANDING did not finish at canonical future-floor frame");
                 assertCamera(cameraStart.get(),mc,"landing body snap fed back into camera");
+                fresh.assertStillSelected(mc);
             });
-            context.takeScreenshot("gravity-fall-landing-final");
+            context.takeScreenshot(fresh.active()?"fresh-animations-gravity-fall-landing-final":"gravity-fall-landing-final");
 
             context.runOnClient(mc->{
                 send(mc,sequence,GravityFallSync.Phase.RESET,null,0.0F);
@@ -168,6 +178,8 @@ public final class GravityFallClientGameTest implements FabricClientGameTest {
 
             context.runOnClient(mc->{GravityFallVisuals.clear();mc.options.setCameraType(CameraType.FIRST_PERSON);mc.player.setDeltaMovement(Vec3.ZERO);});
             world.getServer().runOnServer(server->{var p=server.getPlayerList().getPlayers().getFirst();p.setDeltaMovement(Vec3.ZERO);p.setNoGravity(true);});
+        }finally{
+            fresh.restore(context);
         }
     }
 
@@ -214,5 +226,63 @@ public final class GravityFallClientGameTest implements FabricClientGameTest {
 
     private static final class VisualTransitionsForTest {
         private static Quaternionf visual(Minecraft mc){return io.github.r3neer.clingingreoriented.client.VisualTransitions.current(mc.player);}
+    }
+
+    /** Activates the exact VanillaPlus-26.2 FA fixture only when EMF is present in the lane. */
+    private static final class FreshAnimationsFixture {
+        private final boolean active;
+        private final AtomicReference<List<String>> previous=new AtomicReference<>();
+        private final AtomicReference<CompletableFuture<Void>> reload=new AtomicReference<>();
+        private final AtomicReference<String> freshId=new AtomicReference<>();
+        private final AtomicReference<String> playerId=new AtomicReference<>();
+
+        private FreshAnimationsFixture(boolean active){this.active=active;}
+        private boolean active(){return active;}
+
+        private static FreshAnimationsFixture enableIfPresent(ClientGameTestContext context){
+            boolean emf=FabricLoader.getInstance().isModLoaded("entity_model_features");
+            if(!emf)return new FreshAnimationsFixture(false);
+            if(!FabricLoader.getInstance().isModLoaded("entity_texture_features"))
+                throw new AssertionError("Fresh Animations lane loaded EMF without ETF");
+            var fixture=new FreshAnimationsFixture(true);
+            context.runOnClient(mc->{
+                var repo=mc.getResourcePackRepository();repo.reload();
+                fixture.previous.set(List.copyOf(repo.getSelectedIds()));
+                fixture.freshId.set(findPack(repo.getAvailableIds(),FA_PACK));
+                fixture.playerId.set(findPack(repo.getAvailableIds(),FA_PLAYER_PACK));
+                var selected=new ArrayList<>(fixture.previous.get());
+                if(!selected.contains(fixture.freshId.get()))selected.add(fixture.freshId.get());
+                if(!selected.contains(fixture.playerId.get()))selected.add(fixture.playerId.get());
+                repo.setSelected(selected);
+                fixture.reload.set(mc.reloadResourcePacks());
+            });
+            context.waitFor(mc->fixture.reload.get()!=null&&fixture.reload.get().isDone()&&!fixture.reload.get().isCompletedExceptionally());
+            context.waitFor(mc->mc.gui.overlay()==null);
+            context.waitTicks(20);
+            context.runOnClient(fixture::assertStillSelected);
+            return fixture;
+        }
+
+        private static String findPack(java.util.Collection<String> available,String fileName){
+            return available.stream().filter(id->id.toLowerCase(java.util.Locale.ROOT).contains(fileName.toLowerCase(java.util.Locale.ROOT)))
+                .findFirst().orElseThrow(()->new AssertionError("Fresh Animations fixture not discovered in resourcepacks: "+fileName+" available="+available));
+        }
+
+        private void assertStillSelected(Minecraft mc){
+            if(!active)return;
+            var selected=mc.getResourcePackRepository().getSelectedIds();
+            if(!selected.contains(freshId.get())||!selected.contains(playerId.get()))
+                throw new AssertionError("Fresh Animations packs stopped being selected: "+selected);
+        }
+
+        private void restore(ClientGameTestContext context){
+            if(!active||previous.get()==null)return;
+            context.runOnClient(mc->{
+                mc.getResourcePackRepository().setSelected(previous.get());
+                reload.set(mc.reloadResourcePacks());
+            });
+            context.waitFor(mc->reload.get()!=null&&reload.get().isDone()&&!reload.get().isCompletedExceptionally());
+            context.waitFor(mc->mc.gui.overlay()==null);
+        }
     }
 }
