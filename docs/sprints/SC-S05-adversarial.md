@@ -31,12 +31,13 @@ La primera ejecución tras el hardening del corredor falló antes de compilar: M
 
 ## Evidencia de cierre
 
-- **Run #710** (`34895769482`): matriz completa verde en la rama Shulker antes de sincronizar con el `main` publicado de alpha.14. Pasaron build/JUnit, server GameTests, cliente por defecto, First Person, Scale Brews servidor/cliente, Fresh Animations y validación semántica de snapshots.
-- Después se fusionó el `main` actual en `feature/shulker-charge`, incorporando alpha.14 y el hardening posterior de pet breadcrumb pursuit sin reescribir la feature.
-- **Run #714** (`34897063938`), cabeza `a16d16faaa2cbd3c4b51678f08310ebc9a8bf681`: matriz completa post-merge verde. Pasaron build/JUnit, server GameTests, cliente por defecto, First Person 2.7.2, Scale Brews beta.5 servidor y cliente, Fresh Animations/FA Player/EMF/ETF y el validador de snapshots.
+- **Run #710** (`34895769482`): matriz completa verde en la rama Shulker antes de sincronizar con el `main` publicado de alpha.14.
+- Después se fusionó el `main` de alpha.14 y el hardening posterior de pet breadcrumb pursuit en `feature/shulker-charge`.
+- **Run #714** (`34897063938`), cabeza `a16d16faaa2cbd3c4b51678f08310ebc9a8bf681`: matriz completa post-merge verde, incluidos **121/121 GameTests servidor**, cliente por defecto, First Person 2.7.2, Scale Brews beta.5 servidor/cliente, Fresh Animations/FA Player/EMF/ETF y validador de snapshots.
+- El artefacto exacto de #714 fue `10369304504`, digest `sha256:f0220df2edb45d076302d9849c10e05e662aacd6319d92135720d68e9a0f3869`; la revisión manual de los cinco snapshots de Shulker Charge confirmó icono 2D, modelo 3D definitivo sin missing texture, contextos FP/TP y renderer vanilla de la entidad.
 
-La revisión final de S05 no exige cambios de producción. Los únicos arreglos posteriores a los holdouts fueron de fixture/entorno y de presentación del asset ya aprobado.
+La revisión final de S05 no exige cambios de producción. Los únicos arreglos posteriores a los holdouts fueron de fixture/entorno y de documentación/procedencia del asset ya aprobado.
 
 ## Gate
 
-Cumplido: matriz combinada verde sobre la combinación real con alpha.14, snapshots coherentes, fallos clasificados antes de corregirlos, revisión sin parche de producción y CI completa posterior sobre el HEAD exacto de evidencia. S06 puede canonizar y versionar Shulker Charge como **0.1.0-alpha.15**.
+Cumplido: matriz combinada verde, snapshots coherentes, fallos clasificados antes de corregirlos, revisión sin parche de producción y CI completa sobre el HEAD de evidencia. La publicación posterior de pet pursuit como **0.1.0-alpha.15** durante S06 desplaza Shulker Charge a **0.1.0-alpha.16** sin reabrir este gate funcional.
