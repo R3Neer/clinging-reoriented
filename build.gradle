@@ -5,10 +5,12 @@ repositories { mavenCentral(); maven { url = 'https://api.modrinth.com/maven' } 
 
 def withFirstPerson = providers.gradleProperty('withFirstPerson').isPresent()
 def withScaleBrews = providers.gradleProperty('withScaleBrews').isPresent()
+def withFreshAnimations = providers.gradleProperty('withFreshAnimations').isPresent()
 
 dependencies {
     if (withFirstPerson) runtimeOnly fileTree(dir: 'test-libs', include: ['firstperson*.jar', 'notenoughanimations*.jar'])
     if (withScaleBrews) runtimeOnly fileTree(dir: 'test-libs', include: 'scalebrews-*.jar')
+    if (withFreshAnimations) runtimeOnly fileTree(dir: 'test-libs', include: ['entity_model_features*.jar', 'entity_texture_features*.jar'])
     minecraft "com.mojang:minecraft:${minecraft_version}"
     implementation "net.fabricmc:fabric-loader:${loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
@@ -31,6 +33,17 @@ dependencies {
     if (withFirstPerson) gametestCompileOnly fileTree(dir: 'test-libs', include: ['firstperson*.jar', 'notenoughanimations*.jar'])
 }
 if (!withFirstPerson) sourceSets.gametest.java.exclude '**/FirstPersonChecks.java'
+
+// Client GameTest's run directory is recreated by Loom before the launch task. Copy the exact
+// VanillaPlus Fresh Animations resource-pack fixtures in doFirst, after that cleanup has happened.
+tasks.matching { it.name == 'runClientGameTest' }.configureEach {
+    if (withFreshAnimations) doFirst {
+        copy {
+            from 'test-resourcepacks'
+            into layout.buildDirectory.dir('run/clientGameTest/resourcepacks').get().asFile
+        }
+    }
+}
 
 tasks.register('verifyScaleCompileIsolation') {
     doLast {
