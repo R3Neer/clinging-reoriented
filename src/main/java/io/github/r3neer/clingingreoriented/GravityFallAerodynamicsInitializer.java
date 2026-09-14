@@ -7,7 +7,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec3;
 
-/** Server-authoritative aerodynamic drag driven by a bounded, client-supplied world gaze intent. */
+/** Server-authoritative body-follow, momentum redirection and aerodynamic drag. */
 public final class GravityFallAerodynamicsInitializer implements ModInitializer {
     private static final long LOOK_STALE_TICKS=10L;
 
@@ -38,8 +38,15 @@ public final class GravityFallAerodynamicsInitializer implements ModInitializer 
         }
 
         long age=player.level().getGameTime()-state.gravityFallLookTick;
-        if(state.gravityFallLook!=null&&age>=0L&&age<=LOOK_STALE_TICKS){
-            state.gravityFallAeroBody=GravityFallAerodynamics.followLook(state.gravityFallAeroBody,state.gravityFallLook,player.yBodyRot);
+        boolean freshLook=state.gravityFallLook!=null&&age>=0L&&age<=LOOK_STALE_TICKS;
+        if(freshLook){
+            state.gravityFallAeroBody=GravityFallAerodynamics.followLook(
+                state.gravityFallAeroBody,state.gravityFallLook,player.yBodyRot);
+
+            // W spends existing fall momentum to bend the trajectory toward gaze. This happens
+            // before drag so steering itself is energy-neutral; any speed loss comes from posture.
+            velocity=GravityFallAerodynamics.redirectMomentum(
+                velocity,state.gravityFallLook,state.gravityFallForwardIntent);
         }
 
         double streamline=GravityFallAerodynamics.streamlining(state.gravityFallAeroBody,velocity);
