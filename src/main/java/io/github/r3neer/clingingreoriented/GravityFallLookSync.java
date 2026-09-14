@@ -6,15 +6,16 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
+import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 
-/** Client-to-server world-space gaze samples used only to derive extra Gravity Fall drag. */
+/** Client-to-server bounded gaze/forward samples for Gravity Fall body, drag and air-diving intent. */
 public final class GravityFallLookSync {
-    public record Look(long sequence,Vec3 worldLook) implements CustomPacketPayload {
+    public record Look(long sequence,Vec3 worldLook,float forwardIntent) implements CustomPacketPayload {
         public static final Type<Look> TYPE=new Type<>(Identifier.fromNamespaceAndPath(ClingingReoriented.ID,"gravity_fall_look_v1"));
         public static final StreamCodec<RegistryFriendlyByteBuf,Look> CODEC=StreamCodec.of(
-            (b,v)->{b.writeVarLong(v.sequence);b.writeDouble(v.worldLook.x);b.writeDouble(v.worldLook.y);b.writeDouble(v.worldLook.z);},
-            b->new Look(b.readVarLong(),new Vec3(b.readDouble(),b.readDouble(),b.readDouble())));
+            (b,v)->{b.writeVarLong(v.sequence);b.writeDouble(v.worldLook.x);b.writeDouble(v.worldLook.y);b.writeDouble(v.worldLook.z);b.writeFloat(v.forwardIntent);},
+            b->new Look(b.readVarLong(),new Vec3(b.readDouble(),b.readDouble(),b.readDouble()),b.readFloat()));
         @Override public Type<Look> type(){return TYPE;}
     }
 
@@ -30,6 +31,7 @@ public final class GravityFallLookSync {
             if(look==null||!Double.isFinite(look.x+look.y+look.z)||look.lengthSqr()<1.0E-8D)return;
             state.gravityFallLookSequence=packet.sequence();
             state.gravityFallLook=look.normalize();
+            state.gravityFallForwardIntent=Mth.clamp(packet.forwardIntent(),0.0F,1.0F);
             state.gravityFallLookTick=player.level().getGameTime();
         });
     }
