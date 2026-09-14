@@ -55,8 +55,10 @@ public final class PlayerData {
     public long gravityFallSequence;
 
     // Aerodynamic steering is transient input/presentation state. The client supplies only a
-    // normalized world look vector; the server derives body pose and can only add drag, never thrust.
+    // normalized world look vector plus a clamped [0,1] forward intent; the server derives body
+    // pose, momentum redirection and drag, so the client never supplies velocity or thrust.
     public Vec3 gravityFallLook;
+    public float gravityFallForwardIntent;
     public long gravityFallLookSequence=-1L;
     public long gravityFallLookTick=Long.MIN_VALUE;
     public BodyOrientation.State gravityFallAeroBody;
@@ -74,7 +76,7 @@ public final class PlayerData {
     public void clearLandingCommit(){landingCommitted=false;landingContact=null;landingKind=null;landingEtaTicks=0.0D;landingDeadlineTick=0L;}
     public void clearGravityFall(){
         gravityFallActive=false;gravityFallLanding=false;gravityFallLandingGravity=Direction.DOWN;gravityFallLandingEtaTicks=0.0D;
-        gravityFallLook=null;gravityFallLookSequence=-1L;gravityFallLookTick=Long.MIN_VALUE;gravityFallAeroBody=null;
+        gravityFallLook=null;gravityFallForwardIntent=0.0F;gravityFallLookSequence=-1L;gravityFallLookTick=Long.MIN_VALUE;gravityFallAeroBody=null;
     }
     public void clearFlightSafetyHold(){flightSafetyHolding=false;flightHeldVelocity=Vec3.ZERO;}
     public void clearFlightSafety(){flightSafePosition=null;clearFlightSafetyHold();}
