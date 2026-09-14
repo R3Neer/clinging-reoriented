@@ -11,6 +11,7 @@
       "io.github.r3neer.clingingreoriented.AnimalGravityTests",
       "io.github.r3neer.clingingreoriented.HardeningAdversarialTests",
       "io.github.r3neer.clingingreoriented.WaterClingingGameTests",
+      "io.github.r3neer.clingingreoriented.FluidContextGameTests",
       "io.github.r3neer.clingingreoriented.EntitySnapGameTests",
       "io.github.r3neer.clingingreoriented.GravityInputGameTests",
       "io.github.r3neer.clingingreoriented.GravityPolishGameTests",
