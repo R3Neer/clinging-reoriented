@@ -4,6 +4,7 @@ import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.MoverType;
@@ -36,7 +37,7 @@ public final class ImpactGameTests {
         p.setOnGround(false);
         if(Math.abs(p.getBoundingBox().minY-(floorTop+0.01D))>1.0E-6D)throw new AssertionError("directional impact fixture failed to align above floor");
         if(p.getAbilities().invulnerable||p.getAbilities().mayfly)throw new AssertionError("impact fixture unexpectedly retained creative abilities");
-        if(p.isInvulnerableTo(p.serverLevel(),p.damageSources().fall()))throw new AssertionError("impact fixture remains invulnerable to fall damage after mock client load");
+        if(p.isInvulnerableTo((ServerLevel)p.level(),p.damageSources().fall()))throw new AssertionError("impact fixture remains invulnerable to fall damage after mock client load");
         return p;
     }
     private static String diag(net.minecraft.server.level.ServerPlayer p,float before){
@@ -47,7 +48,7 @@ public final class ImpactGameTests {
             +" controls="+ClingingReoriented.controlsPhysics(p)
             +" loaded="+p.connection.hasClientLoaded()
             +" invuln="+p.getAbilities().invulnerable+" mayfly="+p.getAbilities().mayfly
-            +" fallInvuln="+p.isInvulnerableTo(p.serverLevel(),p.damageSources().fall())
+            +" fallInvuln="+p.isInvulnerableTo((ServerLevel)p.level(),p.damageSources().fall())
             +" armed="+state.armed+" active="+state.moveActive
             +" seq="+state.moveSequence+" handled="+state.handledSequence
             +" start="+state.start+" end="+p.position()
