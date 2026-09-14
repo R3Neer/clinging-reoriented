@@ -67,7 +67,10 @@ public final class ImpactGameTests {
         floor(h,4,Blocks.STONE);var p=aboveFloor(h,5.5,5.5,4,Direction.DOWN);
         p.move(MoverType.SELF,new Vec3(0,.01,0));
         h.assertTrue(ImpactState.state(p).armed,"pre-turn managed motion did not arm impact ownership");
-        Vec3 impact=new Vec3(0,-1.2,0);p.setDeltaMovement(impact);
+        // The real DOWN -> EAST rotation changes the player's AABB, so use an intentionally
+        // high requested speed. The blocked component must remain above vanilla's damage
+        // threshold even after the newly rotated body consumes part of the displacement.
+        Vec3 impact=new Vec3(0,-2.0,0);p.setDeltaMovement(impact);
         var result=ClingingReoriented.attempt(p,new Vec3(1,0,0),GravityTransition.headingFromYaw(Direction.DOWN,p.getYRot()));
         h.assertTrue(result==ClingingReoriented.Result.SUCCESS,"late DOWN -> EAST turn was rejected: "+result);
         h.assertTrue(com.moigferdsrte.gravitychanger.util.GravityDirectionUtil.getGravityDirection(p)==Direction.EAST,"late turn did not establish EAST gravity");
