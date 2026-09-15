@@ -1,0 +1,99 @@
+name: Publish beta.3 prerelease
+
+on:
+  workflow_run:
+    workflows: ["Build and test"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  release:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact validated commit
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Admit only beta.3 once
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's/^mod_version=//p' gradle.properties)"
+          if [[ "$version" != "0.1.0-beta.3" ]]; then
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            echo "Validated main is $version, not beta.3; nothing to publish."
+            exit 0
+          fi
+          if gh release view v0.1.0-beta.3 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "eligible=false" >> "$GITHUB_OUTPUT"
+            echo "beta.3 already exists; refusing to republish."
+            exit 0
+          fi
+          echo "eligible=true" >> "$GITHUB_OUTPUT"
+
+      - name: Download exact CI artifact
+        if: steps.gate.outputs.eligible == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name clinging-reoriented-build --dir release-artifact
+
+      - name: Verify release JARs and prepare notes
+        if: steps.gate.outputs.eligible == 'true'
+        id: assets
+        env:
+          TARGET_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t regular < <(find release-artifact -type f -name 'clinging-reoriented-0.1.0-beta.3.jar')
+          mapfile -t sources < <(find release-artifact -type f -name 'clinging-reoriented-0.1.0-beta.3-sources.jar')
+          [[ ${#regular[@]} -eq 1 ]] || { echo "Expected exactly one regular JAR, found ${#regular[@]}"; exit 1; }
+          [[ ${#sources[@]} -eq 1 ]] || { echo "Expected exactly one sources JAR, found ${#sources[@]}"; exit 1; }
+          regular_sha="$(sha256sum "${regular[0]}" | awk '{print $1}')"
+          sources_sha="$(sha256sum "${sources[0]}" | awk '{print $1}')"
+          echo "regular=${regular[0]}" >> "$GITHUB_OUTPUT"
+          echo "sources=${sources[0]}" >> "$GITHUB_OUTPUT"
+          awk '/^## \[0\.1\.0-beta\.3\]/{capture=1; next} capture && /^## \[/{exit} capture{print}' CHANGELOG.md > release-notes.md
+          cat >> release-notes.md <<EOF
+
+          ---
+          Target commit: $TARGET_SHA
+          Main CI run: #$RUN_NUMBER ($RUN_ID)
+          Regular JAR SHA-256: $regular_sha
+          Sources JAR SHA-256: $sources_sha
+          EOF
+
+      - name: Create beta.3 prerelease from validated artifact
+        if: steps.gate.outputs.eligible == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ github.event.workflow_run.head_sha }}
+          REGULAR: ${{ steps.assets.outputs.regular }}
+          SOURCES: ${{ steps.assets.outputs.sources }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create v0.1.0-beta.3 "$REGULAR" "$SOURCES" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$TARGET_SHA" \
+            --title 'Clinging: Reoriented 0.1.0-beta.3' \
+            --prerelease \
+            --notes-file release-notes.md

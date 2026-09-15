@@ -1,12 +1,12 @@
-# PERF-S00 — Plan TM de rendimiento para beta.3
+# PERF-S00 — Campaña TM de rendimiento para beta.3
 
-Estado: **EN CURSO — ANÁLISIS / GATES DEFINIDOS**.
+Estado: **CÓDIGO CERRADO / RELEASE-PREP**.
 
 ## Objetivo
 
-Reducir coste de CPU, churn de heap y picos de trabajo de Clinging: Reoriented sin cambiar gameplay, autoridad, timings visuales ni compatibilidad. La campaña nace de `0.1.0-beta.2` (`5dfc36500f681e4ed8394c8e91eeb4950b9917df`) y prepara una prerelease pequeña `0.1.0-beta.3` dedicada a rendimiento/estabilidad.
+Reducir coste de CPU, churn de heap y picos de trabajo de Clinging: Reoriented sin cambiar gameplay, autoridad, timings visuales ni compatibilidad. La campaña nace de `0.1.0-beta.2` (`5dfc36500f681e4ed8394c8e91eeb4950b9917df`) y prepara la prerelease pequeña `0.1.0-beta.3`, dedicada a rendimiento y estabilidad.
 
-No se atribuyen a este mod congelaciones observadas en un modpack grande sin perfilado reproducible. El objetivo es eliminar trabajo objetivamente innecesario en rutas calientes y acotar operaciones que hoy pueden concentrar miles de comprobaciones en un solo tick.
+No se atribuyen a este mod congelaciones observadas en un modpack grande sin perfilado reproducible. El objetivo ha sido eliminar trabajo objetivamente innecesario en rutas calientes y acotar operaciones capaces de concentrar miles de comprobaciones en un solo tick. No se publican porcentajes de mejora sin una medición reproducible.
 
 ## Principios TM
 
@@ -15,74 +15,60 @@ No se atribuyen a este mod congelaciones observadas en un modpack grande sin per
 3. Ninguna mejora depende de reducir cobertura, radio, cadencia, precisión de cámara o compatibilidad.
 4. Los casos raros caros se presupuestan entre ticks; no se omiten candidatos ni se cambia su orden lógico.
 5. La matriz completa de release sigue siendo obligatoria: JUnit, server GameTests, cliente normal, First Person, Scale Brews server/client, Fresh Animations y snapshots.
-6. No se publican porcentajes de mejora sin una medición reproducible. Las notas de usuario describirán escenarios beneficiados, no detalles de implementación ni cifras inventadas.
+6. Las notas públicas describen resultados observables, no detalles internos de Java ni cifras no medidas.
 
-## Hallazgos de entrada
+## Resultado por sprint
 
-### P1 — Render global
+### PERF-S01 — Render y contexto global
 
-`GravityFallRenderMixin` toca un `ThreadLocal<ArrayDeque<Boolean>>` alrededor de `EntityRenderDispatcher.submit` y elimina el valor al vaciarse. En escenas con muchas entidades esto provoca trabajo y churn de heap aunque la entidad renderizada no pueda usar Gravity Fall.
+- La ruta de render deja de crear/eliminar estado ThreadLocal para cada entidad renderizada: sólo los avatars entran en el bookkeeping de Gravity Fall y el almacenamiento por hilo se reutiliza.
+- El contexto necesario para el limitador de caída de Gravity Changer conserva la semántica anterior pero reutiliza la entrada ThreadLocal en vez de borrarla/recrearla por cada `LivingEntity.tick`.
+- Un intento de interceptar únicamente la llamada añadida por el mixin de Gravity Changer falló de forma roja en run **#822** porque MixinExtras no puede ver una INVOKE introducida por otro mixin en esa fase. Se descartó ese enfoque; no se relajó `require` ni se ocultó el fallo.
 
-**Contrato:** el push/pop de PoseStack debe seguir perfectamente balanceado, incluidos renders anidados; First Person/Fresh Animations conservan el mismo root visual.
+### PERF-S02 — Mobs y lookup de efecto
 
-### P2 — Tick global de LivingEntity
+- Los mobs en estado quiescente `NONE`/`EXTERNAL`, sin trabajo pendiente, dejan de entrar en la máquina de estado de gravedad cada tick.
+- La referencia al efecto Clinging de Alex's Mobs se resuelve y cachea en vez de reconstruir la búsqueda de registry en cada comprobación de ownership.
 
-`DirectionalFallGraceMixin` hace `ThreadLocal get/set/remove` alrededor de cada `LivingEntity.tick`. `MobGravityMixin` llama a `MobGravity.tick` para cada entidad viva; la ruta ordinaria puede consultar efectos y pasajeros aunque la entidad no tenga ownership del mod.
+### PERF-S03 — Recuperación presupuestada
 
-**Contrato:** timers direccionales, mounts/pets, préstamos de gravedad y ownership externo mantienen exactamente las mismas transiciones.
+- La retirada del jugador y la restauración de mobs conservan exactamente el radio legacy de 4 bloques y los **2.108** offsets válidos en el mismo orden `radius → y → x → z`.
+- Se prueban como máximo **64 candidatos por llamada**, continuando el cursor en ticks posteriores; tras agotar un ciclo completo se conserva la pausa legacy de 20 ticks.
+- Los accesos internos necesarios para completar la misma transición original se resuelven una vez con MethodHandles.
+- `RecoveryBudgetTest` reconstruye de forma independiente el bucle legacy y exige igualdad exacta de conjunto/orden y presupuesto.
 
-### P3 — Restauración / retirada puntual
+### PERF-S04 — Landing
 
-`ClingingReoriented.retire` y `MobGravity.restore` pueden recorrer miles de posiciones de recuperación en una sola llamada. Cada candidato puede disparar colisión, chunks y compatibilidad.
+- El orden de `LandingSurfaceProvider` se mantiene como snapshot inmutable y sólo se reconstruye al registrar/desregistrar providers, en vez de asignar y ordenar una lista durante cada sweep.
+- La revalidación del provider vanilla compara coordenadas AABB ya parseadas en vez de regenerar cadenas hexadecimales por shape. El formato de identidad pública no cambia.
 
-**Contrato:** se conserva el mismo conjunto y orden de candidatos; únicamente se reparte la búsqueda entre ticks con presupuesto acotado.
+### PERF-S05 — Compatibilidad y superficies móviles
 
-### P4 — Predicción de landing
+- Scale Brews/Anatomy siguen enlazándose dinámicamente y sin dependencia de compilación, pero las llamadas frecuentes usan MethodHandles resueltos una vez en vez de `Method.invoke(Object...)` con varargs temporales.
+- La detección de ciclos de superficies móviles reutiliza scratch por hilo.
+- La integración de colisiones legacy evita copiar listas cuando no existe ninguna superficie compatible real.
+- `VisualTransitions` evita lock/lookup del mapa cuando Clinging no posee ninguna transición visual activa.
 
-Cada sweep crea y ordena un snapshot nuevo del registro de `LandingSurfaces`, pese a que el registro cambia raramente.
+### PERF-S06 — Gravity Charge y cámara
 
-**Contrato:** orden estable por provider id y prioridad de soporte en empate permanecen idénticos.
+- Gravity Charge conserva 32 bloques, cono de 15°, prioridad de Target Block central, fan de Target Blocks, LOS, ranking y cadencia de reacquisición, reduciendo objetos temporales durante el scoring.
+- La cámara full-sphere conserva el mismo ownership y API defensiva; el hot path de render copia a storage reutilizable y compone directamente sobre buffers de `Camera`, reduciendo quaternions/vector scratch por frame.
 
-### P5 — Compatibilidad y superficies móviles
+## Evidencia de cierre de código
 
-Scale/Anatomy usan reflection en llamadas frecuentes y `MovingSurface.canBind` crea estructuras de ciclo por candidato.
+HEAD de código antes de versionar: `be04f41ebe1289127837eac4e03b867e9d6e6db3`.
 
-**Contrato:** ausencia/incompatibilidad de Scale Brews sigue fallando cerrada y la detección de ciclos no puede aceptar un grafo antes rechazado.
+Run **#831** (`35008292945`) pasó la matriz completa:
 
-### P6 — Interpolación visual
-
-`GravitySnapMixin` consulta `VisualTransitions.override` en cada `GravityRotationAnimation.getRotation`; la ruta normal sin transición activa entra igualmente en el mapa sincronizado.
-
-**Contrato:** HOLD/LAND/SNAP conservan ownership, secuencias y tiempos; cuando no hay ownership Clinging, Gravity Changer permanece completamente autoritativo.
-
-### P7 — Gravity Charge
-
-La reacquisición está acotada pero crea objetos temporales evitables. No se reducirá el cono, alcance, fan de Target Blocks ni cadencia de reintento.
-
-**Contrato:** targeting/ranking/LOS/direct-ray priority y routing permanecen idénticos.
-
-### P8 — Cámara/quaternions
-
-`Quaternionf`/`Vector3f` son objetos Java mutables. La cámara beta.2 realiza copias defensivas correctas, pero algunas copias por frame pueden sustituirse por destinos/scratch sin compartir estado mutable.
-
-**Contrato:** CAM-S01…S05, full-sphere 360°, 1ª↔3ª persona y snapshots deben quedar bit-semánticamente equivalentes según los invariantes existentes.
-
-## Sprints
-
-- **PERF-S01:** fast paths de render y contexto global.
-- **PERF-S02:** fast path de MobGravity y cache de lookup de efecto.
-- **PERF-S03:** búsqueda de recuperación presupuestada + equivalencia del orden legacy.
-- **PERF-S04:** cache de providers de landing y reducción de churn de geometría.
-- **PERF-S05:** compatibilidad/superficies móviles y fast path de interpolación visual.
-- **PERF-S06:** Gravity Charge y allocations de cámara/body de riesgo bajo-medio.
-- **PERF-S07:** campaña adversarial, docs y release beta.3.
+- paridad `en_us` / `es_es`;
+- build + JUnit;
+- server GameTests;
+- default client GameTests;
+- First Person;
+- Scale Brews server/client;
+- Fresh Animations/EMF/ETF;
+- snapshots semánticos, incluidos los holdouts CAM de beta.2 y Gravity Charge.
 
 ## Gate de release
 
-Beta.3 sólo se integra si:
-
-- todos los contratos funcionales existentes siguen verdes;
-- las nuevas pruebas de equivalencia de recuperación y fast paths están verdes;
-- no se introduce un nuevo camino de gameplay específico de mod de compatibilidad;
-- la matriz completa pasa en el HEAD final de rama y vuelve a pasar en el commit exacto integrado en `main`;
-- `v0.1.0-beta.3` se publica desde los JAR del run verde de `main`, sin recompilar.
+Beta.3 sólo se integra si el HEAD final de release-prep vuelve a pasar la matriz completa. Después `main` debe pasar la misma matriz y `v0.1.0-beta.3` se publicará desde los JAR de ese run exacto, sin recompilar.

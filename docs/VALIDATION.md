@@ -1,5 +1,37 @@
 # Validation
 
+## 0.1.0-beta.3 — Performance and stability hardening
+
+Beta.3 is a small performance/stability prerelease over beta.2. It does not intentionally change gameplay, camera controls, targeting rules, compatibility semantics or visual timings. The campaign focuses on reducing work in global entity/render paths, lowering temporary allocation pressure and bounding rare recovery searches that could otherwise concentrate thousands of collision checks in one tick.
+
+### TM performance campaign
+
+The campaign is documented in `docs/sprints/PERF-S00-performance-plan.md` and `PERF-S07-release.md`.
+
+Key invariants are mechanically preserved:
+
+- ordinary mobs that have no Clinging-owned gravity work can take a cheap tick path, while owned/borrowed states still enter the complete lifecycle;
+- directional fall suppression preserves the previous ownership semantics while reusing thread-local context rather than repeatedly deleting/recreating it;
+- player/mob gravity recovery retains the exact legacy radius and the same 2,108 valid half-block offsets in the same order, but tests at most 64 candidates per call and continues later;
+- landing-provider ordering is unchanged and rebuilt only when the provider registry changes;
+- Scale Brews/Anatomy remain optional and dynamically linked with no production compile dependency;
+- Gravity Charge retains its 32-block range, 15-degree cone, direct Target Block priority, assisted fan, LOS, ranking and retry cadence;
+- Gravity Fall retains the beta.2 full-sphere camera invariants, First Person ownership and Fresh Animations presentation.
+
+`RecoveryBudgetTest` independently rebuilds the old nested recovery loops and asserts exact candidate count/order plus the 64-candidate per-call budget.
+
+### Adversarial history
+
+An attempted PERF-S01 optimization tried to intercept only the `DirectionalFallTracker.tick` invocation injected by Gravity Changer. Run **#822** correctly went red because the target INVOKE is introduced by another mixin and is not visible to that MixinExtras injector phase. That experiment was removed rather than weakening the injector requirement. The final implementation retains the proven owner-context design while eliminating repeated ThreadLocal entry deletion/recreation.
+
+The final pre-version code HEAD `be04f41ebe1289127837eac4e03b867e9d6e6db3` passed **run #831** (`35008292945`) across localization parity, build/JUnit, server GameTests, default client, First Person, Scale Brews server/client, Fresh Animations and semantic snapshot validation.
+
+### Release gate
+
+The beta.3 release-prep HEAD must pass the same complete matrix again after version/docs/workflow canonization. Integration to `main` is allowed only after that green run. `release-beta3.yml` then publishes only from the exact successful `main` CI artifact, verifies one regular and one sources JAR, records SHA-256 digests and creates `v0.1.0-beta.3` against that same commit without rebuilding.
+
+No claim is made that beta.3 definitively fixes a previously observed multi-second freeze in a large modpack: that observation was not isolated to this mod. The release does remove several objectively unnecessary hot-path allocations/workloads and bounds one rare worst-case server search.
+
 ## 0.1.0-beta.2 — Full-sphere camera hardening
 
 Beta.2 is a regression/hardening release over beta.1. It keeps gameplay authority unchanged while replacing the pole-singular Gravity Fall camera representation and fixing retained-camera ownership for gravity turns initiated inside fluid.
@@ -131,11 +163,13 @@ The Gravity Charge 16x16 GUI icon, item texture and project-authored 3D geometry
 - Human motion-comfort/readability during repeated full-sphere look, gravity reversals and 500 ms landing manoeuvres.
 - Long full-pack sessions with First Person + Fresh Animations together, mount/pet routes, Gravity Charge use and modded fluids.
 - Human feel review of Gravity Charge targeting readability and dispenser/build interactions.
+- Performance profiling in a representative large modpack remains recommended before attributing or quantifying any multi-second pause to this mod.
 
 Automated assertions and snapshots are evidence, not a substitute for human gameplay acceptance.
 
 ## Historical releases
 
+- **0.1.0-beta.3**: performance and stability hardening with bounded recovery work and reduced hot-path allocation/CPU overhead.
 - **0.1.0-beta.2**: full-sphere camera/input hardening and underwater retained-camera fix.
 - **0.1.0-beta.1**: Gravity Charge; first beta.
 - **0.1.0-alpha.15**: pet gravity-breadcrumb pursuit; last alpha.
