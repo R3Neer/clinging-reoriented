@@ -1,8 +1,8 @@
 # Player guide
 
-This guide describes Clinging: Reoriented **0.1.0-beta.2**.
+This guide describes Clinging: Reoriented **0.1.0-beta.3**.
 
-Gravity Charge marked the transition from alpha to beta. Beta means the core gravity, camera, landing, lifecycle and compatibility architecture is now treated as a coherent baseline for broader validation; it is still a prerelease and remains subject to bug fixes and tuning.
+Beta.3 keeps the beta.2 gravity/camera/gameplay semantics while hardening performance and stability. Beta means the core gravity, camera, landing, lifecycle and compatibility architecture is treated as a coherent baseline for broader validation; it is still a prerelease and remains subject to bug fixes and tuning.
 
 ## Controls and gravity turns
 
