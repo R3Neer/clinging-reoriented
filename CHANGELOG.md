@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+## [0.1.0-beta.2] - 2026-09-15
+
+### Gravity Fall camera
+
+- Fix full-sphere Gravity Fall look so horizontal and vertical mouse intent keeps the same on-screen direction when crossing either pole.
+- Keep first- and third-person views on the same continuous look frame; switching view mode no longer reinterprets the current orientation.
+- Make third-person Gravity Fall use the continuous camera frame while retaining Minecraft's ordinary camera distance and wall clipping.
+- Keep the player entity's ordinary yaw/pitch compatible with vanilla while preserving the same forward gaze through full 360-degree camera loops and Gravity Fall exit.
+
+### Fluids and retained camera
+
+- Fix underwater Reorientation turns losing their newly created retained camera frame at end-of-tick.
+- Preserve a HOLD created while already inside water/lava for that fluid epoch without re-enabling submerged landing or Gravity Fall body semantics.
+- Keep the original fluid-boundary fence for a later, separate fluid entry so stale dry-flight presentation is still retired.
+
+### Validation and release
+
+- Add red-before-green screen-space camera regressions, diagonal pole holdouts, first/third-person continuity checks and semantic camera snapshots.
+- Keep First Person, Scale Brews server/client and Fresh Animations/EMF/ETF in the release matrix.
+- Publish beta.2 only from the exact successful `main` CI artifact rather than rebuilding for release.
+
 ## [0.1.0-beta.1] - 2026-09-14
 
 ### Beta milestone
