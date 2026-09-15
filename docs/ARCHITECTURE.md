@@ -78,9 +78,22 @@ Player-facing translation files are `en_us.json` and `es_es.json`. CI requires e
 
 Mounted gravity remains transactional over the root/passenger hierarchy. `GravityBreadcrumbs` keeps bounded pet route replay and lifecycle clearing; pets pursue pending breadcrumbs on their current gravity-relative movement plane, replay the turn after bounded arrival, release navigation while unsupported and resume after support returns.
 
+## Alchemical Leather semantic-wear boundary
+
+Alchemical Leather is an optional integration and never enters Clinging: Reoriented's compile-time production type graph. `AlchemicalLeatherCompat` checks Fabric Loader first and reflectively resolves only `InfusionWearApi.emit(...)`; missing or incompatible API linkage leaves the bridge inert rather than changing gravity behaviour.
+
+Clinging owns only the semantic facts that are authoritative inside this mod:
+
+- `AlchemicalWearMixin` observes the single authoritative `ClingingReoriented.attempt(ServerPlayer, Vec3, Vec3)` return boundary and publishes `clinging_reoriented:gravity_turn` only for `SUCCESS`;
+- the event owner is derived from actual active potion effects, preferring Reorientation when both Reorientation and Alex's Mobs Clinging are present and inventing no owner when neither is active;
+- the successful airborne mounted-Reorientation path also returns `SUCCESS`, so it contributes the discrete turn event, while grounded mount actions return `MOUNT_ACTION` and do not;
+- an end-server-tick publisher reports `clinging_reoriented:controlled_flight_tick` only while Reorientation is active, Clinging owns physics, the player is airborne, is not a passenger, is not grounded on a moving/support surface and is not supported through Anatomy.
+
+The bridge never selects equipment, reads Alchemical Leather infusion components or applies durability. Compatibility JSON owned by Clinging: Reoriented maps Reorientation to boots and assigns balance to semantic events. Alchemical Leather independently proves that the corresponding infused item is equipped and effective, handles external-effect eclipse, accumulates fractional work and applies ordinary durability damage.
+
 ## Optional integrations
 
-Production code does not compile against Scale Brews. First Person is mixin-gated. Fresh Animations/FA Player Extension/EMF/ETF are pinned optional test fixtures. Gravity Charge adds no new runtime dependency.
+Production code does not compile against Scale Brews or Alchemical Leather. First Person is mixin-gated. Fresh Animations/FA Player Extension/EMF/ETF are pinned optional test fixtures. Gravity Charge adds no new runtime dependency.
 
 ## State summary
 
