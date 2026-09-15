@@ -111,8 +111,13 @@ public final class Payloads {
     private static long nextVisualSequence(ServerPlayer p){return ++ClingingReoriented.data(p).visualSequence;}
     public static void hold(ServerPlayer p,GravityTransition.Plan plan){
         var s=ClingingReoriented.data(p);
+        boolean inFluid=FluidContext.intersects(p);
+        if(inFluid&&!s.freeFlightVisualHeld){
+            s.visualBaseDirection=com.moigferdsrte.gravitychanger.util.GravityDirectionUtil.getGravityDirection(p);
+            s.visualBaseKnown=true;
+        }
         s.freeFlightVisualHeld=true;
-        s.freeFlightVisualHeldInFluid=FluidContext.intersects(p);
+        s.freeFlightVisualHeldInFluid=inFluid;
         long sequence=nextVisualSequence(p);
         if(ServerPlayNetworking.canSend(p,VisualHold.TYPE))ServerPlayNetworking.send(p,new VisualHold(plan.target().get3DDataValue(),plan.yawDelta(),sequence));
     }
