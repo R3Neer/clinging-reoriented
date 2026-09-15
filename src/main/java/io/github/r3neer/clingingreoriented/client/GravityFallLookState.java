@@ -35,13 +35,21 @@ public final class GravityFallLookState {
         writeForwardGauge(player,baseRotation);
     }
 
-    /** Camera mixin consumes a defensive copy; null means vanilla/Gravity Changer owns the camera normally. */
+    /** Compatibility/test API: callers receive an independent quaternion. */
     public static Quaternionf cameraBase(Player player){
+        Quaternionf copy=new Quaternionf();
+        return copyCameraBase(player,copy)?copy:null;
+    }
+
+    /** Hot render path: copy into caller-owned storage instead of allocating once per camera update. */
+    public static boolean copyCameraBase(Player player,Quaternionf destination){
+        if(destination==null)return false;
         Minecraft mc=Minecraft.getInstance();
-        if(player==null||mc.player!=player||!GravityFallVisuals.active(player))return null;
+        if(player==null||mc.player!=player||!GravityFallVisuals.active(player))return false;
         ensure(player);
         synchronizeExternalYawGauge(player);
-        return new Quaternionf(baseRotation);
+        destination.set(baseRotation);
+        return true;
     }
 
     /** Test/repair hook: rebuild camera orientation from the entity's current vanilla-compatible forward gauge. */

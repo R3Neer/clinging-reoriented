@@ -1,7 +1,7 @@
 package io.github.r3neer.clingingreoriented;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -35,35 +35,42 @@ public final class ScaleBridge {
             Class<?> platforms = Class.forName("io.github.r3neer.scalebrews.platform.Platforms", false, loader);
             Class<?> state = Class.forName("io.github.r3neer.scalebrews.platform.PlatformState", false, loader);
             Class<?> connection = Class.forName("io.github.r3neer.scalebrews.platform.PlatformConnection", false, loader);
+            MethodHandles.Lookup lookup=MethodHandles.publicLookup();
             return new LegacyApi(
-                platforms.getMethod("eligible", Entity.class, LivingEntity.class),
-                platforms.getMethod("state", Entity.class),
-                state.getMethod("clear"),
-                state.getField("support"),
+                lookup.unreflect(platforms.getMethod("eligible", Entity.class, LivingEntity.class)),
+                lookup.unreflect(platforms.getMethod("state", Entity.class)),
+                lookup.unreflect(state.getMethod("clear")),
+                lookup.unreflectGetter(state.getField("support")),
                 connection,
-                connection.getMethod("scalebrews$transportBaseline", Entity.class, Vec3.class)
+                lookup.unreflect(connection.getMethod("scalebrews$transportBaseline", Entity.class, Vec3.class))
             );
         } catch (ReflectiveOperationException | LinkageError incompatible) {
             return null;
         }
     }
 
-    private static Object invoke(Method method, Object receiver, Object... arguments) {
-        try { return method.invoke(receiver, arguments); }
-        catch (ReflectiveOperationException failure) { throw new IllegalStateException("Scale Brews compatibility invocation failed", failure); }
+    private static IllegalStateException invocationFailure(Throwable failure) {
+        return new IllegalStateException("Scale Brews compatibility invocation failed",failure);
     }
 
-    private static Object read(Field field, Object receiver) {
-        try { return field.get(receiver); }
-        catch (ReflectiveOperationException failure) { throw new IllegalStateException("Scale Brews compatibility field access failed", failure); }
-    }
-
-    private record LegacyApi(Method eligible, Method state, Method clear, Field support, Class<?> connection, Method baseline) {
-        boolean eligible(Entity body, LivingEntity surface) { return (boolean) invoke(eligible, null, body, surface); }
-        void clear(Entity entity) { invoke(clear, invoke(state, null, entity)); }
-        LivingEntity parent(Entity entity) { return (LivingEntity) read(support, invoke(state, null, entity)); }
+    private record LegacyApi(MethodHandle eligible, MethodHandle state, MethodHandle clear, MethodHandle support,
+                             Class<?> connection, MethodHandle baseline) {
+        boolean eligible(Entity body, LivingEntity surface) {
+            try { return (boolean)eligible.invoke(body,surface); }
+            catch(Throwable failure){throw invocationFailure(failure);}
+        }
+        void clear(Entity entity) {
+            try { clear.invoke(state.invoke(entity)); }
+            catch(Throwable failure){throw invocationFailure(failure);}
+        }
+        LivingEntity parent(Entity entity) {
+            try { return (LivingEntity)support.invoke(state.invoke(entity)); }
+            catch(Throwable failure){throw invocationFailure(failure);}
+        }
         void baseline(ServerPlayer player, Vec3 delta) {
-            if (connection.isInstance(player.connection)) invoke(baseline, player.connection, player, delta);
+            if (!connection.isInstance(player.connection))return;
+            try { baseline.invoke(player.connection,player,delta); }
+            catch(Throwable failure){throw invocationFailure(failure);}
         }
     }
 }

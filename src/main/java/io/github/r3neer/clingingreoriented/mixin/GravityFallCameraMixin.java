@@ -11,6 +11,7 @@ import org.joml.Vector3f;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -28,23 +29,24 @@ public abstract class GravityFallCameraMixin {
     @Shadow @Final private Vector3f up;
     @Shadow @Final private Vector3f left;
     @Shadow private int matrixPropertiesDirty;
+    @Unique private final Quaternionf clinging$baseScratch=new Quaternionf();
 
     @Inject(method="setRotation(FF)V",at=@At("TAIL"))
     private void clinging$applyFullSphereCamera(float yRot,float xRot,CallbackInfo ci){
         if(!(entity instanceof Player player))return;
         Minecraft mc=Minecraft.getInstance();
         if(mc.player!=player||mc.getCameraEntity()!=player)return;
-        Quaternionf base=GravityFallLookState.cameraBase(player);
-        if(base==null)return;
+        if(!GravityFallLookState.copyCameraBase(player,clinging$baseScratch))return;
 
         // Front third person looks back along the same camera frame while preserving its screen-up.
-        if(mc.options.getCameraType().isMirrored())base.rotateY((float)Math.PI);
+        if(mc.options.getCameraType().isMirrored())clinging$baseScratch.rotateY((float)Math.PI);
 
-        Quaternionf world=new Quaternionf(VisualTransitions.current(player)).mul(base).normalize();
-        rotation.set(world);
-        forwards.set(0.0F,0.0F,-1.0F).rotate(world);
-        up.set(0.0F,1.0F,0.0F).rotate(world);
-        left.set(-1.0F,0.0F,0.0F).rotate(world);
+        // Camera already owns reusable quaternion/vector storage: compose directly into it instead
+        // of manufacturing a base copy plus a second world quaternion every camera update.
+        rotation.set(VisualTransitions.current(player)).mul(clinging$baseScratch).normalize();
+        forwards.set(0.0F,0.0F,-1.0F).rotate(rotation);
+        up.set(0.0F,1.0F,0.0F).rotate(rotation);
+        left.set(-1.0F,0.0F,0.0F).rotate(rotation);
         matrixPropertiesDirty|=3;
     }
 }

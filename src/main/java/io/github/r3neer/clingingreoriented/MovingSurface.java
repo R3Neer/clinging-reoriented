@@ -9,6 +9,13 @@ import java.util.*;
 
 public final class MovingSurface {
     private static final long REFERENCE_MAX_AGE_TICKS=20;
+    private static final class CycleScratch {
+        final Set<UUID> stack=new HashSet<>();
+        final Set<UUID> done=new HashSet<>();
+        void reset(){stack.clear();done.clear();}
+    }
+    private static final ThreadLocal<CycleScratch> CYCLE_SCRATCH=ThreadLocal.withInitial(CycleScratch::new);
+
     public static LivingEntity resolve(Player p) {
         var s=ClingingReoriented.data(p);
         Entity e=p.level().getEntity(s.supportId);
@@ -16,7 +23,8 @@ public final class MovingSurface {
     }
     public static boolean canBind(Player p, LivingEntity entity) {
         if (!ScaleBridge.eligible(p,entity)) return false;
-        return acyclic(p,entity,new HashSet<>(),new HashSet<>());
+        CycleScratch scratch=CYCLE_SCRATCH.get();scratch.reset();
+        return acyclic(p,entity,scratch.stack,scratch.done);
     }
     private static boolean acyclic(Player p,Entity node,Set<UUID> stack,Set<UUID> done) {
         if(node==null)return true;

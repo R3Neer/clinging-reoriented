@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## [0.1.0-beta.3] - 2026-09-15
+
+### Performance and stability
+
+- Reduce background CPU overhead in entity-heavy worlds, especially when loaded mobs are not actively using Clinging/Reorientation gravity.
+- Reduce transient memory pressure during entity rendering and Gravity Fall camera updates to improve frame-time consistency in heavier client and modpack setups.
+- Smooth rare gravity-recovery cases by spreading collision-safe placement work across multiple ticks instead of concentrating the full search into one server tick.
+- Reduce repeated landing and collision bookkeeping during sustained Gravity Fall and moving-surface interactions.
+- Reduce overhead in optional Scale Brews compatibility paths while preserving the same integration behaviour.
+- Reduce temporary work during Gravity Charge target reacquisition without changing its range, targeting cone, priority rules or retry cadence.
+- Keep camera controls, gameplay timings, targeting rules and compatibility semantics unchanged; this prerelease is focused on runtime efficiency rather than new features.
+
+### Validation and release
+
+- Add TM performance holdouts that preserve the exact legacy gravity-recovery candidate set/order while enforcing a bounded per-call search budget.
+- Re-run the complete server/client compatibility matrix, including First Person, Scale Brews, Fresh Animations and semantic camera snapshots.
+- Publish beta.3 only from the exact successful `main` CI artifact rather than rebuilding for release.
+
 ## [0.1.0-beta.2] - 2026-09-15
 
 ### Gravity Fall camera

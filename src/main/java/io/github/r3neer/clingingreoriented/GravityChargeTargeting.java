@@ -1,8 +1,6 @@
 package io.github.r3neer.clingingreoriented;
 
-import java.util.HashSet;
 import java.util.Optional;
-import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
@@ -23,6 +21,7 @@ public final class GravityChargeTargeting {
     private static final double COS_CONE=Math.cos(Math.toRadians(CONE_DEGREES));
     private static final int FAN_RADIUS=2;
     private static final double FAN_TAN=Math.tan(Math.toRadians(CONE_DEGREES));
+    private static final Acquisition NONE=new Acquisition(null,null,false);
 
     private GravityChargeTargeting() {}
 
@@ -35,15 +34,27 @@ public final class GravityChargeTargeting {
     public record Acquisition(@Nullable Entity entity,@Nullable BlockPos block,boolean directBlock){
         public static Acquisition entity(Entity entity){return new Acquisition(entity,null,false);}
         public static Acquisition block(BlockPos block,boolean direct){return new Acquisition(null,block.immutable(),direct);}
-        public static Acquisition none(){return new Acquisition(null,null,false);}
+        public static Acquisition none(){return NONE;}
         public boolean present(){return entity!=null||block!=null;}
     }
 
     static Optional<Score> score(Vec3 rawIntent,Vec3 offset){
-        if(!finite(rawIntent)||!finite(offset)||rawIntent.lengthSqr()<1.0E-12D||offset.lengthSqr()<1.0E-12D)return Optional.empty();
-        Vec3 intent=rawIntent.normalize();double distanceSq=offset.lengthSqr();double cosine=intent.dot(offset)/Math.sqrt(distanceSq);
-        if(!Double.isFinite(cosine)||cosine<COS_CONE)return Optional.empty();
-        return Optional.of(new Score(1.0D-Math.min(1.0D,cosine),distanceSq));
+        if(!finite(rawIntent)||rawIntent.lengthSqr()<1.0E-12D)return Optional.empty();
+        Vec3 intent=rawIntent.normalize();double distanceSq=offset==null?0.0D:offset.lengthSqr();
+        double angular=angularError(intent,offset,distanceSq);
+        return Double.isFinite(angular)?Optional.of(new Score(angular,distanceSq)):Optional.empty();
+    }
+
+    /** NaN means invalid/outside cone. Intent must already be normalized. */
+    private static double angularError(Vec3 intent,Vec3 offset,double distanceSq){
+        if(!finite(intent)||!finite(offset)||distanceSq<1.0E-12D)return Double.NaN;
+        double cosine=intent.dot(offset)/Math.sqrt(distanceSq);
+        if(!Double.isFinite(cosine)||cosine<COS_CONE)return Double.NaN;
+        return 1.0D-Math.min(1.0D,cosine);
+    }
+
+    private static boolean better(double angle,double distanceSq,double bestAngle,double bestDistanceSq){
+        return !Double.isFinite(bestAngle)||angle<bestAngle||(Double.compare(angle,bestAngle)==0&&distanceSq<bestDistanceSq);
     }
 
     public static Acquisition acquire(ServerLevel level,ShulkerBullet bullet,Vec3 rawIntent){
@@ -51,25 +62,29 @@ public final class GravityChargeTargeting {
         BlockHitResult center=clip(level,bullet,origin,intent);
         if(center.getType()!=HitResult.Type.MISS&&level.getBlockState(center.getBlockPos()).is(Blocks.TARGET))return Acquisition.block(center.getBlockPos(),true);
 
-        Entity bestEntity=null;Score bestEntityScore=null;Entity owner=bullet.getOwner();
+        Entity bestEntity=null;double bestEntityAngle=Double.NaN,bestEntityDistance=Double.POSITIVE_INFINITY;Entity owner=bullet.getOwner();
         for(LivingEntity candidate:level.getEntitiesOfClass(LivingEntity.class,bullet.getBoundingBox().inflate(RANGE),e->e!=owner&&e.isAlive()&&e.canBeHitByProjectile()&&(!(e instanceof Player p)||!p.isSpectator()))){
-            Vec3 aim=candidate.getBoundingBox().getCenter();var scored=score(intent,aim.subtract(origin));if(scored.isEmpty()||!visible(level,bullet,origin,aim))continue;
-            Score candidateScore=scored.get();if(bestEntityScore==null||candidateScore.compareTo(bestEntityScore)<0){bestEntity=candidate;bestEntityScore=candidateScore;}
+            Vec3 aim=candidate.getBoundingBox().getCenter();Vec3 offset=aim.subtract(origin);double distanceSq=offset.lengthSqr();double angle=angularError(intent,offset,distanceSq);
+            if(!Double.isFinite(angle)||!visible(level,bullet,origin,aim))continue;
+            if(better(angle,distanceSq,bestEntityAngle,bestEntityDistance)){bestEntity=candidate;bestEntityAngle=angle;bestEntityDistance=distanceSq;}
         }
 
-        BlockPos bestBlock=null;Score bestBlockScore=null;Set<BlockPos> seen=new HashSet<>();
+        BlockPos bestBlock=null;double bestBlockAngle=Double.NaN,bestBlockDistance=Double.POSITIVE_INFINITY;
         Vec3 reference=Math.abs(intent.y)<0.9D?new Vec3(0,1,0):new Vec3(1,0,0);
         Vec3 right=intent.cross(reference).normalize();Vec3 up=right.cross(intent).normalize();
         for(int ix=-FAN_RADIUS;ix<=FAN_RADIUS;ix++)for(int iy=-FAN_RADIUS;iy<=FAN_RADIUS;iy++){
             if(ix==0&&iy==0)continue;
             double sx=FAN_TAN*ix/FAN_RADIUS,sy=FAN_TAN*iy/FAN_RADIUS;
             Vec3 ray=intent.add(right.scale(sx)).add(up.scale(sy)).normalize();BlockHitResult hit=clip(level,bullet,origin,ray);
-            if(hit.getType()==HitResult.Type.MISS||!level.getBlockState(hit.getBlockPos()).is(Blocks.TARGET)||!seen.add(hit.getBlockPos()))continue;
-            var scored=score(intent,Vec3.atCenterOf(hit.getBlockPos()).subtract(origin));if(scored.isEmpty())continue;
-            Score candidateScore=scored.get();if(bestBlockScore==null||candidateScore.compareTo(bestBlockScore)<0){bestBlock=hit.getBlockPos().immutable();bestBlockScore=candidateScore;}
+            if(hit.getType()==HitResult.Type.MISS||!level.getBlockState(hit.getBlockPos()).is(Blocks.TARGET))continue;
+            Vec3 offset=Vec3.atCenterOf(hit.getBlockPos()).subtract(origin);double distanceSq=offset.lengthSqr();double angle=angularError(intent,offset,distanceSq);
+            if(!Double.isFinite(angle))continue;
+            // Multiple fan rays may hit the same block; comparing it again is allocation-free and
+            // leaves ranking unchanged, so a per-acquisition HashSet is unnecessary.
+            if(better(angle,distanceSq,bestBlockAngle,bestBlockDistance)){bestBlock=hit.getBlockPos().immutable();bestBlockAngle=angle;bestBlockDistance=distanceSq;}
         }
-        if(bestEntityScore==null&&bestBlockScore==null)return Acquisition.none();
-        if(bestBlockScore!=null&&(bestEntityScore==null||bestBlockScore.compareTo(bestEntityScore)<0))return Acquisition.block(bestBlock,false);
+        if(!Double.isFinite(bestEntityAngle)&&!Double.isFinite(bestBlockAngle))return Acquisition.none();
+        if(Double.isFinite(bestBlockAngle)&&(!Double.isFinite(bestEntityAngle)||better(bestBlockAngle,bestBlockDistance,bestEntityAngle,bestEntityDistance)))return Acquisition.block(bestBlock,false);
         return Acquisition.entity(bestEntity);
     }
 

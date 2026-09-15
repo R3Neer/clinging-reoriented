@@ -24,6 +24,8 @@ public final class VisualTransitions {
     private static final Map<UUID,Long> LATEST_ENTITY_SEQUENCE=new HashMap<>();
     private static volatile Field animationField;
     private static volatile boolean fieldResolved;
+    /** Makes the overwhelmingly common upstream-only getRotation path lock-free. */
+    private static volatile boolean hasActiveTransitions;
     private static long latestSequence=-1;
 
     private enum Mode { HOLD, LAND, SNAP }
@@ -47,7 +49,7 @@ public final class VisualTransitions {
         Quaternionf held=GravityTransition.compensatedVisualStart(current,yawDelta);
         GravityTransition.applyYawGauge(entity,yawDelta);
         animation.forceSet(target,now);
-        synchronized(ACTIVE){ACTIVE.put(animation,new Active(entity,target,null,sequence,held,now,0L,actual==target,Mode.HOLD));}
+        put(animation,new Active(entity,target,null,sequence,held,now,0L,actual==target,Mode.HOLD));
         latestSequence=sequence;
     }
 
@@ -60,7 +62,7 @@ public final class VisualTransitions {
         long now=System.nanoTime();Direction actual=GravityDirectionUtil.getGravityDirection(entity);
         Quaternionf current=animation.getRotation(actual,now);
         boolean seen=actual==target;if(seen)animation.forceSet(target,now);
-        synchronized(ACTIVE){ACTIVE.put(animation,new Active(entity,target,kind,sequence,current,now,seen?now:0L,seen,Mode.LAND));}
+        put(animation,new Active(entity,target,kind,sequence,current,now,seen?now:0L,seen,Mode.LAND));
         latestSequence=sequence;
     }
 
@@ -71,7 +73,7 @@ public final class VisualTransitions {
         long now=System.nanoTime();Direction actual=GravityDirectionUtil.getGravityDirection(entity);
         Quaternionf current=animation.getRotation(actual,now);
         animation.forceSet(actual,now);
-        if(holdCurrent)synchronized(ACTIVE){ACTIVE.put(animation,new Active(entity,actual,null,sequence,current,now,0L,true,Mode.HOLD));}
+        if(holdCurrent)put(animation,new Active(entity,actual,null,sequence,current,now,0L,true,Mode.HOLD));
         else clear(animation);
         latestSequence=sequence;
     }
@@ -92,12 +94,12 @@ public final class VisualTransitions {
         Quaternionf currentVisual=animation.getRotation(actual,now);
         Quaternionf start=GravityTransition.compensatedVisualStart(currentVisual,yawDelta);
         GravityTransition.applyYawGauge(entity,yawDelta);
-        synchronized(ACTIVE){ACTIVE.put(animation,new Active(entity,target,kind,sequence,start,now,0L,false,Mode.SNAP));}
+        put(animation,new Active(entity,target,kind,sequence,start,now,0L,false,Mode.SNAP));
         return true;
     }
 
     public static Quaternionf override(GravityRotationAnimation animation,Direction actual,long now){
-        if(animation==null||actual==null)return null;
+        if(!hasActiveTransitions||animation==null||actual==null)return null;
         Active active; synchronized(ACTIVE){active=ACTIVE.get(animation);} if(active==null)return null;
         if(active.mode()==Mode.HOLD)return holdOverride(animation,active,actual,now);
         return snapOverride(animation,active,actual,now);
@@ -109,7 +111,7 @@ public final class VisualTransitions {
             if(actual==active.target()){
                 animation.forceSet(active.target(),now);
                 active=new Active(active.entity(),active.target(),null,active.sequence(),active.startVisual(),active.receivedNanos(),0L,true,Mode.HOLD);
-                synchronized(ACTIVE){ACTIVE.put(animation,active);}
+                put(animation,active);
             }else if(now-active.receivedNanos()>TARGET_WAIT_NANOS){clear(animation);return null;}
         }
         return new Quaternionf(active.startVisual());
@@ -123,7 +125,7 @@ public final class VisualTransitions {
         if(!active.targetSeen()){
             animation.forceSet(active.target(),now);
             active=new Active(active.entity(),active.target(),active.kind(),active.sequence(),active.startVisual(),active.receivedNanos(),now,true,active.mode());
-            synchronized(ACTIVE){ACTIVE.put(animation,active);}
+            put(animation,active);
         }
         long elapsed=Math.max(0L,now-active.startedNanos());
         long duration=active.mode()==Mode.LAND?LandingTiming.PRESENTATION_NANOS:active.kind().durationNanos();
@@ -134,14 +136,18 @@ public final class VisualTransitions {
         return result;
     }
 
-    public static boolean owns(GravityRotationAnimation animation){if(animation==null)return false;synchronized(ACTIVE){return ACTIVE.containsKey(animation);}}
-    public static boolean owns(Entity entity){GravityRotationAnimation animation=animation(entity);return animation!=null&&owns(animation);}
-    public static boolean holding(Entity entity){GravityRotationAnimation animation=animation(entity);if(animation==null)return false;synchronized(ACTIVE){var active=ACTIVE.get(animation);return active!=null&&active.mode()==Mode.HOLD;}}
+    public static boolean owns(GravityRotationAnimation animation){if(!hasActiveTransitions||animation==null)return false;synchronized(ACTIVE){return ACTIVE.containsKey(animation);}}
+    public static boolean owns(Entity entity){if(!hasActiveTransitions)return false;GravityRotationAnimation animation=animation(entity);return animation!=null&&owns(animation);}
+    public static boolean holding(Entity entity){if(!hasActiveTransitions)return false;GravityRotationAnimation animation=animation(entity);if(animation==null)return false;synchronized(ACTIVE){var active=ACTIVE.get(animation);return active!=null&&active.mode()==Mode.HOLD;}}
 
     /** Advance every owned animation once per client tick, including tracked entities outside the renderer/frustum. */
     public static void tickAll(){
+        if(!hasActiveTransitions)return;
         java.util.List<Map.Entry<GravityRotationAnimation,Active>> snapshot;
-        synchronized(ACTIVE){snapshot=new ArrayList<>(ACTIVE.entrySet());}
+        synchronized(ACTIVE){
+            if(ACTIVE.isEmpty()){hasActiveTransitions=false;return;}
+            snapshot=new ArrayList<>(ACTIVE.entrySet());
+        }
         long now=System.nanoTime();
         for(var entry:snapshot){
             var animation=entry.getKey();var active=entry.getValue();var entity=active.entity();
@@ -151,8 +157,9 @@ public final class VisualTransitions {
     }
 
     public static Quaternionf current(Entity entity){GravityRotationAnimation animation=animation(entity);return animation==null?RotationUtil.getEntityRotationQuaternion(GravityDirectionUtil.getGravityDirection(entity)):animation.getRotation(GravityDirectionUtil.getGravityDirection(entity),System.nanoTime());}
-    public static void clear(){synchronized(ACTIVE){ACTIVE.clear();}synchronized(LATEST_ENTITY_SEQUENCE){LATEST_ENTITY_SEQUENCE.clear();}latestSequence=-1;}
-    private static void clear(GravityRotationAnimation animation){synchronized(ACTIVE){ACTIVE.remove(animation);}}
+    public static void clear(){synchronized(ACTIVE){ACTIVE.clear();hasActiveTransitions=false;}synchronized(LATEST_ENTITY_SEQUENCE){LATEST_ENTITY_SEQUENCE.clear();}latestSequence=-1;}
+    private static void put(GravityRotationAnimation animation,Active active){synchronized(ACTIVE){ACTIVE.put(animation,active);hasActiveTransitions=true;}}
+    private static void clear(GravityRotationAnimation animation){synchronized(ACTIVE){ACTIVE.remove(animation);if(ACTIVE.isEmpty())hasActiveTransitions=false;}}
 
     private static GravityRotationAnimation animation(Entity entity){
         Field field=animationField;
