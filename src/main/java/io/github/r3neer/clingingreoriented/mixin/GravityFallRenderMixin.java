@@ -31,14 +31,20 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  */
 @Mixin(EntityRenderDispatcher.class)
 public abstract class GravityFallRenderMixin {
+    /**
+     * Render submit can nest, so retain a stack, but only avatars ever need it. Keep one deque per
+     * render thread instead of removing/recreating its ThreadLocal entry for every rendered entity.
+     */
     @Unique private static final ThreadLocal<ArrayDeque<Boolean>> CLINGING_GRAVITY_FALL_PUSHES=ThreadLocal.withInitial(ArrayDeque::new);
+    @Unique private static final boolean CLINGING_FIRST_PERSON_PRESENT=FabricLoader.getInstance().isModLoaded("firstperson");
     @Unique private static final String CLINGING_RENDER_TARGET="Lnet/minecraft/client/renderer/entity/EntityRenderer;submit(Lnet/minecraft/client/renderer/entity/state/EntityRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V";
 
     @Inject(method="submit",at=@At(value="INVOKE",target=CLINGING_RENDER_TARGET,shift=At.Shift.BEFORE))
     private void clinging$pushGravityFallBody(EntityRenderState renderState,CameraRenderState camera,double x,double y,double z,
                                                PoseStack poseStack,SubmitNodeCollector submitNodeCollector,CallbackInfo ci){
+        if(!(renderState instanceof AvatarRenderState avatar))return;
         boolean pushed=false;
-        if(renderState instanceof AvatarRenderState avatar && !GravityRenderContext.isRenderingGuiEntity()){
+        if(!GravityRenderContext.isRenderingGuiEntity()){
             Minecraft mc=Minecraft.getInstance();
             if(mc.level!=null && mc.level.getEntity(avatar.id) instanceof Player player){
                 float partial=renderState.ageInTicks-(float)Math.floor(renderState.ageInTicks);
@@ -71,7 +77,7 @@ public abstract class GravityFallRenderMixin {
 
     @Unique
     private static boolean clinging$firstPersonBodyPass(Minecraft mc,Player player){
-        return FabricLoader.getInstance().isModLoaded("firstperson")
+        return CLINGING_FIRST_PERSON_PRESENT
             && mc.options.getCameraType()==CameraType.FIRST_PERSON
             && mc.getCameraEntity()==player;
     }
@@ -79,8 +85,8 @@ public abstract class GravityFallRenderMixin {
     @Inject(method="submit",at=@At(value="INVOKE",target=CLINGING_RENDER_TARGET,shift=At.Shift.AFTER))
     private void clinging$popGravityFallBody(EntityRenderState renderState,CameraRenderState camera,double x,double y,double z,
                                               PoseStack poseStack,SubmitNodeCollector submitNodeCollector,CallbackInfo ci){
+        if(!(renderState instanceof AvatarRenderState))return;
         ArrayDeque<Boolean> pushes=CLINGING_GRAVITY_FALL_PUSHES.get();
         if(!pushes.isEmpty()&&pushes.pop())poseStack.popPose();
-        if(pushes.isEmpty())CLINGING_GRAVITY_FALL_PUSHES.remove();
     }
 }
