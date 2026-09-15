@@ -1,8 +1,8 @@
 # Player guide
 
-This guide describes Clinging: Reoriented **0.1.0-beta.2**.
+This guide describes Clinging: Reoriented **0.1.0-beta.3**.
 
-Gravity Charge marked the transition from alpha to beta. Beta means the core gravity, camera, landing, lifecycle and compatibility architecture is now treated as a coherent baseline for broader validation; it is still a prerelease and remains subject to bug fixes and tuning.
+Beta.3 keeps the beta.2 gravity/camera/gameplay semantics while hardening performance and stability. Beta means the core gravity, camera, landing, lifecycle and compatibility architecture is treated as a coherent baseline for broader validation; it is still a prerelease and remains subject to bug fixes and tuning.
 
 ## Controls and gravity turns
 
@@ -114,6 +114,18 @@ A relaunched Gravity Charge can itself be recaptured by melee or arrow under the
 Clinging comes from Alex's Mobs Continued and grants one successful voluntary airborne gravity decision before valid support restores it.
 
 **Reorientation is brewed with a Gravity Charge, not a Shulker Shell.** Add a Gravity Charge to a Clinging potion to obtain Reorientation; long Clinging maps to long Reorientation, and redstone extends normal Reorientation. Vanilla splash and lingering routes remain available. Clinging remains available as a tier-two beacon power; Reorientation is not a beacon choice.
+
+## Alchemical Leather equipment wear
+
+Alchemical Leather is optional. When it is installed, Clinging: Reoriented supplies the semantics that only the gravity mod can know while Alchemical Leather keeps ownership of the equipment and durability system.
+
+- **Clinging:** only a successful voluntary gravity turn counts as work. Failed, blocked, same-direction and grounded-mount actions do not count.
+- **Reorientation:** a successful turn counts, and controlled airborne self-locomotion contributes gradual work while Reorientation actually owns that motion.
+- Riding, passenger travel, moving/support-surface transport and anatomy support do not create continuous Reorientation work.
+- A successful Reorientation-requested airborne mount turn still counts as the discrete turn event.
+- Clinging: Reoriented never chooses the infused armor item or damages it directly. Alchemical Leather validates the actual active infusion, external-effect eclipse and configured JSON wear rule before applying ordinary durability damage.
+
+Reorientation's humanoid slot declaration belongs to Clinging: Reoriented and remains **boots**. The integration is optional and linkage-safe, so none of these rules add an Alchemical Leather runtime requirement.
 
 ## Mounts and pets
 

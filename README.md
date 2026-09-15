@@ -2,7 +2,7 @@
 
 The floor is wherever you decide it is.
 
-**Clinging: Reoriented** turns the Clinging effect from Alex's Mobs into an airborne gravity ability for Minecraft 26.2 on Fabric. Leave your local floor, release **Space**, look toward another world-cardinal direction and press Space again. Clinging grants one voluntary airborne gravity decision; **Reorientation** removes that one-turn limit. **0.1.0-beta.1** introduced the **Gravity Charge** and marked the project's transition from alpha to beta; **0.1.0-beta.2** hardens full-sphere camera control and underwater retained-camera behaviour.
+**Clinging: Reoriented** turns the Clinging effect from Alex's Mobs into an airborne gravity ability for Minecraft 26.2 on Fabric. Leave your local floor, release **Space**, look toward another world-cardinal direction and press Space again. Clinging grants one voluntary airborne gravity decision; **Reorientation** removes that one-turn limit. **0.1.0-beta.1** introduced the **Gravity Charge**, **beta.2** hardened full-sphere camera control, and **0.1.0-beta.3** is the current performance/stability prerelease.
 
 [![Minecraft 26.2](https://img.shields.io/badge/Minecraft-26.2-62B47A)](https://www.minecraft.net/)
 [![Fabric](https://img.shields.io/badge/Loader-Fabric-DDBD3B)](https://fabricmc.net/)
@@ -94,14 +94,16 @@ This is a **beta prerelease**. Back up important worlds before updating and use 
 
 ## Optional companions and compatibility
 
-- **Alchemical Leather** remains optional and can supply Clinging/Reorientation through compatible equipment.
+- **Alchemical Leather** remains optional. When present, Clinging: Reoriented owns Reorientation's boots slot plus the semantic wear events for successful gravity turns and controlled Reorientation flight. Passive riding/support transport does not count as continuous work; Alchemical Leather remains responsible for source arbitration, armor selection and durability. There is no hard Alchemical Leather dependency.
 - **First Person 2.7.2** is tested with Not Enough Animations 1.12.4.
 - **Fresh Animations 1.10.5 + FA Player Extension 1.1 + EMF 3.3.5 + ETF 7.2** are exercised in a pinned client lane.
 - **Scale Brews beta.5** is exercised in isolated server/client compatibility lanes; production compile/runtime does not require it.
 
+The exact Alchemical Leather ownership and validation contract is recorded in [the compatibility guide](docs/COMPATIBILITY.md) and [TM closeout](docs/TM_ALCHEMICAL_LEATHER_COMPAT.md).
+
 ## Project status
 
-**0.1.0-beta.2** is the current beta prerelease. It keeps Gravity Charge from beta.1 and hardens Gravity Fall camera control across pole crossings, first/third-person switching and underwater gravity turns. The beta gate covers build/JUnit, required server GameTests, default client, First Person, optional Scale Brews server/client, pinned Fresh Animations/Player Extension, localization parity and semantic screenshot validation.
+**0.1.0-beta.3** is the current beta prerelease. It keeps the beta.2 gameplay/camera semantics while reducing hot-path allocation/CPU work and bounding rare recovery searches. The beta gate covers localization parity, build/JUnit, required server GameTests, default client, First Person, optional Scale Brews server/client, pinned Fresh Animations/Player Extension and semantic screenshot validation.
 
 The prerelease is published only from the exact `main` commit that passes that complete matrix. Beta means the core design is coherent enough for broader validation; it does **not** mean feature freeze or guaranteed absence of bugs.
 
@@ -114,7 +116,7 @@ Use Java 25 and the included Gradle wrapper:
 .\gradlew.bat runClientGameTest
 ```
 
-Production `compileClasspath` remains Scale-free. Optional compatibility fixtures are isolated test-only inputs.
+Production `compileClasspath` remains free of optional Scale Brews and Alchemical Leather APIs. Optional compatibility fixtures are isolated test/runtime inputs.
 
 - [Player guide](docs/GUIDE.md)
 - [Architecture](docs/ARCHITECTURE.md)
