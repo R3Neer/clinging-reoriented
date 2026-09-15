@@ -9,6 +9,9 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 
@@ -34,7 +37,7 @@ public final class AlchemicalCompatibilityGameTests {
         h.succeed();
     }
 
-    @GameTest(padding=16) public void controlledFlightExcludesPassiveAndSupportedStates(GameTestHelper h){
+    @GameTest(padding=16) public void controlledFlightExcludesForeignAndPassiveContexts(GameTestHelper h){
         var p=h.makeMockServerPlayerInLevel();
         p.snapTo(h.absoluteVec(new Vec3(4,10,4)));
         for(var pos:BlockPos.betweenClosed(p.blockPosition().offset(-4,-4,-4),p.blockPosition().offset(4,4,4)))
@@ -52,6 +55,21 @@ public final class AlchemicalCompatibilityGameTests {
         state.groundedOnSurface=true;
         h.assertFalse(AlchemicalLeatherCompat.controlledFlightEligible(p),"moving/support surface state is passive transport and cannot accrue continuous wear");
         state.groundedOnSurface=false;
+
+        BlockPos fluidPos=p.blockPosition();
+        h.getLevel().setBlockAndUpdate(fluidPos,Blocks.WATER.defaultBlockState());
+        h.assertFalse(AlchemicalLeatherCompat.controlledFlightEligible(p),"swimming/fluid context is not Reorientation-controlled airborne flight");
+        h.getLevel().setBlockAndUpdate(fluidPos,Blocks.AIR.defaultBlockState());
+
+        p.setItemSlot(EquipmentSlot.CHEST,new ItemStack(Items.ELYTRA));
+        h.assertTrue(p.tryToStartFallFlying(),"holdout fixture enters real Elytra flight");
+        h.assertFalse(AlchemicalLeatherCompat.controlledFlightEligible(p),"Elytra owns locomotion and suppresses continuous Reorientation wear");
+        p.stopFallFlying();
+        p.setItemSlot(EquipmentSlot.CHEST,ItemStack.EMPTY);
+
+        p.getAbilities().flying=true;
+        h.assertFalse(AlchemicalLeatherCompat.controlledFlightEligible(p),"independent player flight is not Reorientation-controlled work");
+        p.getAbilities().flying=false;
 
         p.removeEffect(Reorientation.EFFECT);
         h.assertFalse(AlchemicalLeatherCompat.controlledFlightEligible(p),"flight without Reorientation cannot accrue Reorientation wear");
