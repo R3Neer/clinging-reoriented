@@ -42,8 +42,9 @@ public final class FluidContextGameTests {
     }
 
     private static void assertFluidOriginHoldSurvives(GameTestHelper h,Block fluid,String label){
-        BlockPos fluidPos=h.absolutePos(new BlockPos(4,4,4));
-        h.setBlock(new BlockPos(4,4,4),fluid);
+        BlockPos relative=new BlockPos(4,4,4);
+        BlockPos fluidPos=h.absolutePos(relative);
+        h.setBlock(relative,fluid);
 
         var p=h.makeMockServerPlayerInLevel();
         p.snapTo(new Vec3(fluidPos.getX()+.5D,fluidPos.getY(),fluidPos.getZ()+.5D));
@@ -61,8 +62,21 @@ public final class FluidContextGameTests {
         h.assertTrue(state.freeFlightVisualHeld,label+" cancelled a HOLD created inside the fluid context");
         h.assertTrue(state.freeFlightVisualHeldInFluid,label+" lost provenance for a live fluid-origin HOLD");
         h.assertFalse(state.landingCommitted,label+" retained solid landing state inside fluid");
-        h.assertFalse(state.visualBaseKnown,label+" retained a solid visual base inside fluid");
+        h.assertTrue(state.visualBaseKnown,label+" forgot the retained camera base while preserving its HOLD");
+        h.assertTrue(state.visualBaseDirection==Direction.UP,label+" changed the retained camera base while immersed");
         h.assertTrue(state.airborneTicks==0,label+" kept dry-air landing clock alive inside fluid");
+
+        // Leaving the fluid keeps the camera HOLD, but converts it back to an ordinary dry-flight
+        // HOLD. A later, distinct fluid entry must therefore cross the transfer fence again.
+        h.setBlock(relative,Blocks.AIR);
+        LandingState.tick(p);
+        h.assertTrue(state.freeFlightVisualHeld,label+" released fluid-origin HOLD merely because the player left fluid");
+        h.assertFalse(state.freeFlightVisualHeldInFluid,label+" kept fluid provenance after returning to dry flight");
+
+        h.setBlock(relative,fluid);
+        LandingState.tick(p);
+        h.assertFalse(state.freeFlightVisualHeld,label+" treated a later fluid re-entry as the original fluid HOLD epoch");
+        h.assertFalse(state.freeFlightVisualHeldInFluid,label+" retained provenance after later fluid transfer clear");
     }
 
     @GameTest
