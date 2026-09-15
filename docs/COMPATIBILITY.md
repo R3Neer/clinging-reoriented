@@ -39,7 +39,20 @@ Gravity Charge likewise contains no Scale-specific production path. Its targetin
 
 ## Alchemical Leather
 
-Alchemical Leather remains optional. Compatible equipment may supply Clinging/Reorientation effects; Clinging owns gravity selection, camera/landing, Gravity Fall, aerodynamics, impact and mace semantics once those effects are active.
+Alchemical Leather is optional and is never a compile-time dependency of Clinging: Reoriented. The optional adapter resolves Alchemical Leather's small public wear API reflectively only when `alchemical_leather` is loaded; if the API is absent or incompatible, the bridge disables itself without changing gravity gameplay.
+
+Clinging: Reoriented owns the semantic facts that only this mod can know:
+
+- a `clinging_reoriented:gravity_turn` event is published only after the authoritative gravity-attempt path returns `SUCCESS`;
+- Clinging uses successful voluntary turns as discrete work;
+- Reorientation uses successful turns plus controlled airborne self-locomotion;
+- passenger travel, moving/support-surface transport and anatomy support do not publish continuous Reorientation work.
+
+The owning effect is resolved from the player's real active effects. Reorientation takes precedence when both Reorientation and Alex's Mobs Clinging are present; no event owner is invented when neither effect is active.
+
+Compatibility balance is data-owned. Clinging: Reoriented ships Reorientation's boots slot plus wear rules for Reorientation and Alex's Mobs Clinging. Alchemical Leather remains responsible for deciding which equipped infused item actually owns an effect, handling stronger/equal external-effect eclipse, accumulating fractional work and applying ordinary item durability damage. Clinging never selects or damages armor itself.
+
+The current implementation and TM evidence are documented in [TM_ALCHEMICAL_LEATHER_COMPAT.md](TM_ALCHEMICAL_LEATHER_COMPAT.md).
 
 ## Fluids and jump modifiers
 
@@ -52,12 +65,12 @@ Fluid handling is deliberately generic: non-empty `FluidState` volume suspends C
 ## Ownership boundaries
 
 - **Minecraft vanilla**: ShulkerBullet entity type, projectile collision/Levitation, projectile renderer/resources, Target Block hit/redstone semantics and shulker-duplication mechanics.
-- **Clinging: Reoriented**: Gravity Charge item/capture/acquisition/cardinal routing plus voluntary gravity policy, camera HOLD/full-sphere Gravity Fall, landing commitment, body root, air-diving/aerodynamics, safety, impact, mace and owned mount/pet transitions.
+- **Clinging: Reoriented**: Gravity Charge item/capture/acquisition/cardinal routing plus voluntary gravity policy, camera HOLD/full-sphere Gravity Fall, landing commitment, body root, air-diving/aerodynamics, safety, impact, mace and owned mount/pet transitions. When Alchemical Leather is present, Clinging also owns publication of successful-turn and controlled-Reorientation semantic facts.
 - **Gravity Changer**: physical gravity attributes, coordinate transforms and general movement/collision behaviour; presentation for foreign changes.
 - **Vanilla / registered landing providers**: collision/support facts subject to shared fluid fencing.
 - **First Person**: camera/model baseline; Clinging may transform its body pass but not the real camera.
 - **Fresh Animations/EMF/ETF**: internal model animation; Clinging owns only macro root orientation while active.
 - **Scale Brews**: Scale-specific size/mount/anatomical mechanics.
-- **Alchemical Leather**: equipment-supplied effects.
+- **Alchemical Leather**: infusion storage/source arbitration, armor ownership, wear-rule interpretation, fractional accounting and durability application.
 
 No required or optional dependency JAR is bundled in the production artifact.
