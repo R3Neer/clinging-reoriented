@@ -21,7 +21,7 @@ public final class LandingState {
             // requested while the player was already inside this fluid context: cancelling that
             // HOLD at END_SERVER_TICK would undo the very turn presentation we just accepted.
             if(!eligibleWithoutFluid(player) || !ClingingReoriented.controlsPhysics(player)
-                || !state.freeFlightVisualHeld || !state.freeFlightVisualHeldInFluid){
+                || state.landingCommitted || !state.freeFlightVisualHeld || !state.freeFlightVisualHeldInFluid){
                 transferClear(player);
             }else{
                 clearFluidTransientPreservingHold(state);
@@ -107,7 +107,8 @@ public final class LandingState {
     private static void clearFluidTransientPreservingHold(PlayerData state){
         state.airborneTicks=0;
         state.clearLandingCommit();
-        state.visualBaseKnown=false;
+        // Keep visualBaseKnown/direction: this HOLD still represents that exact retained world frame
+        // and dry landing logic needs its original base after the player leaves the fluid.
     }
 
     private static void touchdown(ServerPlayer player,Direction gravity){
