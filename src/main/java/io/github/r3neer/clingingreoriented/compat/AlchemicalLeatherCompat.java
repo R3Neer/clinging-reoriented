@@ -56,7 +56,9 @@ public final class AlchemicalLeatherCompat implements ModInitializer {
     }
 
     static boolean controlledFlightEligible(ServerPlayer player){
-        if(player==null||!player.hasEffect(Reorientation.EFFECT)||player.isPassenger())return false;
+        if(player==null||!player.isAlive()||player.isSpectator()||player.isSleeping())return false;
+        if(!player.hasEffect(Reorientation.EFFECT)||player.isPassenger()||player.isFallFlying()||player.getAbilities().flying)return false;
+        if(FluidContext.intersects(player))return false;
         if(!ClingingReoriented.controlsPhysics(player)||AirChanges.grounded(player))return false;
         var state=ClingingReoriented.data(player);
         if(state.groundedOnSurface)return false;
