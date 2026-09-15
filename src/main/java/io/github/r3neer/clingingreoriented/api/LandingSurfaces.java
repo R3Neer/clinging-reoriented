@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -22,8 +23,13 @@ public final class LandingSurfaces {
     private static final Map<Identifier,LandingSurfaceProvider> PROVIDERS = new HashMap<>();
     private static final Set<String> WARNED = new HashSet<>();
     private static final double TIE=1.0E-12D;
+    private record ProviderEntry(Identifier id,LandingSurfaceProvider provider) {}
+    private static volatile List<ProviderEntry> ORDERED_PROVIDERS=List.of();
 
-    static { PROVIDERS.put(VANILLA, new VanillaLandingSurfaceProvider()); }
+    static {
+        PROVIDERS.put(VANILLA,new VanillaLandingSurfaceProvider());
+        rebuildOrderedProviders();
+    }
 
     private LandingSurfaces() {}
 
@@ -58,6 +64,7 @@ public final class LandingSurfaces {
         synchronized (LOCK) {
             if (PROVIDERS.containsKey(id)) throw new IllegalStateException("Landing surface provider already registered: " + id);
             PROVIDERS.put(id, provider);
+            rebuildOrderedProviders();
         }
         return new Registration() {
             private boolean closed;
@@ -65,7 +72,10 @@ public final class LandingSurfaces {
                 synchronized (LOCK) {
                     if (closed) return;
                     closed = true;
-                    if (PROVIDERS.get(id) == provider) PROVIDERS.remove(id);
+                    if (PROVIDERS.get(id) == provider) {
+                        PROVIDERS.remove(id);
+                        rebuildOrderedProviders();
+                    }
                     WARNED.removeIf(key -> key.startsWith(id.toString() + ":"));
                 }
             }
@@ -75,9 +85,9 @@ public final class LandingSurfaces {
     public static Optional<Contact> currentSupport(LivingEntity entity, Direction gravity) {
         if (entity == null || gravity == null) return Optional.empty();
         var query = new LandingSurfaceProvider.Query(entity, gravity);
-        for (var entry : snapshot()) {
-            var local = safeSupport(entry.getKey(), entry.getValue(), query);
-            if (local.isPresent()) return Optional.of(wrap(entry.getKey(), gravity, local.get()));
+        for (var entry : ORDERED_PROVIDERS) {
+            var local = safeSupport(entry.id(), entry.provider(), query);
+            if (local.isPresent()) return Optional.of(wrap(entry.id(), gravity, local.get()));
         }
         return Optional.empty();
     }
@@ -87,10 +97,10 @@ public final class LandingSurfaces {
         if (entity == null || gravity == null || !finite(startBody) || !finite(endBody)) return Optional.empty();
         var query = new LandingSurfaceProvider.Query(entity, gravity);
         SweepHit best = null;
-        for (var entry : snapshot()) {
-            var local = safeSweep(entry.getKey(), entry.getValue(), query, startBody, endBody);
+        for (var entry : ORDERED_PROVIDERS) {
+            var local = safeSweep(entry.id(), entry.provider(), query, startBody, endBody);
             if (local.isEmpty()) continue;
-            var hit = new SweepHit(wrap(entry.getKey(), gravity, local.get().contact()), local.get().fraction(),local.get().support());
+            var hit = new SweepHit(wrap(entry.id(), gravity, local.get().contact()), local.get().fraction(),local.get().support());
             if (best == null || hit.fraction() < best.fraction() - TIE
                 || Math.abs(hit.fraction()-best.fraction())<=TIE && hit.support() && !best.support()) best = hit;
         }
@@ -111,11 +121,12 @@ public final class LandingSurfaces {
         }
     }
 
-    private static ArrayList<Map.Entry<Identifier,LandingSurfaceProvider>> snapshot() {
-        ArrayList<Map.Entry<Identifier,LandingSurfaceProvider>> result;
-        synchronized (LOCK) { result = new ArrayList<>(PROVIDERS.entrySet()); }
-        result.sort(Comparator.comparing(entry -> entry.getKey().toString()));
-        return result;
+    /** Called only while LOCK is held, except during static initialization before publication. */
+    private static void rebuildOrderedProviders() {
+        ArrayList<ProviderEntry> result=new ArrayList<>(PROVIDERS.size());
+        for(var entry:PROVIDERS.entrySet())result.add(new ProviderEntry(entry.getKey(),entry.getValue()));
+        result.sort(Comparator.comparing(entry->entry.id().toString()));
+        ORDERED_PROVIDERS=List.copyOf(result);
     }
 
     private static Optional<LandingSurfaceProvider.LocalContact> safeSupport(Identifier id, LandingSurfaceProvider provider,
