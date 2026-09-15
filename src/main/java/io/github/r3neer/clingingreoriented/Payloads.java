@@ -110,7 +110,15 @@ public final class Payloads {
     }
     private static long nextVisualSequence(ServerPlayer p){return ++ClingingReoriented.data(p).visualSequence;}
     public static void hold(ServerPlayer p,GravityTransition.Plan plan){
-        var s=ClingingReoriented.data(p);s.freeFlightVisualHeld=true;long sequence=nextVisualSequence(p);
+        var s=ClingingReoriented.data(p);
+        boolean inFluid=FluidContext.intersects(p);
+        if(inFluid&&!s.freeFlightVisualHeld){
+            s.visualBaseDirection=com.moigferdsrte.gravitychanger.util.GravityDirectionUtil.getGravityDirection(p);
+            s.visualBaseKnown=true;
+        }
+        s.freeFlightVisualHeld=true;
+        s.freeFlightVisualHeldInFluid=inFluid;
+        long sequence=nextVisualSequence(p);
         if(ServerPlayNetworking.canSend(p,VisualHold.TYPE))ServerPlayNetworking.send(p,new VisualHold(plan.target().get3DDataValue(),plan.yawDelta(),sequence));
     }
     public static void land(ServerPlayer p,net.minecraft.core.Direction direction,GravityTransition.TurnKind kind){
@@ -118,11 +126,13 @@ public final class Payloads {
         if(ServerPlayNetworking.canSend(p,LandingVisual.TYPE))ServerPlayNetworking.send(p,new LandingVisual(direction.get3DDataValue(),kind.ordinal(),sequence));
     }
     public static void cancelLanding(ServerPlayer p,boolean holdCurrent){
-        var s=ClingingReoriented.data(p);if(!holdCurrent)s.freeFlightVisualHeld=false;long sequence=nextVisualSequence(p);
+        var s=ClingingReoriented.data(p);
+        if(!holdCurrent){s.freeFlightVisualHeld=false;s.freeFlightVisualHeldInFluid=false;}
+        long sequence=nextVisualSequence(p);
         if(ServerPlayNetworking.canSend(p,VisualCancel.TYPE))ServerPlayNetworking.send(p,new VisualCancel(holdCurrent,sequence));
     }
     public static void visual(ServerPlayer p,GravityTransition.Plan plan){
-        var s=ClingingReoriented.data(p);s.freeFlightVisualHeld=false;long sequence=nextVisualSequence(p);
+        var s=ClingingReoriented.data(p);s.freeFlightVisualHeld=false;s.freeFlightVisualHeldInFluid=false;long sequence=nextVisualSequence(p);
         if(ServerPlayNetworking.canSend(p,VisualTransition.TYPE))ServerPlayNetworking.send(p,new VisualTransition(
             plan.target().get3DDataValue(),plan.yawDelta(),plan.kind().ordinal(),sequence));
     }

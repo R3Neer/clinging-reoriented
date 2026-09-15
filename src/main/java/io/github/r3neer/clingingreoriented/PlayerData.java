@@ -17,7 +17,7 @@ public final class PlayerData {
 
     public int airborneTicks; public boolean landingCommitted; public LandingSurfaces.Contact landingContact; public Direction landingGravity=Direction.DOWN;
     public GravityTransition.TurnKind landingKind; public double landingEtaTicks; public long landingDeadlineTick; public Direction visualBaseDirection=Direction.DOWN;
-    public boolean visualBaseKnown; public long landingSequence; public boolean freeFlightVisualHeld;
+    public boolean visualBaseKnown; public long landingSequence; public boolean freeFlightVisualHeld; public boolean freeFlightVisualHeldInFluid;
 
     public boolean gravityFallActive; public boolean gravityFallLanding; public Direction gravityFallLandingGravity=Direction.DOWN;
     public double gravityFallLandingEtaTicks; public long gravityFallSequence;
