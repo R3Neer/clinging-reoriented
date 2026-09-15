@@ -3,7 +3,7 @@
   "package": "io.github.r3neer.clingingreoriented.mixin",
   "compatibilityLevel": "JAVA_25",
   "plugin": "io.github.r3neer.clingingreoriented.mixin.CompatPlugin",
-  "mixins": ["ClingingEffectMixin", "PlayerStateMixin", "GravityHelperMixin", "AnchorMixin", "EntityCollisionMixin", "MovementMixin", "ConnectionMixin", "ScalePhysicsMixin", "JumpMixin", "WorldVerticalWaterMixin", "PlayerClimbableMixin", "LivingEntityClimbableMixin", "DirectionalMaceMixin", "PlayerTransferMixin", "DirectionalFallGraceMixin", "FallTrackerMixin", "MobGravityMixin", "ImpactStateMixin", "MountGravityMixin", "FollowGravityMixin", "BeaconAccess", "ShulkerBulletMixin", "PlayerRecoveryBudgetMixin", "MobRecoveryBudgetMixin"],
+  "mixins": ["ClingingEffectMixin", "PlayerStateMixin", "GravityHelperMixin", "AnchorMixin", "EntityCollisionMixin", "MovementMixin", "ConnectionMixin", "ScalePhysicsMixin", "JumpMixin", "WorldVerticalWaterMixin", "PlayerClimbableMixin", "LivingEntityClimbableMixin", "DirectionalMaceMixin", "PlayerTransferMixin", "DirectionalFallTrackerCallMixin", "MobGravityMixin", "ImpactStateMixin", "MountGravityMixin", "FollowGravityMixin", "BeaconAccess", "ShulkerBulletMixin", "PlayerRecoveryBudgetMixin", "MobRecoveryBudgetMixin"],
   "client": ["GravitySnapMixin", "LegacyClientMixin", "JumpInputMixin", "OutgoingMoveMixin", "FirstPersonOffsetMixin", "GravityFallRenderMixin", "GravityFallLookMixin", "GravityFallCameraMixin", "VisualMovementMixin"],
   "injectors": { "defaultRequire": 1 }
 }
