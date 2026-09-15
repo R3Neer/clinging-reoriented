@@ -12,7 +12,13 @@ public abstract class MobGravityMixin implements MobGravity.Holder {
     @Unique private final MobGravity.State clinging$mobState=new MobGravity.State();
     public MobGravity.State clinging$mobGravity(){return clinging$mobState;}
     @Inject(method="tick",at=@At("TAIL"))
-    private void clinging$lifetime(CallbackInfo ci){MobGravity.tick((LivingEntity)(Object)this);}
+    private void clinging$lifetime(CallbackInfo ci){
+        // NONE/EXTERNAL are quiescent in MobGravity.tick. The only exceptional reason to enter
+        // from those states is a legacy airUsed flag that still needs its grounded reset.
+        if((clinging$mobState.ownership==MobGravity.Ownership.NONE||clinging$mobState.ownership==MobGravity.Ownership.EXTERNAL)
+            && !clinging$mobState.airUsed)return;
+        MobGravity.tick((LivingEntity)(Object)this);
+    }
     @Inject(method="addAdditionalSaveData",at=@At("TAIL"))
     private void clinging$saveMob(ValueOutput out,CallbackInfo ci){
         out.putInt("clinging_reoriented:mob_ownership",clinging$mobState.ownership.ordinal());
@@ -32,8 +38,6 @@ public abstract class MobGravityMixin implements MobGravity.Holder {
             clinging$mobState.borrowedPreviousOwnership=MobGravity.Ownership.values()[previous];
             clinging$mobState.borrowedPreviousDirection=Direction.from3DDataValue(Math.clamp(in.getIntOr("clinging_reoriented:mob_borrow_previous_direction",0),0,5));
         }else{
-            // Old effectSeen merely proved that an effect had existed, not that this mod
-            // authored the gravity. Migrate ambiguous non-DOWN state as EXTERNAL.
             boolean borrowed=in.getBooleanOr("clinging_reoriented:mob_borrowed",false);
             boolean effectSeen=in.getBooleanOr("clinging_reoriented:mob_effect_seen",false);
             Direction actual=GravityDirectionUtil.getOwnGravityDirection((LivingEntity)(Object)this);
