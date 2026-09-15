@@ -37,6 +37,11 @@ final class GravityFallLookMathTest {
         assertHandedness(170.0F,-170.0F);
     }
 
+    @Test void diagonalInputKeepsBothScreenAxesAcrossPoles(){
+        assertDiagonal(80.0F,100.0F);
+        assertDiagonal(-80.0F,-100.0F);
+    }
+
     @Test void verticalLoopReturnsFullCameraFrame(){
         Quaternionf start=GravityFallLookMath.vanillaRotation(0,0);
         Quaternionf loop=new Quaternionf(start);
@@ -75,12 +80,21 @@ final class GravityFallLookMathTest {
         assertEquals(Math.signum(canonical),Math.signum(past),0.0D,"horizontal handedness changed between "+canonicalPitch+" and "+pastPitch);
     }
 
-    private static double response(float pitch){
+    private static void assertDiagonal(float canonicalPitch,float pastPitch){
+        double[] canonical=diagonalResponse(canonicalPitch),past=diagonalResponse(pastPitch);
+        assertTrue(Math.abs(canonical[0])>EPS&&Math.abs(canonical[1])>EPS&&Math.abs(past[0])>EPS&&Math.abs(past[1])>EPS);
+        assertEquals(Math.signum(canonical[0]),Math.signum(past[0]),0.0D,"diagonal horizontal axis inverted across pole");
+        assertEquals(Math.signum(canonical[1]),Math.signum(past[1]),0.0D,"diagonal vertical axis inverted across pole");
+    }
+
+    private static double response(float pitch){return diagonalResponse(pitch)[0];}
+    private static double[] diagonalResponse(float pitch){
         Quaternionf q=GravityFallLookMath.vanillaRotation(0,pitch);
         Vec3 before=GravityFallLookMath.forward(q);
         Vector3f r=new Quaternionf(q).transform(new Vector3f(1,0,0));Vec3 right=new Vec3(r.x,r.y,r.z);
-        Vec3 after=GravityFallLookMath.forward(GravityFallLookMath.screenTurn(q,6,0));
-        return after.subtract(before).dot(right);
+        Vector3f u=new Quaternionf(q).transform(new Vector3f(0,1,0));Vec3 up=new Vec3(u.x,u.y,u.z);
+        Vec3 after=GravityFallLookMath.forward(GravityFallLookMath.screenTurn(q,6,6));Vec3 delta=after.subtract(before);
+        return new double[]{delta.dot(right),delta.dot(up)};
     }
 
     private static void assertQuat(Quaternionf a,Quaternionf b,String label){float dot=Math.abs(new Quaternionf(a).normalize().dot(new Quaternionf(b).normalize()));assertTrue(1.0F-dot<1.0E-5F,label+" dot="+dot);}
