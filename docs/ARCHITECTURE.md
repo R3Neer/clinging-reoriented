@@ -1,6 +1,6 @@
 # Architecture
 
-Clinging: Reoriented 0.1.0-beta.2 separates **physical gravity**, **camera ownership**, **body presentation**, **landing authority**, **aerodynamic steering**, **impact damage**, **interaction context** and the independent **Gravity Charge projectile lifecycle** instead of treating a gravity-direction write as one monolithic event.
+Clinging: Reoriented 0.1.0-beta.3 separates **physical gravity**, **camera ownership**, **body presentation**, **landing authority**, **aerodynamic steering**, **impact damage**, **interaction context** and the independent **Gravity Charge projectile lifecycle** instead of treating a gravity-direction write as one monolithic event. Beta.3 preserves the beta.2 gameplay/camera architecture while hardening hot paths and bounded recovery work.
 
 ## Authority and design rule
 
@@ -99,4 +99,4 @@ Production code does not compile against Scale Brews or Alchemical Leather. Firs
 
 The major gravity states are GROUNDED, AIRBORNE, SUSTAINED_GRAVITY_FALL, LANDING_COMMITTED and context transfer. These remain orthogonal to effect acquisition, Gravity Charge projectile state, mount loans, pet breadcrumbs and external gravity ownership.
 
-**0.1.0-beta.1** marks the transition from alpha to beta because Gravity Charge is integrated on top of the hardened gravity/camera/lifecycle baseline. **0.1.0-beta.2** hardens that baseline further by replacing the pole-singular Gravity Fall look representation while keeping gameplay authority unchanged.
+**0.1.0-beta.1** introduced Gravity Charge and the beta line. **0.1.0-beta.2** replaced the pole-singular Gravity Fall look representation while keeping gameplay authority unchanged. **0.1.0-beta.3** preserves those semantics while reducing hot-path allocation/CPU work and bounding rare recovery searches.
