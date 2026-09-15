@@ -47,7 +47,7 @@ public final class VanillaLandingSurfaceProvider implements LandingSurfaceProvid
         AABB stored=parse(contact.localId());
         if(stored==null)return false;
         for (var shape : query.entity().level().getBlockCollisions(query.entity(), stored.inflate(PROBE)))
-            for (var box : shape.toAabbs()) if(identity(box).equals(contact.localId()))return true;
+            for (var box : shape.toAabbs()) if(sameBox(box,stored))return true;
         return false;
     }
 
@@ -55,6 +55,10 @@ public final class VanillaLandingSurfaceProvider implements LandingSurfaceProvid
     private static String identity(AABB box) {
         return Double.toHexString(box.minX) + "," + Double.toHexString(box.minY) + "," + Double.toHexString(box.minZ) + ";"
             + Double.toHexString(box.maxX) + "," + Double.toHexString(box.maxY) + "," + Double.toHexString(box.maxZ);
+    }
+    private static boolean sameBox(AABB a,AABB b){
+        return Double.compare(a.minX,b.minX)==0&&Double.compare(a.minY,b.minY)==0&&Double.compare(a.minZ,b.minZ)==0
+            &&Double.compare(a.maxX,b.maxX)==0&&Double.compare(a.maxY,b.maxY)==0&&Double.compare(a.maxZ,b.maxZ)==0;
     }
     private static AABB parse(String id){
         try{
