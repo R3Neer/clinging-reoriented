@@ -1,5 +1,20 @@
 # Validation
 
+## Alchemical Leather compatibility TM
+
+The Alchemical Leather semantic-wear integration was rebuilt on a fresh branch from current `main` rather than merging the stale first prototype, which had diverged by more than a hundred mainline commits.
+
+The compatibility boundary is intentionally narrow and optional:
+
+- Clinging: Reoriented owns Reorientation's boots slot declaration and the semantic facts for successful gravity turns / controlled Reorientation flight;
+- Alex's Mobs retains registry ownership of Clinging;
+- Alchemical Leather owns infusion/source arbitration, equipment selection, balance interpretation, fractional work and durability damage;
+- the Java bridge is linkage-safe and inert when Alchemical Leather is absent.
+
+Reserved GameTest holdouts verify that the compatibility resources are packaged, no event owner is invented with no active gravity effect, Clinging/Reorientation ownership is resolved from real effects with Reorientation precedence, airborne self-controlled Reorientation is eligible for continuous work, and moving/support-surface state or removal of Reorientation suppresses that work. The authoritative turn publisher is attached to the single `ClingingReoriented.attempt(...)` return boundary and only accepts `SUCCESS`; this structurally excludes failed, blocked, unchanged and grounded-mount actions while retaining successful airborne mounted turns.
+
+The ordinary Clinging CI remains the standalone/missing-Alchemical gate. The coordinated Alchemical Leather CI builds this branch and loads it beside Alchemical Leather so its registry-driven VanillaPlus potion/wear audit validates the real compatibility resources. Final convergence evidence is recorded in `TM_ALCHEMICAL_LEATHER_COMPAT.md` after both sides are green on the final documentation-complete heads.
+
 ## 0.1.0-beta.3 — Performance and stability hardening
 
 Beta.3 is a small performance/stability prerelease over beta.2. It does not intentionally change gameplay, camera controls, targeting rules, compatibility semantics or visual timings. The campaign focuses on reducing work in global entity/render paths, lowering temporary allocation pressure and bounding rare recovery searches that could otherwise concentrate thousands of collision checks in one tick.
