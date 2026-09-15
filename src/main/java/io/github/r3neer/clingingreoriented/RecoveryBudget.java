@@ -78,13 +78,19 @@ public final class RecoveryBudget {
                 completePlayer(player,target,transition);return true;
             }
         }
+
+        var state=ClingingReoriented.data(player);
+        state.retirementPending=true;
         if(cursor.index>=OFFSETS.size()){
             cursor.index=0;cursor.completedCycle=true;
+            state.nextRetirementAttempt=player.level().getGameTime()+20L;
             org.slf4j.LoggerFactory.getLogger(ClingingReoriented.ID).warn(
                 "Cannot retire Clinging for {} yet: no collision-free DOWN placement within {} blocks",player.getUUID(),RADIUS);
+        }else{
+            // A direct caller such as anchor release must not allow END_SERVER_TICK to consume a
+            // second batch in the same tick. Reconcile will continue this cursor on the next tick.
+            state.nextRetirementAttempt=player.level().getGameTime()+1L;
         }
-        // Suppress the legacy reconcile warning until a full bounded cycle has actually completed.
-        ClingingReoriented.data(player).retirementPending=true;
         return false;
     }
 
