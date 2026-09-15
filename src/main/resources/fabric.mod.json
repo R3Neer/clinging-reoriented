@@ -18,7 +18,8 @@
       "io.github.r3neer.clingingreoriented.FlightSafetyInitializer",
       "io.github.r3neer.clingingreoriented.DirectionalMaceFallInitializer",
       "io.github.r3neer.clingingreoriented.GravityFallInitializer",
-      "io.github.r3neer.clingingreoriented.GravityFallAerodynamicsInitializer"
+      "io.github.r3neer.clingingreoriented.GravityFallAerodynamicsInitializer",
+      "io.github.r3neer.clingingreoriented.compat.AlchemicalLeatherCompat"
     ],
     "client": [
       "io.github.r3neer.clingingreoriented.client.ClingingClient",
