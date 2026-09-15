@@ -26,9 +26,17 @@ An attempted PERF-S01 optimization tried to intercept only the `DirectionalFallT
 
 The final pre-version code HEAD `be04f41ebe1289127837eac4e03b867e9d6e6db3` passed **run #831** (`35008292945`) across localization parity, build/JUnit, server GameTests, default client, First Person, Scale Brews server/client, Fresh Animations and semantic snapshot validation.
 
-### Release gate
+### Final beta.3 evidence
 
-The beta.3 release-prep HEAD must pass the same complete matrix again after version/docs/workflow canonization. Integration to `main` is allowed only after that green run. `release-beta3.yml` then publishes only from the exact successful `main` CI artifact, verifies one regular and one sources JAR, records SHA-256 digests and creates `v0.1.0-beta.3` against that same commit without rebuilding.
+- **Release-prep HEAD:** `4dfd3ed64d55b0ab55fef6b302cf1b98dbe2a316`.
+- **Run #832** (`35009515014`): success across the complete release matrix after version, docs and publisher canonization.
+- **PR #29** merged the campaign to `main` as `d45511e0fa8829c8bc451b5f3db3a652f13f3d9f`; the merge preserved the release-prep tree.
+- **Main run #834** (`35010672290`): success across localization parity, build/JUnit, server GameTests, default client, First Person, Scale Brews server/client, Fresh Animations and semantic snapshots on the exact release commit.
+- **Publish beta.3 prerelease #1** (`35011714128`): success; downloaded the exact artifact from main run #834 and published without rebuilding.
+- **Release/tag:** `v0.1.0-beta.3`, target `d45511e0fa8829c8bc451b5f3db3a652f13f3d9f`.
+- **Regular JAR SHA-256:** `675b7edbc8579cbfa471e6a372afceab5d23306ed50caf356e8de315b944757d`.
+- **Sources JAR SHA-256:** `ce04d04d940461f6e16a2136927b610c4a6c64eba14936bef1bc07e4820dcf4b`.
+- A later beta.3 publisher invocation was skipped by the one-shot gate because the release already existed.
 
 No claim is made that beta.3 definitively fixes a previously observed multi-second freeze in a large modpack: that observation was not isolated to this mod. The release does remove several objectively unnecessary hot-path allocations/workloads and bounds one rare worst-case server search.
 
