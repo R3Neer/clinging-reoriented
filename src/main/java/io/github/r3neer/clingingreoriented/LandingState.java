@@ -13,9 +13,30 @@ public final class LandingState {
     public static void tick(ServerPlayer player){
         var state=ClingingReoriented.data(player);
         Direction gravity=GravityDirectionUtil.getGravityDirection(player);
-        if(!eligibleContext(player)){
-            // Fluids/Elytra/vehicles/death/etc. own the next presentation. Unlike an invalidated
-            // solid landing surface, there is no Clinging landing frame to preserve here.
+        boolean fluid=FluidContext.intersects(player);
+
+        if(fluid){
+            // Entering a fluid still tears down any solid-air landing/camera presentation from the
+            // previous context. The one exception is a HOLD that was created by a gravity turn
+            // requested while the player was already inside this fluid context: cancelling that
+            // HOLD at END_SERVER_TICK would undo the very turn presentation we just accepted.
+            if(!eligibleWithoutFluid(player) || !ClingingReoriented.controlsPhysics(player)
+                || !state.freeFlightVisualHeld || !state.freeFlightVisualHeldInFluid){
+                transferClear(player);
+            }else{
+                clearFluidTransientPreservingHold(state);
+            }
+            return;
+        }
+
+        // Once the player leaves fluid, a surviving HOLD is an ordinary dry free-flight HOLD again.
+        // Re-entering a fluid later must therefore cross the normal transfer fence rather than being
+        // mistaken for the same underwater interaction epoch.
+        state.freeFlightVisualHeldInFluid=false;
+
+        if(!eligibleWithoutFluid(player)){
+            // Elytra/vehicles/death/etc. own the next presentation. Unlike an invalidated solid
+            // landing surface, there is no Clinging landing frame to preserve here.
             transferClear(player);return;
         }
         if(AirChanges.grounded(player)){
@@ -79,13 +100,21 @@ public final class LandingState {
     }
 
     private static void clearTransient(PlayerData state){
-        state.airborneTicks=0;state.clearLandingCommit();state.visualBaseKnown=false;state.freeFlightVisualHeld=false;
+        state.airborneTicks=0;state.clearLandingCommit();state.visualBaseKnown=false;
+        state.freeFlightVisualHeld=false;state.freeFlightVisualHeldInFluid=false;
+    }
+
+    private static void clearFluidTransientPreservingHold(PlayerData state){
+        state.airborneTicks=0;
+        state.clearLandingCommit();
+        state.visualBaseKnown=false;
     }
 
     private static void touchdown(ServerPlayer player,Direction gravity){
         var state=ClingingReoriented.data(player);boolean wasCommitted=state.landingCommitted;
         if(!wasCommitted&&state.freeFlightVisualHeld)Payloads.cancelLanding(player,false);
-        state.freeFlightVisualHeld=false;state.airborneTicks=0;state.clearLandingCommit();state.visualBaseDirection=gravity;state.visualBaseKnown=true;
+        state.freeFlightVisualHeld=false;state.freeFlightVisualHeldInFluid=false;state.airborneTicks=0;
+        state.clearLandingCommit();state.visualBaseDirection=gravity;state.visualBaseKnown=true;
     }
 
     private static void commit(ServerPlayer player,LandingPrediction.Candidate candidate,GravityTransition.TurnKind kind){
@@ -105,7 +134,11 @@ public final class LandingState {
     private static boolean same(LandingSurfaces.Contact a,LandingSurfaces.Contact b){return a!=null&&b!=null&&a.gravity()==b.gravity()&&a.key().equals(b.key());}
 
     private static boolean eligibleContext(ServerPlayer player){
+        return eligibleWithoutFluid(player)&&!FluidContext.intersects(player);
+    }
+
+    private static boolean eligibleWithoutFluid(ServerPlayer player){
         return player.isAlive()&&!player.isSpectator()&&!player.isSleeping()&&!player.isPassenger()
-            &&!player.isFallFlying()&&!FluidContext.intersects(player)&&!player.getAbilities().flying;
+            &&!player.isFallFlying()&&!player.getAbilities().flying;
     }
 }
