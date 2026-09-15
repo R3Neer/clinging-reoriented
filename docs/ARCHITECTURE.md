@@ -1,6 +1,6 @@
 # Architecture
 
-Clinging: Reoriented 0.1.0-beta.1 separates **physical gravity**, **camera ownership**, **body presentation**, **landing authority**, **aerodynamic steering**, **impact damage**, **interaction context** and the independent **Gravity Charge projectile lifecycle** instead of treating a gravity-direction write as one monolithic event.
+Clinging: Reoriented 0.1.0-beta.2 separates **physical gravity**, **camera ownership**, **body presentation**, **landing authority**, **aerodynamic steering**, **impact damage**, **interaction context** and the independent **Gravity Charge projectile lifecycle** instead of treating a gravity-direction write as one monolithic event.
 
 ## Authority and design rule
 
@@ -20,11 +20,13 @@ During sustained Gravity Fall, the client sends sparse world-space gaze/forward 
 
 `GravityTransition` plans gravity/yaw coordinate transport but voluntary turns do not rotate world velocity. Gravity Changer remains the gravity-coordinate authority; Clinging records whether physical and visual state is its responsibility and releases ownership when another source takes over.
 
-`VisualTransitions` provides HOLD, LAND and SNAP presentation modes. Local-player LAND uses a shared **500 ms / 10 tick** window; ordinary tracked non-player SNAP keeps shorter 180/240 ms turn timing. Cancellation caused by invalidated support may hold the exact current quaternion; lifecycle/context transfer releases ownership.
+`VisualTransitions` provides HOLD, LAND and SNAP presentation modes. Local-player LAND uses a shared **500 ms / 10 tick** window; ordinary tracked non-player SNAP keeps shorter 180/240 ms turn timing. Cancellation caused by invalidated support may hold the exact current quaternion; lifecycle/context transfer releases ownership. A camera HOLD created inside an already-active fluid context preserves the retained world frame for that fluid epoch; a later independent fluid entry still crosses the transfer fence and releases an older dry-flight HOLD.
 
 ## Full-sphere Gravity Fall and body root
 
-`GravityFallLookMixin` owns full-sphere pitch only while the local player has active Gravity Fall presentation. On exit, `GravityFallLookMath.vanillaEquivalent` maps orientation back to an equivalent vanilla yaw/pitch pair without changing the look vector.
+`GravityFallLookState` owns a continuous local camera orientation only while the local player has active Gravity Fall presentation. Mouse deltas are applied in the camera's own screen frame, so horizontal/vertical intent keeps the same handedness through both pitch poles. The entity's ordinary yaw/pitch fields remain a vanilla-compatible representation of the same **forward vector** rather than storing out-of-range full-sphere pitch.
+
+`GravityFallCameraMixin` composes that camera-base orientation after Gravity Changer's retained visual-gravity frame and rebuilds Minecraft's camera basis. Vanilla third-person boom distance and wall clipping therefore consume the same continuous look frame instead of a second custom orbit implementation. Switching between first and third person changes camera placement, not the meaning of look input. When Gravity Fall releases ownership, the canonical entity yaw/pitch already represents the current gaze, so exit does not snap the view.
 
 `GravityFallState` is a server-authoritative coarse phase machine. Sustained presentation begins after 12 airborne ticks. `GravityFallVisuals`, `BodyOrientation` and `BodyRenderMath` reconstruct the body client-side from world velocity, with a six-tick entry blend and stable zero-speed retention.
 
@@ -84,4 +86,4 @@ Production code does not compile against Scale Brews. First Person is mixin-gate
 
 The major gravity states are GROUNDED, AIRBORNE, SUSTAINED_GRAVITY_FALL, LANDING_COMMITTED and context transfer. These remain orthogonal to effect acquisition, Gravity Charge projectile state, mount loans, pet breadcrumbs and external gravity ownership.
 
-**0.1.0-beta.1** marks the transition from alpha to beta because Gravity Charge is integrated on top of the already hardened gravity/camera/lifecycle baseline, not because the release gate is weaker.
+**0.1.0-beta.1** marks the transition from alpha to beta because Gravity Charge is integrated on top of the hardened gravity/camera/lifecycle baseline. **0.1.0-beta.2** hardens that baseline further by replacing the pole-singular Gravity Fall look representation while keeping gameplay authority unchanged.

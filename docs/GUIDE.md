@@ -1,8 +1,8 @@
 # Player guide
 
-This guide describes Clinging: Reoriented **0.1.0-beta.1**.
+This guide describes Clinging: Reoriented **0.1.0-beta.2**.
 
-Gravity Charge marks the transition from alpha to beta. Beta means the core gravity, camera, landing, lifecycle and compatibility architecture is now treated as a coherent baseline for broader validation; it is still a prerelease and remains subject to bug fixes and tuning.
+Gravity Charge marked the transition from alpha to beta. Beta means the core gravity, camera, landing, lifecycle and compatibility architecture is now treated as a coherent baseline for broader validation; it is still a prerelease and remains subject to bug fixes and tuning.
 
 ## Controls and gravity turns
 
@@ -19,7 +19,7 @@ A successful turn changes gravity immediately but preserves the current world-sp
 
 Airborne gravity changes do not force the local camera into the new gravity basis. Clinging retains the world frame that was actually being rendered, while target selection continues to use that retained view.
 
-During sustained **Gravity Fall**, vertical look becomes full-sphere. Pitch can cross both poles and complete a full 360-degree loop instead of clamping at vanilla's +/-90 degrees. When Gravity Fall ends, the current viewing direction is converted to an equivalent vanilla yaw/pitch pair, so returning to vanilla coordinates does not change where the player is looking.
+During sustained **Gravity Fall**, look becomes full-sphere. You can pass through both poles and complete a full 360-degree loop without the horizontal or vertical mouse direction flipping on screen. First- and third-person views use the same look direction; changing view mode changes camera placement, not the meaning of your input. When Gravity Fall ends, the same viewing direction returns to ordinary vanilla camera coordinates without a snap.
 
 ## Gravity Fall body language
 
@@ -47,17 +47,17 @@ At speed >= **0.75 blocks/tick**, Gravity Fall reuses vanilla's `ELYTRA_FLYING` 
 
 Clinging predicts a bounded trajectory using the real body, velocity, gravity and landing-surface providers. A candidate floor must be physically valid support under the active gravity.
 
-Beta.1 retains the shared **10-tick / 500 ms** landing window introduced in alpha.14. Camera LAND and BODY_LANDING use that timing. This is separate from the shorter 180/240 ms tracked SNAP used by non-player entities.
+Beta keeps the shared **10-tick / 500 ms** landing window introduced in alpha.14. Camera LAND and BODY_LANDING use that timing. This is separate from the shorter 180/240 ms tracked SNAP used by non-player entities.
 
 During `LANDING_COMMITTED`, new gravity requests are discarded rather than queued. If predicted support disappears while Clinging still owns flight, the exact current presentation becomes the held frame. If another subsystem takes ownership instead, Clinging releases obsolete landing state.
 
 ## Fluids and water
 
-Intersecting **any non-empty fluid volume** suspends Clinging support, landing commitment/prediction and Gravity Fall presentation. Modded fluids receive the same treatment as water and lava.
+Intersecting **any non-empty fluid volume** suspends Clinging support, landing commitment/prediction and Gravity Fall body presentation. Modded fluids receive the same treatment as water and lava.
 
 A seabed touched while the body is still submerged is not a Clinging floor and does not restore the one-turn budget. Recharge requires genuine gravity-relative support outside fluid context.
 
-Water keeps its deliberate gravity-request gesture: press Space, release it, then press again within **250 ms**. The ordinary/held press remains swimming input. While Clinging/Reorientation owns water movement, Space is world **+Y** and Shift is world **-Y**, regardless of current gravity.
+Water keeps its deliberate gravity-request gesture: press Space, release it, then press again within **250 ms**. The ordinary/held press remains swimming input. While Clinging/Reorientation owns water movement, Space is world **+Y** and Shift is world **-Y**, regardless of current gravity. A gravity turn requested while already in water keeps the current camera frame stable; entering a fluid later from dry free flight still clears obsolete presentation state.
 
 ## Climbables
 
@@ -129,7 +129,7 @@ The mod's player-facing strings ship in English (`en_us`) and Spanish from Spain
 
 When Clinging-owned gravity must retire, the mod first attempts DOWN in place and then a deterministic validated local search within four blocks. If no safe placement exists, retirement remains pending instead of teleporting to a distant checkpoint.
 
-Teleport, dimension transfer, death/respawn, disconnect, fluid entry, Elytra and foreign ownership explicitly clear or transfer transient landing/Gravity Fall state. Respawn keeps visual epochs monotonic so stale packets cannot become new presentation state.
+Teleport, dimension transfer, death/respawn, disconnect, Elytra and foreign ownership explicitly clear or transfer transient landing/Gravity Fall state. Fluid boundaries suspend landing/Gravity Fall body semantics while preserving only the camera HOLD that was deliberately created by a turn inside the current fluid epoch. Respawn keeps visual epochs monotonic so stale packets cannot become new presentation state.
 
 ## Landing-surface API
 

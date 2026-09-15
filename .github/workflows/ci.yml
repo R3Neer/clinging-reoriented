@@ -109,6 +109,11 @@ jobs:
               'first_person': Path('build/first-person-screenshots'),
               'fresh_animations': Path('build/fresh-animations-screenshots'),
           }
+          camera = [
+              'cam-s01-first-person-past-pole',
+              'cam-s01-third-person-past-pole',
+              'cam-s05-first-third-continuity',
+          ]
           required = {
               'default': [
                   's05-six-turn-retained-camera',
@@ -117,6 +122,8 @@ jobs:
                   's05-cancelled-landing-holds-partial',
                   's05-language-falling',
                   's05-language-elytra',
+                  'gravity-fall-full-sphere-360',
+                  *camera,
                   'gravity-charge-inventory-icon',
                   'gravity-charge-first-person-held',
                   'gravity-charge-third-person-held',
@@ -126,11 +133,13 @@ jobs:
               'first_person': [
                   'firstperson-gravity-fall-root',
                   'firstperson-gravity-fall-landing',
+                  *camera,
               ],
               'fresh_animations': [
                   'fresh-animations-gravity-fall-sustained-down',
                   'fresh-animations-gravity-fall-landing-mid',
                   'fresh-animations-gravity-fall-landing-final',
+                  *camera,
               ],
           }
           rows = []
@@ -155,6 +164,7 @@ jobs:
           distinct = [
               (('default', 's05-language-falling'), ('default', 's05-language-elytra')),
               (('fresh_animations', 'fresh-animations-gravity-fall-landing-mid'), ('fresh_animations', 'fresh-animations-gravity-fall-landing-final')),
+              (('default', 'cam-s01-first-person-past-pole'), ('default', 'cam-s01-third-person-past-pole')),
               (('default', 'gravity-charge-inventory-icon'), ('default', 'gravity-charge-first-person-held')),
               (('default', 'gravity-charge-first-person-held'), ('default', 'gravity-charge-third-person-held')),
               (('default', 'gravity-charge-third-person-held'), ('default', 'gravity-charge-projectile-renderer')),

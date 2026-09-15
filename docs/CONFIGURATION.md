@@ -1,10 +1,10 @@
 # Configuration
 
-Clinging: Reoriented 0.1.0-beta.1 exposes **no mod-owned configuration file**. The values below are fixed gameplay/presentation semantics rather than user preferences.
+Clinging: Reoriented 0.1.0-beta.2 exposes **no mod-owned configuration file**. The values below are fixed gameplay/presentation semantics rather than user preferences.
 
 ## Local-player camera and landing
 
-A voluntary gravity change during free flight does **not** rotate the local camera. During a physically predicted landing, local camera LAND and Gravity Fall BODY_LANDING share a **10-tick / 500 ms** presentation window. Invalidated support retains the exact current frame; context transfer releases obsolete presentation.
+A voluntary gravity change during free flight does **not** rotate the local camera. During sustained Gravity Fall, look input remains screen-relative through full-sphere pole crossings in both first and third person. During a physically predicted landing, local camera LAND and Gravity Fall BODY_LANDING share a **10-tick / 500 ms** presentation window. Invalidated support retains the exact current frame; context transfer releases obsolete presentation.
 
 Ordinary tracked non-player SNAP remains separate: quarter turns use **180 ms** and opposite half turns **240 ms**.
 
@@ -33,7 +33,7 @@ Gravity Charge uses fixed rules rather than configuration:
 - a valid lock remains sticky until invalid;
 - a directly sighted Target Block has absolute acquisition priority.
 
-These constants are part of the beta.1 gameplay contract, not settings.
+These constants are part of the beta gameplay contract, not settings.
 
 ## Localization
 
@@ -45,7 +45,7 @@ Clinging-owned non-player transitions use fixed **180/240 ms** tracked SNAP pres
 
 ## Water
 
-Normal and held Space remain vanilla swimming input. A second rising edge after a real release within **250 ms** requests Clinging/Reorientation. While owned, water ascent/descent is world-vertical.
+Normal and held Space remain vanilla swimming input. A second rising edge after a real release within **250 ms** requests Clinging/Reorientation. While owned, water ascent/descent is world-vertical. A retained camera frame created by a gravity turn while already inside fluid survives that fluid epoch; a later separate fluid entry still clears an older dry-flight HOLD.
 
 ## Sprint-jump reservation
 

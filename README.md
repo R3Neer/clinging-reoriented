@@ -2,7 +2,7 @@
 
 The floor is wherever you decide it is.
 
-**Clinging: Reoriented** turns the Clinging effect from Alex's Mobs into an airborne gravity ability for Minecraft 26.2 on Fabric. Leave your local floor, release **Space**, look toward another world-cardinal direction and press Space again. Clinging grants one voluntary airborne gravity decision; **Reorientation** removes that one-turn limit. **0.1.0-beta.1** adds the **Gravity Charge**, a capturable and relaunchable shulker projectile that becomes Reorientation's brewing ingredient and marks the project's transition from alpha to beta.
+**Clinging: Reoriented** turns the Clinging effect from Alex's Mobs into an airborne gravity ability for Minecraft 26.2 on Fabric. Leave your local floor, release **Space**, look toward another world-cardinal direction and press Space again. Clinging grants one voluntary airborne gravity decision; **Reorientation** removes that one-turn limit. **0.1.0-beta.1** introduced the **Gravity Charge** and marked the project's transition from alpha to beta; **0.1.0-beta.2** hardens full-sphere camera control and underwater retained-camera behaviour.
 
 [![Minecraft 26.2](https://img.shields.io/badge/Minecraft-26.2-62B47A)](https://www.minecraft.net/)
 [![Fabric](https://img.shields.io/badge/Loader-Fabric-DDBD3B)](https://fabricmc.net/)
@@ -15,7 +15,7 @@ The floor is wherever you decide it is.
 
 A voluntary turn changes **physical gravity immediately** but preserves the existing world-space velocity vector. Gravity changes acceleration, not momentum. Reversing gravity therefore brakes the old motion naturally, crosses zero speed, and only then accelerates the other way.
 
-The local player's camera is independent from logical gravity. Free-flight turns retain the world frame that was actually being rendered, so chained Reorientation choices do not drag the view through every gravity basis. During sustained Gravity Fall the camera also gains **full-sphere vertical look**: pitch can pass through both poles and complete a 360-degree loop. On exit, the same viewing direction is re-expressed as an ordinary vanilla yaw/pitch pair without a camera snap.
+The local player's camera is independent from logical gravity. Free-flight turns retain the world frame that was actually being rendered, so chained Reorientation choices do not drag the view through every gravity basis. During sustained Gravity Fall the camera also gains **full-sphere look**: it can pass through both poles and complete 360-degree loops while horizontal and vertical mouse intent remains consistent on screen. First- and third-person views share that same look frame. On exit, the same viewing direction returns to ordinary vanilla yaw/pitch without a camera snap.
 
 When the real trajectory is about to meet a valid gravity-relative floor, Clinging reserves a shared **10-tick / 500 ms landing manoeuvre**. New gravity requests during `LANDING_COMMITTED` are discarded, never queued; invalidated support preserves the current visible frame instead of snapping backward.
 
@@ -39,7 +39,7 @@ Mace smash height under directional gravity is measured as literal geometric dis
 
 ## Fluids, water and climbables
 
-Any intersection with a non-empty fluid volume is a context boundary. Water, lava and modded fluids suspend gravity-relative support, landing prediction/commitment and Gravity Fall presentation.
+Any intersection with a non-empty fluid volume is a context boundary for support, landing prediction/commitment and Gravity Fall body presentation. Water, lava and modded fluids use the same policy. A camera HOLD created by a gravity turn while already inside the fluid remains stable for that fluid epoch; entering fluid later with an older dry-flight HOLD still releases that obsolete frame.
 
 Water keeps the deliberate **Space, release, Space within 250 ms** gravity-request gesture. While Clinging/Reorientation owns water movement, Space is world **+Y** and Shift is world **-Y**, independent of the current gravity basis.
 
@@ -101,7 +101,7 @@ This is a **beta prerelease**. Back up important worlds before updating and use 
 
 ## Project status
 
-**0.1.0-beta.1** is the first beta prerelease. Gravity Charge is the milestone feature that closes the alpha line after alpha.15's pet gravity-breadcrumb pursuit. The beta gate covers build/JUnit, required server GameTests including the Gravity Charge adversarial campaign, default client, First Person, optional Scale Brews server/client, pinned Fresh Animations/Player Extension, localization parity and semantic screenshot validation.
+**0.1.0-beta.2** is the current beta prerelease. It keeps Gravity Charge from beta.1 and hardens Gravity Fall camera control across pole crossings, first/third-person switching and underwater gravity turns. The beta gate covers build/JUnit, required server GameTests, default client, First Person, optional Scale Brews server/client, pinned Fresh Animations/Player Extension, localization parity and semantic screenshot validation.
 
 The prerelease is published only from the exact `main` commit that passes that complete matrix. Beta means the core design is coherent enough for broader validation; it does **not** mean feature freeze or guaranteed absence of bugs.
 

@@ -1,5 +1,36 @@
 # Validation
 
+## 0.1.0-beta.2 — Full-sphere camera hardening
+
+Beta.2 is a regression/hardening release over beta.1. It keeps gameplay authority unchanged while replacing the pole-singular Gravity Fall camera representation and fixing retained-camera ownership for gravity turns initiated inside fluid.
+
+### TM camera campaign
+
+The camera work followed red-before-green TM gates:
+
+- **CAM-S01 red:** commit `73ab816b111824ac79c903eb5f5bd0a9b6d523d3`; run **#792** (`34948135795`) passed build/JUnit and server GameTests, then failed in default Client GameTests after registering screen-space pole/third-person regressions.
+- **CAM-S02–S04 green:** commit `ff4624618cfdfead0c74b812fc4bcb9a5a09db27`; run **#793** (`34949005750`) passed build/JUnit, server, default client, First Person, Scale Brews server/client, Fresh Animations and semantic snapshots.
+- **CAM-S05 adversarial:** commit `d6a0cf545698e8fe7a2244329664b0d3fb0e480d`; run **#794** (`34950338232`) passed the same complete matrix after adding diagonal pole and first/third-person continuity holdouts.
+
+Automated camera coverage verifies:
+
+- horizontal screen-space input does not invert at either pole;
+- diagonal input preserves both screen axes across both poles;
+- a pure vertical 360-degree loop restores forward and screen-up without accumulating roll;
+- first- and third-person modes share one look frame through a pole crossing;
+- third-person keeps vanilla camera distance/wall clipping while using the continuous Gravity Fall look frame;
+- entity yaw/pitch remains vanilla-compatible with the same forward vector;
+- Gravity Fall exit preserves gaze;
+- historical HOLD/LAND/body, First Person, Scale Brews and Fresh Animations tests remain green.
+
+### Fluid retained-camera regression
+
+PR #27 first registered the underwater HOLD regression red, then separated dry-origin and fluid-origin retained-camera epochs. A HOLD created by a gravity request while already inside fluid survives that fluid epoch; a later distinct fluid entry still retires an older dry-flight HOLD. Water/lava, exit and re-entry are covered without re-enabling submerged landing or Gravity Fall body semantics.
+
+### Beta.2 visual evidence
+
+The release matrix requires semantic camera snapshots in the default, First Person and Fresh Animations lanes, including pole-crossing and first/third-person continuity checkpoints. Each screenshot has a neighboring numerical invariant; screenshots are supporting evidence rather than the sole assertion.
+
 ## 0.1.0-beta.1 — Gravity Charge beta gate
 
 Gravity Charge is the feature that moves Clinging: Reoriented from alpha to beta. The beta label does **not** weaken validation: the feature passed the complete matrix on the final branch HEAD and then again on the exact integrated `main` commit before `v0.1.0-beta.1` was published.
@@ -86,7 +117,7 @@ Every beta release-gating run executes:
 
 ## Packaging gate
 
-A prerelease is published only from the **exact `main` commit whose complete `Build and test` run succeeded**. `release-beta1.yml` downloads the regular and sources JARs from that exact workflow artifact, verifies one of each, records SHA-256 digests and creates `v0.1.0-beta.1` against the same commit. It never performs a second release build.
+A prerelease is published only from the **exact `main` commit whose complete `Build and test` run succeeded**. The version-specific release workflow downloads the regular and sources JARs from that exact workflow artifact, verifies one of each, records SHA-256 digests and creates the matching prerelease tag against the same commit. It never performs a second release build.
 
 Production output must not contain GameTest classes, dependency JARs, temporary planning files or raw validation logs.
 
@@ -105,6 +136,7 @@ Automated assertions and snapshots are evidence, not a substitute for human game
 
 ## Historical releases
 
+- **0.1.0-beta.2**: full-sphere camera/input hardening and underwater retained-camera fix.
 - **0.1.0-beta.1**: Gravity Charge; first beta.
 - **0.1.0-alpha.15**: pet gravity-breadcrumb pursuit; last alpha.
 - **0.1.0-alpha.14**: Gravity Fall control/camera, 500 ms landing, full-sphere look, aerodynamics, fluid/climbable policy, safety and directional mace.
