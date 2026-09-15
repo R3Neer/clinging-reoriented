@@ -94,10 +94,12 @@ This is a **beta prerelease**. Back up important worlds before updating and use 
 
 ## Optional companions and compatibility
 
-- **Alchemical Leather** remains optional and can supply Clinging/Reorientation through compatible equipment.
+- **Alchemical Leather** remains optional. When present, Clinging: Reoriented owns Reorientation's boots slot plus the semantic wear events for successful gravity turns and controlled Reorientation flight. Passive riding/support transport does not count as continuous work; Alchemical Leather remains responsible for source arbitration, armor selection and durability. There is no hard Alchemical Leather dependency.
 - **First Person 2.7.2** is tested with Not Enough Animations 1.12.4.
 - **Fresh Animations 1.10.5 + FA Player Extension 1.1 + EMF 3.3.5 + ETF 7.2** are exercised in a pinned client lane.
 - **Scale Brews beta.5** is exercised in isolated server/client compatibility lanes; production compile/runtime does not require it.
+
+The exact Alchemical Leather ownership and validation contract is recorded in [the compatibility guide](docs/COMPATIBILITY.md) and [TM closeout](docs/TM_ALCHEMICAL_LEATHER_COMPAT.md).
 
 ## Project status
 
