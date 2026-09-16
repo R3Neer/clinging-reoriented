@@ -37,7 +37,9 @@ public final class PetGravityCommitGameTests {
         h.assertTrue(wolf.getDeltaMovement().equals(Vec3.ZERO),"commit retained navigation momentum despite zero-velocity forecast: "+wolf.getDeltaMovement());
         h.assertTrue(committed.launchPosition().distanceTo(preview.transition().launchPosition())<1.0E-9D,
             "commit launch no longer matches the immediately previewed launch");
-        h.assertFalse(MobGravity.replay(wolf,Direction.NORTH),"Clinging received a second midair gravity turn after grounded planned commit");
+        var second=MobGravityPlanner.evaluateImmediate(wolf,Direction.NORTH,5);
+        h.assertTrue(!second.accepted()&&second.rejection()==MobGravityPlanner.Rejection.CAPABILITY_SPENT,
+            "Clinging received a second midair gravity plan after grounded commit: "+second.rejection());
         h.succeed();
     }
 
