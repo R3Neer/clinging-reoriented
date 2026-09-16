@@ -59,9 +59,7 @@ public final class ClingingReoriented implements ModInitializer {
         Reorientation.initialize();
         Payloads.register();
         net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.SERVER_STARTING.register(server->BeaconPowers.install());
-        net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.SERVER_STOPPED.register(server->GravityBreadcrumbs.clearAll());
         ServerTickEvents.END_SERVER_TICK.register(server -> {
-            GravityBreadcrumbs.prune(server);
             for (ServerPlayer p : server.getPlayerList().getPlayers()) {
                 reconcile(p);
                 LandingState.tick(p);
@@ -69,7 +67,7 @@ public final class ClingingReoriented implements ModInitializer {
             }
         });
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> { reconcile(handler.player); Payloads.publish(handler.player); });
-        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {LandingState.lifecycleClear(handler.player);data(handler.player).unbind();GravityBreadcrumbs.clear(handler.player.getUUID());});
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {LandingState.lifecycleClear(handler.player);data(handler.player).unbind();});
         ServerPlayerEvents.COPY_FROM.register(ClingingReoriented::copyPlayerState);
         ServerPlayerEvents.AFTER_RESPAWN.register((oldPlayer,newPlayer,alive)->Payloads.publish(newPlayer));
         EntityTrackingEvents.START_TRACKING.register((entity, observer) -> { if (entity instanceof ServerPlayer p) Payloads.sendState(p, observer); });
@@ -131,7 +129,6 @@ public final class ClingingReoriented implements ModInitializer {
         ScaleBridge.clear(p);
         p.setOnGround(false); p.verticalCollision=false;p.verticalCollisionBelow=false;p.horizontalCollision=false;
         Payloads.publish(p);
-        GravityBreadcrumbs.record(p,direction);
         return Result.SUCCESS;
     }
 
