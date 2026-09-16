@@ -28,6 +28,21 @@ public final class LandingStateGameTests {
             @Override public boolean revalidate(Query q,LocalContact c){return q.entity().getUUID().equals(p.getUUID())&&valid.get()&&c!=null&&c.localId().equals("fixture");}
         };
     }
+    private static LandingSurfaceProvider planeFixture(ServerPlayer p,AtomicBoolean valid,AtomicBoolean visible,double targetY){
+        String id="plane:"+Double.toHexString(targetY);
+        return new LandingSurfaceProvider(){
+            private LocalContact contact(Query q){return new LocalContact(id,1L,FaceGeometry.vector(q.gravity().getOpposite()));}
+            @Override public Optional<LocalContact> currentSupport(Query q){return Optional.empty();}
+            @Override public Optional<LocalSweep> sweep(Query q,AABB start,AABB end){
+                if(!q.entity().getUUID().equals(p.getUUID())||!valid.get())return Optional.empty();
+                if(!visible.get())return Optional.of(new LocalSweep(contact(q),.1D,false));
+                if(end.minY>=start.minY || !(start.minY>targetY&&end.minY<=targetY))return Optional.empty();
+                double fraction=(start.minY-targetY)/(start.minY-end.minY);
+                return Optional.of(new LocalSweep(contact(q),fraction,true));
+            }
+            @Override public boolean revalidate(Query q,LocalContact c){return q.entity().getUUID().equals(p.getUUID())&&valid.get()&&c!=null&&c.localId().equals(id);}
+        };
+    }
 
     @GameTest(padding=16)
     public void quarterTurnCommitsOnlyInsideSnapWindowAndBlocksFurtherGravity(GameTestHelper h){
@@ -46,11 +61,50 @@ public final class LandingStateGameTests {
         h.succeed();
     }
 
+    @GameTest(padding=40)
+    public void acquiresLongRangeBeforePresentationAndKeepsSurfaceIdentity(GameTestHelper h){
+        var p=managed(h,Direction.DOWN,Direction.EAST);p.snapTo(h.absoluteVec(new Vec3(5.5,30,5.5)));p.setDeltaMovement(new Vec3(0,-.25,0));
+        double targetY=h.absoluteVec(new Vec3(5.5,12,5.5)).y;var valid=new AtomicBoolean(true);var visible=new AtomicBoolean(true);
+        var reg=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","long_acquisition"),planeFixture(p,valid,visible,targetY));
+        try{
+            LandingState.tick(p);var s=ClingingReoriented.data(p);
+            h.assertTrue(s.landingCandidate!=null,"support inside 40-tick acquisition horizon should be retained");
+            h.assertTrue(s.landingCandidate.etaTicks()>LandingTiming.PRESENTATION_TICKS,"early acquisition must stay outside visual window");
+            h.assertTrue(s.landingCandidate.etaTicks()<=LandingPrediction.ACQUISITION_TICKS,"early acquisition must respect bounded horizon");
+            h.assertFalse(s.landingCommitted,"early acquisition must not commit camera/body presentation");
+            var key=s.landingCandidate.contact().key();
+            p.snapTo(h.absoluteVec(new Vec3(5.5,16,5.5)));p.setDeltaMovement(new Vec3(0,-.25,0));LandingState.tick(p);
+            h.assertTrue(s.landingCandidate!=null&&s.landingCandidate.contact().key().equals(key),"entering presentation window must preserve acquired surface identity");
+            h.assertTrue(s.landingCandidateStableTicks>=2,"same acquired surface should accumulate stability");
+            h.assertTrue(s.landingCandidateConfirmed,"presentation may commit only from the current prediction");
+            h.assertTrue(s.landingCommitted,"same surface should commit after its ETA enters the 10-tick visual window");
+        }finally{reg.close();}
+        h.succeed();
+    }
+
+    @GameTest(padding=40)
+    public void oneFarMissIsHysteresisOnlyAndSecondMissClearsCandidate(GameTestHelper h){
+        var p=managed(h,Direction.DOWN,Direction.EAST);p.snapTo(h.absoluteVec(new Vec3(5.5,30,5.5)));p.setDeltaMovement(new Vec3(0,-.25,0));
+        double targetY=h.absoluteVec(new Vec3(5.5,12,5.5)).y;var valid=new AtomicBoolean(true);var visible=new AtomicBoolean(true);
+        var reg=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","candidate_hysteresis"),planeFixture(p,valid,visible,targetY));
+        try{
+            LandingState.tick(p);var s=ClingingReoriented.data(p);h.assertTrue(s.landingCandidate!=null,"fixture should acquire far support");
+            visible.set(false);LandingState.tick(p);
+            h.assertTrue(s.landingCandidate!=null&&s.landingCandidateMisses==1,"one far miss should retain candidate only as hysteresis");
+            h.assertFalse(s.landingCandidateConfirmed,"hysteresis-retained candidate must not masquerade as a current forecast");
+            h.assertFalse(s.landingCommitted,"hysteresis alone must never start landing presentation");
+            LandingState.tick(p);
+            h.assertTrue(s.landingCandidate==null,"second consecutive miss should clear acquired candidate");
+            h.assertFalse(s.landingCommitted,"clearing stale acquisition must not manufacture a commitment");
+        }finally{reg.close();}
+        h.succeed();
+    }
+
     @GameTest(padding=16)
     public void earlierBlockingContactNeverBecomesLanding(GameTestHelper h){
         var p=managed(h,Direction.DOWN,Direction.EAST);var valid=new AtomicBoolean(true);var supportNow=new AtomicBoolean(false);
         var reg=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","obstruction"),fixture(p,valid,supportNow,false));
-        try{LandingState.tick(p);h.assertFalse(ClingingReoriented.data(p).landingCommitted,"first non-support collision stops trajectory instead of seeing through it");}
+        try{LandingState.tick(p);var s=ClingingReoriented.data(p);h.assertFalse(s.landingCommitted,"first non-support collision stops trajectory instead of seeing through it");h.assertTrue(s.landingCandidate==null,"blocking first contact must prevent even early acquisition of geometry behind it");}
         finally{reg.close();}
         h.succeed();
     }
@@ -73,6 +127,7 @@ public final class LandingStateGameTests {
             h.assertTrue(s.landingCommitted&&s.landingKind==GravityTransition.TurnKind.HALF,"opposite retained frame reserves the 240 ms half-turn window");
             supportNow.set(true);p.setDeltaMovement(Vec3.ZERO);LandingState.tick(p);
             h.assertFalse(s.landingCommitted,"real provider support completes commitment");
+            h.assertTrue(s.landingCandidate==null,"touchdown clears predictive acquisition state");
             h.assertTrue(s.visualBaseKnown&&s.visualBaseDirection==Direction.DOWN,"touchdown establishes new canonical visual base");
             h.assertTrue(s.airborneTicks==0,"touchdown resets sustained-airborne clock");
         }finally{reg.close();}

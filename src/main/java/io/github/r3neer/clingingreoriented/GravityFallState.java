@@ -7,7 +7,7 @@ import net.minecraft.server.level.ServerPlayer;
 /** Server-authoritative coarse Gravity Fall phase machine. It deliberately owns no render quaternion. */
 public final class GravityFallState {
     public static final int START_AIRBORNE_TICKS=12;
-    public static final int BODY_LANDING_HORIZON=LandingPrediction.MAX_TICKS;
+    public static final int BODY_LANDING_HORIZON=LandingTiming.PRESENTATION_TICKS;
 
     private GravityFallState() {}
 
@@ -22,11 +22,12 @@ public final class GravityFallState {
             return;
         }
 
-        var candidate=LandingPrediction.predict(player,BODY_LANDING_HORIZON);
-        boolean imminent=candidate.isPresent() && candidate.get().etaTicks()<=BODY_LANDING_HORIZON;
+        // LandingState already performed the bounded 40-tick sweep earlier in this END_SERVER_TICK.
+        // Consume only its current-tick result: Gravity Fall must never run a second world forecast.
+        var candidate=LandingState.currentPrediction(player);
+        boolean imminent=candidate.isPresent() && candidate.get().etaTicks()<=BODY_LANDING_HORIZON+1.0E-6D;
 
         if(!state.gravityFallActive){
-            // Do not flash into Gravity Fall if the first eligible frame is already the landing window.
             if(state.landingCommitted || imminent)return;
             state.gravityFallActive=true;
             state.gravityFallLanding=false;

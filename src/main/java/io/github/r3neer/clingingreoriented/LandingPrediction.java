@@ -8,9 +8,10 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
-/** Short-horizon landing forecast backed by the shared volumetric trajectory engine. */
+/** Bounded landing forecast backed by the shared volumetric trajectory engine. */
 public final class LandingPrediction {
-    public static final int MAX_TICKS=LandingTiming.PRESENTATION_TICKS;
+    public static final int ACQUISITION_TICKS=40;
+    public static final int MAX_TICKS=ACQUISITION_TICKS;
     public record Candidate(LandingSurfaces.Contact contact,Direction gravity,double etaTicks) {}
     private LandingPrediction() {}
 

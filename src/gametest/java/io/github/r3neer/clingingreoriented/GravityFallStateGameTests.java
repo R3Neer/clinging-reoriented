@@ -5,6 +5,7 @@ import io.github.r3neer.clingingreoriented.api.LandingSurfaces;
 import io.github.r3neer.clingingreoriented.geometry.FaceGeometry;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -17,8 +18,6 @@ import net.minecraft.world.phys.Vec3;
 public final class GravityFallStateGameTests {
     private static ServerPlayer managed(GameTestHelper h,int airborneTicks){
         var p=h.makeMockServerPlayerInLevel();
-        // Keep generic Gravity Fall holdouts comfortably outside the new 10-tick landing horizon.
-        // Tests that need imminent support register an explicit provider below.
         p.snapTo(h.absoluteVec(new Vec3(5.5,30,5.5)));
         p.addEffect(new MobEffectInstance(Reorientation.EFFECT,400));
         ClingingReoriented.write(p,Direction.DOWN);
@@ -30,13 +29,18 @@ public final class GravityFallStateGameTests {
     }
 
     private static LandingSurfaceProvider fixture(ServerPlayer p,AtomicBoolean valid,AtomicBoolean supportNow,double fraction){
+        return fixture(p,valid,supportNow,fraction,null);
+    }
+    private static LandingSurfaceProvider fixture(ServerPlayer p,AtomicBoolean valid,AtomicBoolean supportNow,double fraction,AtomicInteger sweepCalls){
         return new LandingSurfaceProvider(){
             private LocalContact contact(Query q){return new LocalContact("gravity_fall_fixture",1L,FaceGeometry.vector(q.gravity().getOpposite()));}
             @Override public Optional<LocalContact> currentSupport(Query q){
                 return q.entity().getUUID().equals(p.getUUID())&&valid.get()&&supportNow.get()?Optional.of(contact(q)):Optional.empty();
             }
             @Override public Optional<LocalSweep> sweep(Query q,AABB start,AABB end){
-                return q.entity().getUUID().equals(p.getUUID())&&valid.get()&&!supportNow.get()?Optional.of(new LocalSweep(contact(q),fraction,true)):Optional.empty();
+                if(!q.entity().getUUID().equals(p.getUUID())||!valid.get()||supportNow.get())return Optional.empty();
+                if(sweepCalls!=null)sweepCalls.incrementAndGet();
+                return Optional.of(new LocalSweep(contact(q),fraction,true));
             }
             @Override public boolean revalidate(Query q,LocalContact c){
                 return q.entity().getUUID().equals(p.getUUID())&&valid.get()&&c!=null&&c.localId().equals("gravity_fall_fixture");
@@ -66,35 +70,44 @@ public final class GravityFallStateGameTests {
     }
 
     @GameTest(padding=32)
-    public void bodyLandingUsesPredictorEvenWhenCameraNeedsNoCommit(GameTestHelper h){
+    public void bodyLandingUsesSharedPredictorEvenWhenCameraNeedsNoCommit(GameTestHelper h){
         var p=managed(h,GravityFallState.START_AIRBORNE_TICKS+3);var s=ClingingReoriented.data(p);
-        s.gravityFallActive=true;s.gravityFallLanding=false;s.landingCommitted=false;
-        s.visualBaseKnown=true;s.visualBaseDirection=Direction.DOWN;
-        var valid=new AtomicBoolean(true);
-        var supportNow=new AtomicBoolean(false);
+        s.gravityFallActive=true;s.gravityFallLanding=false;s.landingCommitted=false;s.visualBaseKnown=true;s.visualBaseDirection=Direction.DOWN;
+        var valid=new AtomicBoolean(true);var supportNow=new AtomicBoolean(false);
         var reg=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","gravity_fall_body_land"),fixture(p,valid,supportNow,.4D));
         try{
-            GravityFallState.tick(p);
+            LandingState.tick(p);GravityFallState.tick(p);
             h.assertFalse(s.landingCommitted,"body landing must not manufacture a camera commitment");
             h.assertTrue(s.gravityFallLanding,"body should prepare for the same imminent support independently of camera state");
             h.assertTrue(s.gravityFallLandingGravity==Direction.DOWN,"body landing target must be the predicted gravity-relative floor");
-            h.assertTrue(Math.abs(s.gravityFallLandingEtaTicks-.4D)<1.0E-6D,"body landing must retain predictor ETA for visual timing");
+            h.assertTrue(Math.abs(s.gravityFallLandingEtaTicks-.4D)<1.0E-6D,"body landing must retain shared predictor ETA for visual timing");
+        }finally{reg.close();}
+        h.succeed();
+    }
+
+    @GameTest(padding=32)
+    public void gravityFallDoesNotSweepWorldTwiceForSameTick(GameTestHelper h){
+        var p=managed(h,GravityFallState.START_AIRBORNE_TICKS+3);var s=ClingingReoriented.data(p);s.gravityFallActive=true;
+        var valid=new AtomicBoolean(true);var supportNow=new AtomicBoolean(false);var calls=new AtomicInteger();
+        var reg=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","gravity_fall_single_prediction"),fixture(p,valid,supportNow,.4D,calls));
+        try{
+            LandingState.tick(p);int afterLanding=calls.get();h.assertTrue(afterLanding>0,"LandingState should own the current-tick world sweep");
+            GravityFallState.tick(p);
+            h.assertTrue(calls.get()==afterLanding,"GravityFallState must consume LandingState's prediction instead of sweeping the world again");
+            h.assertTrue(s.gravityFallLanding,"shared imminent prediction should still drive BODY_LANDING");
         }finally{reg.close();}
         h.succeed();
     }
 
     @GameTest(padding=32)
     public void invalidatedBodyLandingResumesFromCurrentPresentation(GameTestHelper h){
-        var p=managed(h,GravityFallState.START_AIRBORNE_TICKS+3);var s=ClingingReoriented.data(p);
-        s.gravityFallActive=true;
-        var valid=new AtomicBoolean(true);
-        var supportNow=new AtomicBoolean(false);
+        var p=managed(h,GravityFallState.START_AIRBORNE_TICKS+3);var s=ClingingReoriented.data(p);s.gravityFallActive=true;
+        var valid=new AtomicBoolean(true);var supportNow=new AtomicBoolean(false);
         var reg=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","gravity_fall_resume"),fixture(p,valid,supportNow,.35D));
         try{
-            GravityFallState.tick(p);
+            LandingState.tick(p);GravityFallState.tick(p);
             h.assertTrue(s.gravityFallLanding,"fixture should first enter body landing");
-            valid.set(false);
-            GravityFallState.tick(p);
+            valid.set(false);LandingState.tick(p);GravityFallState.tick(p);
             h.assertTrue(s.gravityFallActive,"invalidating a landing target should resume sustained Gravity Fall, not reset the whole presentation");
             h.assertFalse(s.gravityFallLanding,"invalidated landing target must leave BODY_LANDING");
             h.assertTrue(s.gravityFallLandingEtaTicks==0.0D,"resume must clear stale touchdown timing");
@@ -106,8 +119,7 @@ public final class GravityFallStateGameTests {
     public void realSupportResetsActiveGravityFall(GameTestHelper h){
         var p=managed(h,GravityFallState.START_AIRBORNE_TICKS+3);var s=ClingingReoriented.data(p);
         s.gravityFallActive=true;s.gravityFallLanding=true;s.gravityFallLandingGravity=Direction.DOWN;s.gravityFallLandingEtaTicks=.2D;
-        var valid=new AtomicBoolean(true);
-        var supportNow=new AtomicBoolean(true);
+        var valid=new AtomicBoolean(true);var supportNow=new AtomicBoolean(true);
         var reg=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","gravity_fall_touchdown"),fixture(p,valid,supportNow,.2D));
         try{
             GravityFallState.tick(p);
@@ -121,11 +133,10 @@ public final class GravityFallStateGameTests {
     @GameTest(padding=32)
     public void imminentSupportAtThresholdDoesNotFlashStart(GameTestHelper h){
         var p=managed(h,GravityFallState.START_AIRBORNE_TICKS);var s=ClingingReoriented.data(p);
-        var valid=new AtomicBoolean(true);
-        var supportNow=new AtomicBoolean(false);
+        var valid=new AtomicBoolean(true);var supportNow=new AtomicBoolean(false);
         var reg=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","gravity_fall_no_flash"),fixture(p,valid,supportNow,.25D));
         try{
-            GravityFallState.tick(p);
+            LandingState.tick(p);GravityFallState.tick(p);
             h.assertFalse(s.gravityFallActive,"first eligible frame already inside landing horizon must stay normal instead of flashing START");
         }finally{reg.close();}
         h.succeed();
