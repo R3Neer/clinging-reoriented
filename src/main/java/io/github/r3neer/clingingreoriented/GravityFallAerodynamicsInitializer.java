@@ -7,7 +7,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec3;
 
-/** Server-authoritative body-follow, momentum redirection and aerodynamic drag. */
+/** Server-authoritative persistent body attitude and body-relative aerodynamic drag. */
 public final class GravityFallAerodynamicsInitializer implements ModInitializer {
     private static final long LOOK_STALE_TICKS=10L;
 
@@ -33,18 +33,12 @@ public final class GravityFallAerodynamicsInitializer implements ModInitializer 
         if(state.gravityFallAeroBody==null){
             state.gravityFallAeroBody=BodyOrientation.start(
                 RotationUtil.getEntityRotationQuaternion(GravityDirectionUtil.getGravityDirection(player)),velocity);
-        }else state.gravityFallAeroBody=BodyOrientation.transport(state.gravityFallAeroBody,velocity);
+        }
 
         long age=player.level().getGameTime()-state.gravityFallLookTick;
         boolean freshLook=state.gravityFallLook!=null&&age>=0L&&age<=LOOK_STALE_TICKS;
-        if(freshLook){
-            state.gravityFallAeroBody=GravityFallAerodynamics.followLook(
-                state.gravityFallAeroBody,state.gravityFallLook,player.yBodyRot);
-            velocity=GravityFallAerodynamics.redirectMomentum(
-                velocity,state.gravityFallLook,state.gravityFallForwardIntent);
-        }
-
-        double streamline=GravityFallAerodynamics.streamlining(state.gravityFallAeroBody,velocity);
-        player.setDeltaMovement(GravityFallAerodynamics.applyDrag(velocity,streamline));
+        state.gravityFallAeroBody=GravityFallAerodynamics.advanceBody(
+            state.gravityFallAeroBody,velocity,freshLook?state.gravityFallLook:null,player.yBodyRot);
+        player.setDeltaMovement(GravityFallAerodynamics.applyAerodynamics(state.gravityFallAeroBody,velocity));
     }
 }

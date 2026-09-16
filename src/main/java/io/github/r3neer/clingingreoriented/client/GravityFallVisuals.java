@@ -111,9 +111,10 @@ public final class GravityFallVisuals {
                 if(entity.isRemoved()||(entity instanceof LivingEntity living&&(living.isFallFlying()||FluidContext.intersects(living)))){it.remove();continue;}
                 ensureInitialized(active,entity);
                 if(active.mode==Mode.SUSTAIN){
-                    active.transport=BodyOrientation.transport(active.transport,entity.getDeltaMovement());
                     Vec3 look=entity==client.getCameraEntity()?cameraForward(client):entity.getLookAngle();
-                    if(entity instanceof LivingEntity living)active.transport=GravityFallAerodynamics.followLook(active.transport,look,living.yBodyRot);
+                    if(entity instanceof LivingEntity living)
+                        active.transport=GravityFallAerodynamics.advanceBody(active.transport,entity.getDeltaMovement(),look,living.yBodyRot);
+                    else active.transport=GravityFallAerodynamics.stabilize(active.transport,entity.getDeltaMovement());
                     if(active.transport.direction()!=null&&active.blendTicks<ENTRY_BLEND_TICKS)active.blendTicks=Math.min(ENTRY_BLEND_TICKS,active.blendTicks+1.0F);
                 }else active.landTicks+=1.0F;
             }
