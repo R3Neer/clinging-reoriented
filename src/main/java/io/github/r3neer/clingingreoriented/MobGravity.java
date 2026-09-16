@@ -209,6 +209,28 @@ public final class MobGravity {
         return transition;
     }
 
+    /**
+     * Revalidates and commits one owned airborne correction from the real current body/velocity.
+     * Unlike a grounded launch, world momentum is preserved across the gravity-frame change.
+     * Capability semantics remain entirely in MobGravityPlanner.evaluateImmediate: spent Clinging is
+     * rejected, while Reorientation may legally turn again in the same airborne stage.
+     */
+    public static MobGravityPlanner.Transition executeAirborneCorrection(LivingEntity mob,Direction targetGravity){
+        return executeAirborneCorrection(mob,targetGravity,MobGravityPlanner.DEFAULT_TRANSITION_HORIZON_TICKS);
+    }
+    public static MobGravityPlanner.Transition executeAirborneCorrection(LivingEntity mob,Direction targetGravity,int horizonTicks){
+        if(!canOwnEffectTransition(mob)||targetGravity==null||AirChanges.grounded(mob))return null;
+        Direction current=GravityDirectionUtil.getOwnGravityDirection(mob);
+        if(current==targetGravity)return null;
+        var evaluation=MobGravityPlanner.evaluateImmediate(mob,targetGravity,horizonTicks);
+        if(!evaluation.accepted())return null;
+        var transition=evaluation.transition();Vec3 velocity=mob.getDeltaMovement();
+        if(!ownedRelocateTree(mob,targetGravity,transition.launchPosition(),null))return null;
+        mob.setDeltaMovement(velocity);
+        var s=state(mob);s.airUsed=true;s.ownership=Ownership.OWNED_EFFECT;s.ownedDirection=targetGravity;s.clearBorrow();s.retryAt=0;
+        return transition;
+    }
+
     static boolean canOwnEffectTransition(LivingEntity mob){
         if(!ClingingReoriented.hasEffect(mob)||!supported(mob)||mob.isPassenger()||mob.isVehicle()||!mob.isAlive())return false;
         var s=state(mob);ownershipStillMatches(mob,s);
