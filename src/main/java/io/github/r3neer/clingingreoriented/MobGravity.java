@@ -206,6 +206,7 @@ public final class MobGravity {
         if(!ownedRelocateTree(mob,targetGravity,transition.launchPosition(),null))return null;
         mob.setDeltaMovement(Vec3.ZERO);
         var s=state(mob);s.airUsed=true;s.ownership=Ownership.OWNED_EFFECT;s.ownedDirection=targetGravity;s.clearBorrow();s.retryAt=0;
+        MobFlightReactor.arm(mob,transition);
         return transition;
     }
 
@@ -228,6 +229,7 @@ public final class MobGravity {
         if(!ownedRelocateTree(mob,targetGravity,transition.launchPosition(),null))return null;
         mob.setDeltaMovement(velocity);
         var s=state(mob);s.airUsed=true;s.ownership=Ownership.OWNED_EFFECT;s.ownedDirection=targetGravity;s.clearBorrow();s.retryAt=0;
+        MobFlightReactor.arm(mob,transition);
         return transition;
     }
 
