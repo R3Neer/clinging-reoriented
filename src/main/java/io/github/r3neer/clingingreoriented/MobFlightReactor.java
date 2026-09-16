@@ -18,6 +18,7 @@ import net.minecraft.world.phys.Vec3;
 public final class MobFlightReactor {
     private static final int REACTION_FORECAST_TICKS=80;
     private static final double TARGET_CORRECTION_MIN_IMPROVEMENT=1.5D;
+    private static final double RISK_EPS=1.0E-9D;
     private static final Map<LivingEntity,FlightState> STATES=new WeakHashMap<>();
 
     private static final class FlightState {
@@ -98,7 +99,8 @@ public final class MobFlightReactor {
             var farther=MobFlightMonitor.forecast(mob,REACTION_FORECAST_TICKS);
             if(farther.hit()!=null&&farther.hit().support())baseline=landingPosition(mob,farther.hit().impactBody(),GravityDirectionUtil.getOwnGravityDirection(mob));
         }
-        Candidate candidate=bestCandidate(mob,focus,danger,baseline);
+        double baselineRisk=baselineRisk(mob,state);
+        Candidate candidate=bestCandidate(mob,focus,danger,baseline,baselineRisk);
         if(candidate==null)return false;
 
         // Re-run the winning physical forecast at the commit seam. A block can still appear between
@@ -109,7 +111,7 @@ public final class MobFlightReactor {
         return committed!=null;
     }
 
-    private static Candidate bestCandidate(Mob mob,Vec3 focus,boolean danger,Vec3 baselineLanding){
+    private static Candidate bestCandidate(Mob mob,Vec3 focus,boolean danger,Vec3 baselineLanding,double baselineRisk){
         if(!danger&&(!finite(focus)||!finite(baselineLanding)))return null;
         double baselineDistance=!finite(focus)||!finite(baselineLanding)?Double.POSITIVE_INFINITY:baselineLanding.distanceTo(focus);
         Direction current=GravityDirectionUtil.getOwnGravityDirection(mob);Candidate best=null;
@@ -121,11 +123,27 @@ public final class MobFlightReactor {
             Vec3 landing=landingPosition(mob,transition.landingBody(),candidateGravity);
             if(!finite(landing))continue;
             double remaining=finite(focus)?landing.distanceTo(focus):0.0D;
-            if(!danger&&baselineDistance-remaining<TARGET_CORRECTION_MIN_IMPROVEMENT)continue;
+            if(!danger){
+                if(baselineDistance-remaining<TARGET_CORRECTION_MIN_IMPROVEMENT)continue;
+                if(!targetRiskAcceptable(baselineRisk,transition.riskCost()))continue;
+            }
             double score=transition.physicalCost()+remaining;
             if(best==null||score<best.score())best=new Candidate(transition,landing,score);
         }
         return best;
+    }
+
+    private static double baselineRisk(Mob mob,FlightState state){
+        var observation=state.reaction.lastObservation();
+        if(observation!=null&&observation.hit()!=null&&observation.hit().support())
+            return MobGravityPlanner.riskCost(observation.hit().vanillaEquivalentFallDistance(),mob.getHealth());
+        var committed=state.reaction.committed();
+        return committed==null?0.0D:committed.riskCost();
+    }
+
+    static boolean targetRiskAcceptable(double baselineRisk,double candidateRisk){
+        return Double.isFinite(baselineRisk)&&baselineRisk>=0.0D&&Double.isFinite(candidateRisk)&&candidateRisk>=0.0D
+            &&candidateRisk<=baselineRisk+RISK_EPS;
     }
 
     private static Vec3 currentFocus(Mob mob){
