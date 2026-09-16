@@ -15,7 +15,7 @@ import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 
-/** S06-E gates for vanilla goal adapters. Goals own intent; generic gravity navigation owns locomotion. */
+/** S06-E/S08 gates for vanilla goal adapters. Goals own intent; generic gravity navigation owns locomotion. */
 public final class MobGravityGoalAdapterGameTests {
     @GameTest(padding=64)
     public void meleeAttackGoalHandsBlockedPartialPathToGravityNavigation(GameTestHelper h) throws Exception {
@@ -35,6 +35,27 @@ public final class MobGravityGoalAdapterGameTests {
         goal.stop();
         h.assertFalse(MobGravityNavigation.active(zombie),"stopping pre-commit melee goal left stale gravity navigation");
         h.succeed();
+    }
+
+    @GameTest(padding=64,maxTicks=40)
+    public void meleeAttackGoalSurvivesWaitingPlanBudgetDefer(GameTestHelper h) throws Exception {
+        Zombie zombie=zombie(h,true);Villager target=villager(h,new Vec3(14,10,5));wall(h,9);zombie.setTarget(target);
+        while(MobGravityPlanningBudget.tryAcquire(zombie)){}
+        var goal=new MeleeAttackGoal(zombie,1.0D,true);bypassCanUseCooldown(goal,zombie);
+        h.assertTrue(goal.canUse(),"blocked melee goal never entered its ordinary running state");
+        goal.start();goal.tick();
+        var state=MobGravityNavigation.state(zombie);
+        h.assertTrue(state.phase()==MobGravityNavigation.Phase.WAITING_PLAN,
+            "exhausted planner budget did not defer live melee intent: "+state.phase());
+        h.assertTrue(goal.canContinueToUse(),"WAITING_PLAN killed the melee goal before it could acquire budget");
+
+        h.runAfterDelay(1,()->{
+            MobGravityNavigation.tick(zombie);
+            h.assertTrue(state.phase()==MobGravityNavigation.Phase.APPROACH||state.phase()==MobGravityNavigation.Phase.REVALIDATE,
+                "live melee intent did not resume after next-tick planner budget: "+state.phase());
+            h.assertTrue(goal.canContinueToUse(),"melee goal died when deferred plan became executable");
+            goal.stop();h.succeed();
+        });
     }
 
     @GameTest(padding=64)
