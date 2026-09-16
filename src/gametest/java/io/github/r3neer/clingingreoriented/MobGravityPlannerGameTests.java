@@ -1,6 +1,7 @@
 package io.github.r3neer.clingingreoriented;
 
 import com.moigferdsrte.gravitychanger.util.GravityDirectionUtil;
+import com.moigferdsrte.gravitychanger.util.RotationUtil;
 import io.github.r3neer.clingingreoriented.api.LandingSurfaceProvider;
 import io.github.r3neer.clingingreoriented.api.LandingSurfaces;
 import java.util.Optional;
@@ -62,6 +63,32 @@ public final class MobGravityPlannerGameTests {
             var evaluation=MobGravityPlanner.evaluateImmediate(wolf,Direction.EAST,20);
             h.assertTrue(!evaluation.accepted()&&evaluation.rejection()==MobGravityPlanner.Rejection.BLOCKING_CONTACT,
                 "first non-support contact must veto later landing, got "+evaluation.rejection());
+        }finally{registration.close();}
+        h.succeed();
+    }
+
+    @GameTest(padding=32)
+    public void supportWithoutAnyStableTangentExitIsRejectedAsTrapped(GameTestHelper h){
+        Wolf wolf=wolf(h,true);
+        AABB eastBody=RotationUtil.makeBoxFromDimensions(wolf.getDimensions(wolf.getPose()),Direction.EAST,wolf.position()).deflate(1.0E-7D);
+        Vec3 mainCenter=eastBody.getCenter();
+        var provider=new LandingSurfaceProvider(){
+            private LocalContact contact(){return new LocalContact("trap",1L,new Vec3(-1,0,0));}
+            @Override public Optional<LocalContact> currentSupport(Query query){return Optional.empty();}
+            @Override public Optional<LocalSweep> sweep(Query query,AABB start,AABB end){
+                if(!query.entity().getUUID().equals(wolf.getUUID()))return Optional.empty();
+                Vec3 a=start.getCenter(),b=end.getCenter();
+                boolean mainLane=Math.abs(a.y-mainCenter.y)<1.0E-4D&&Math.abs(a.z-mainCenter.z)<1.0E-4D;
+                boolean movingEast=b.x>a.x+1.0E-8D;
+                return mainLane&&movingEast?Optional.of(new LocalSweep(contact(),.25D,true)):Optional.empty();
+            }
+            @Override public boolean revalidate(Query query,LocalContact contact){return query.entity().getUUID().equals(wolf.getUUID());}
+        };
+        var registration=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","planner_trap"),provider);
+        try{
+            var evaluation=MobGravityPlanner.evaluateImmediate(wolf,Direction.EAST,20);
+            h.assertTrue(!evaluation.accepted()&&evaluation.rejection()==MobGravityPlanner.Rejection.TRAPPED_LANDING,
+                "support with zero stable tangent exits was accepted: "+evaluation.rejection());
         }finally{registration.close();}
         h.succeed();
     }
