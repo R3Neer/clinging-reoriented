@@ -100,6 +100,21 @@ public final class MobGravityPlannerGameTests {
         h.succeed();
     }
 
+    @GameTest(padding=32)
+    public void trajectoryLeavingWorldBoundsFailsClosedAndDoesNotMutate(GameTestHelper h){
+        Wolf wolf=wolf(h,true);wolf.setDeltaMovement(new Vec3(0,1000,0));
+        Vec3 beforePosition=wolf.position(),beforeVelocity=wolf.getDeltaMovement();
+        Direction beforeGravity=GravityDirectionUtil.getOwnGravityDirection(wolf);
+        var beforeOwnership=MobGravity.state(wolf).ownership;
+        var evaluation=MobGravityPlanner.evaluateImmediate(wolf,Direction.EAST,2);
+        h.assertTrue(!evaluation.accepted()&&evaluation.rejection()==MobGravityPlanner.Rejection.UNKNOWN_GEOMETRY,
+            "trajectory outside build height was treated as known air: "+evaluation.rejection());
+        h.assertTrue(wolf.position().equals(beforePosition)&&wolf.getDeltaMovement().equals(beforeVelocity),"failed unknown-geometry query mutated motion state");
+        h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(wolf)==beforeGravity&&MobGravity.state(wolf).ownership==beforeOwnership,
+            "failed unknown-geometry query mutated gravity ownership");
+        h.succeed();
+    }
+
     private static Wolf wolf(GameTestHelper h,boolean reorientation){
         for(var pos:BlockPos.betweenClosed(h.absolutePos(new BlockPos(0,3,0)),h.absolutePos(new BlockPos(20,18,12))))
             h.getLevel().setBlockAndUpdate(pos,Blocks.AIR.defaultBlockState());
