@@ -30,8 +30,11 @@ public final class WaterCameraFrameClientGameTest implements FabricClientGameTes
                 p.teleport(new TeleportTransition(level,new Vec3(-1.0,82,.5),Vec3.ZERO,-90.0F,0.0F,TeleportTransition.DO_NOTHING));
                 p.setNoGravity(true);p.setDeltaMovement(Vec3.ZERO);p.removeAllEffects();p.addEffect(new MobEffectInstance(Reorientation.EFFECT,1200));
                 ClingingReoriented.write(p,Direction.EAST);var s=ClingingReoriented.data(p);s.owned=true;s.selected=Direction.EAST;s.visualFrameOwned=true;s.airChangeUsed=false;
+                // Production gravity turns publish ownership after mutating it. Reproduce that boundary so
+                // client-side water presentation sees the same authoritative state as real gameplay.
+                Payloads.publish(p);
             });
-            context.waitFor(mc->mc.player!=null&&mc.player.isInWater()&&GravityDirectionUtil.getOwnGravityDirection(mc.player)==Direction.EAST);
+            context.waitFor(mc->mc.player!=null&&mc.player.isInWater()&&GravityDirectionUtil.getOwnGravityDirection(mc.player)==Direction.EAST&&ClingingReoriented.controlsPhysics(mc.player));
             context.waitTicks(30); // let upstream's direct fixture gravity animation settle before measuring our water frame.
             context.runOnClient(mc->{
                 if(!WaterCameraVisuals.active(mc.player))throw new AssertionError("water camera owner never activated");
