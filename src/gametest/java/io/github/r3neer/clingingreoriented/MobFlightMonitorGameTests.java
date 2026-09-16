@@ -4,6 +4,7 @@ import com.moigferdsrte.gravitychanger.util.GravityDirectionUtil;
 import io.github.r3neer.clingingreoriented.api.LandingSurfaceProvider;
 import io.github.r3neer.clingingreoriented.api.LandingSurfaces;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
@@ -117,6 +118,48 @@ public final class MobFlightMonitorGameTests {
         });
     }
 
+    @GameTest(padding=64,maxTicks=100)
+    public void disappearingFarCommittedLandingIsDetectedBeforeShortMonitorCouldRediscoverIt(GameTestHelper h){
+        clear(h);floor(h);
+        Wolf wolf=h.spawn(EntityTypes.WOLF,new BlockPos(5,10,5));
+        wolf.setNoAi(true);wolf.setNoGravity(true);wolf.setOnGround(true);wolf.setDeltaMovement(Vec3.ZERO);
+        wolf.addEffect(new MobEffectInstance(Reorientation.EFFECT,800));
+        AtomicBoolean eastValid=new AtomicBoolean(true);
+        double farX=wolf.getX()+25.0D;
+
+        var provider=new LandingSurfaceProvider(){
+            @Override public Optional<LocalContact> currentSupport(Query query){return Optional.empty();}
+            @Override public Optional<LocalSweep> sweep(Query query,AABB start,AABB end){
+                if(query.entity()!=wolf)return Optional.empty();
+                Vec3 a=start.getCenter(),b=end.getCenter();
+                if(query.gravity()==Direction.EAST&&b.x>a.x+1.0E-8D&&b.x>=farX)
+                    return Optional.of(new LocalSweep(new LocalContact("far-east",1L,new Vec3(-1,0,0)),.5D,true));
+                if(query.gravity()==Direction.NORTH&&b.z<a.z-1.0E-8D)
+                    return Optional.of(new LocalSweep(new LocalContact("north-rescue",1L,new Vec3(0,0,1)),.5D,true));
+                return Optional.empty();
+            }
+            @Override public boolean revalidate(Query query,LocalContact contact){
+                if(query.entity()!=wolf)return false;
+                return !"far-east".equals(contact.localId())||eastValid.get();
+            }
+        };
+        var registration=LandingSurfaces.register(
+            Identifier.fromNamespaceAndPath("clinging_reoriented_test","s07_far_committed"),provider);
+        var committed=MobGravity.executePlannedTransition(wolf,Direction.EAST,80);
+        h.assertTrue(committed!=null,"fixture failed to commit far EAST landing");
+        h.assertTrue(committed.etaTicks()>MobFlightMonitor.DEFAULT_HORIZON_TICKS,
+            "fixture landing is not actually beyond short monitor horizon: eta="+committed.etaTicks());
+        eastValid.set(false);
+
+        h.runAfterDelay(20,()->{
+            try{
+                h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(wolf)==Direction.NORTH,
+                    "reactor lost committed far landing identity and failed to take NORTH rescue after it disappeared");
+            }finally{registration.close();}
+            h.succeed();
+        });
+    }
+
     private static Wolf flightWolf(GameTestHelper h,BlockPos relative,Holder<MobEffect> effect){
         Wolf wolf=h.spawn(EntityTypes.WOLF,relative);wolf.setNoAi(true);wolf.setNoGravity(true);wolf.setOnGround(false);wolf.setDeltaMovement(Vec3.ZERO);
         wolf.addEffect(new MobEffectInstance(effect,600));GravityDirectionUtil.setGravityDirection(wolf,Direction.EAST);
@@ -127,7 +170,7 @@ public final class MobFlightMonitorGameTests {
     private static Holder<MobEffect> clinging(){return BuiltInRegistries.MOB_EFFECT.get(Identifier.parse("alexsmobs:clinging")).orElseThrow();}
     private static void floor(GameTestHelper h){for(int x=0;x<=12;x++)for(int z=0;z<=10;z++)h.setBlock(new BlockPos(x,9,z),Blocks.STONE);}
     private static void clear(GameTestHelper h){
-        for(var pos:BlockPos.betweenClosed(h.absolutePos(new BlockPos(-4,3,-4)),h.absolutePos(new BlockPos(18,20,14))))
+        for(var pos:BlockPos.betweenClosed(h.absolutePos(new BlockPos(-4,3,-4)),h.absolutePos(new BlockPos(38,20,14))))
             h.getLevel().setBlockAndUpdate(pos,Blocks.AIR.defaultBlockState());
     }
 }
