@@ -13,6 +13,7 @@
       "io.github.r3neer.clingingreoriented.MobGravityLocalPlannerGameTests",
       "io.github.r3neer.clingingreoriented.MobGravityOnlinePlannerGameTests",
       "io.github.r3neer.clingingreoriented.MobGravityNavigationGameTests",
+      "io.github.r3neer.clingingreoriented.MobGravityGoalAdapterGameTests",
       "io.github.r3neer.clingingreoriented.PetGravityCommitGameTests",
       "io.github.r3neer.clingingreoriented.PetGravityFollowGameTests",
       "io.github.r3neer.clingingreoriented.PetGravityFollowGoalGameTests",
