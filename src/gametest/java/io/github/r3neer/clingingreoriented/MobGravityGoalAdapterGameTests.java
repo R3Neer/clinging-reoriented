@@ -9,6 +9,7 @@ import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.ai.goal.AvoidEntityGoal;
 import net.minecraft.world.entity.ai.goal.MeleeAttackGoal;
 import net.minecraft.world.entity.monster.zombie.Zombie;
+import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
@@ -18,16 +19,15 @@ import net.minecraft.world.phys.Vec3;
 public final class MobGravityGoalAdapterGameTests {
     @GameTest(padding=64)
     public void meleeAttackGoalHandsBlockedPartialPathToGravityNavigation(GameTestHelper h) throws Exception {
-        Zombie zombie=zombie(h,true);var target=player(h,new Vec3(14,10,5));wall(h,9);zombie.setTarget(target);
-        h.assertTrue(zombie.getTarget()==target&&target.isAlive(),"fixture lost its live melee target before canUse");
+        Zombie zombie=zombie(h,true);Villager target=villager(h,new Vec3(14,10,5));wall(h,9);zombie.setTarget(target);
+        h.assertTrue(zombie.getTarget()==target&&target.isAlive(),"fixture lost its valid villager target before canUse");
         h.assertTrue(MobGravityNavigation.requestEntityAfterVanilla(zombie,target,1.0D,false),
             "fixture has no direct safe gravity route for the melee target");
         MobGravityNavigation.goalStopped(zombie);
         h.assertFalse(MobGravityNavigation.active(zombie),"diagnostic gravity route did not release before goal test");
 
         var goal=new MeleeAttackGoal(zombie,1.0D,true);bypassCanUseCooldown(goal,zombie);
-        boolean canUse=goal.canUse();
-        h.assertTrue(canUse,"blocked melee goal did not start after vanilla path attempt and gravity wake");
+        h.assertTrue(goal.canUse(),"blocked melee goal did not start after vanilla path attempt/gravity wake");
         goal.start();goal.tick();
         h.assertTrue(MobGravityNavigation.active(zombie),"running melee goal did not hand its blocked entity intent to gravity navigation");
         h.assertTrue(MobGravityNavigation.state(zombie).plan()!=null,"melee handoff produced no gravity plan");
@@ -39,7 +39,7 @@ public final class MobGravityGoalAdapterGameTests {
 
     @GameTest(padding=64)
     public void effectFreeBlockedMeleeGoalCannotGainGravityLocomotion(GameTestHelper h) throws Exception {
-        Zombie zombie=zombie(h,false);var target=player(h,new Vec3(14,10,5));wall(h,9);zombie.setTarget(target);
+        Zombie zombie=zombie(h,false);Villager target=villager(h,new Vec3(14,10,5));wall(h,9);zombie.setTarget(target);
         var goal=new MeleeAttackGoal(zombie,1.0D,true);bypassCanUseCooldown(goal,zombie);
         boolean canUse=goal.canUse();
         if(canUse){goal.start();goal.tick();}
@@ -50,7 +50,8 @@ public final class MobGravityGoalAdapterGameTests {
 
     @GameTest(padding=64)
     public void reachableMeleeGoalStaysVanilla(GameTestHelper h) throws Exception {
-        Zombie zombie=zombie(h,true);var target=player(h,new Vec3(10,10,5));zombie.setTarget(target);
+        Zombie zombie=zombie(h,true);Villager target=villager(h,new Vec3(10,10,5));zombie.setTarget(target);
+        h.assertTrue(zombie.getTarget()==target,"reachable fixture lost valid villager target");
         h.assertTrue(zombie.getNavigation().createPath(target,0)!=null,"reachable fixture itself produced no vanilla path");
         var goal=new MeleeAttackGoal(zombie,1.0D,true);bypassCanUseCooldown(goal,zombie);
         h.assertTrue(goal.canUse(),"reachable vanilla melee goal unexpectedly failed after cooldown");
@@ -98,6 +99,12 @@ public final class MobGravityGoalAdapterGameTests {
         zombie.setNoAi(true);zombie.setNoGravity(true);zombie.setOnGround(true);zombie.setDeltaMovement(Vec3.ZERO);
         if(powered)zombie.addEffect(new MobEffectInstance(Reorientation.EFFECT,1200));
         return zombie;
+    }
+
+    private static Villager villager(GameTestHelper h,Vec3 relative){
+        Villager villager=h.spawn(EntityTypes.VILLAGER,BlockPos.containing(relative));
+        Vec3 world=h.absoluteVec(relative);villager.setPos(world.x,world.y,world.z);
+        villager.setNoAi(true);villager.setNoGravity(true);villager.setOnGround(true);villager.setDeltaMovement(Vec3.ZERO);return villager;
     }
 
     private static net.minecraft.server.level.ServerPlayer player(GameTestHelper h,Vec3 relative){
