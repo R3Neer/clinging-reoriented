@@ -51,7 +51,7 @@ At speed >= **0.75 blocks/tick**, Gravity Fall reuses vanilla's `ELYTRA_FLYING` 
 
 ## Landing commitment
 
-Clinging predicts a bounded trajectory using the real body, velocity, gravity, aerodynamic motion model and landing-surface providers. A candidate floor must be physically valid support under the active gravity, and the **first real contact** on the predicted path matters.
+Clinging predicts a bounded trajectory from the real body, **current world-space velocity** and gravity using the shared `AirMotion` recurrence plus landing-surface providers. Gravity Fall aerodynamics continuously changes that real velocity before later predictions, so the forecast is refreshed from the measured state each tick instead of guessing future look or posture input. A candidate floor must be physically valid support under the active gravity, and the **first real contact** on the predicted path matters.
 
 Acquisition and presentation are now separate:
 
