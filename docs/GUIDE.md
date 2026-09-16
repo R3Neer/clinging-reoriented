@@ -1,8 +1,8 @@
 # Player guide
 
-This guide describes Clinging: Reoriented **0.1.0-beta.3**.
+This guide describes the **unreleased beta.4 navigation/gamefeel development state** of Clinging: Reoriented. **0.1.0-beta.3** remains the latest published prerelease.
 
-Beta.3 keeps the beta.2 gravity/camera/gameplay semantics while hardening performance and stability. Beta means the core gravity, camera, landing, lifecycle and compatibility architecture is treated as a coherent baseline for broader validation; it is still a prerelease and remains subject to bug fixes and tuning.
+The beta.4 campaign changes Gravity Fall aerodynamics, landing acquisition, water controls/camera and gravity-aware mob navigation while preserving the core rule: Clinging grants one voluntary airborne gravity decision and Reorientation removes that one-turn limit. Development builds remain prerelease software and are still subject to bug fixes and tuning.
 
 ## Controls and gravity turns
 
@@ -23,21 +23,27 @@ During sustained **Gravity Fall**, look becomes full-sphere. You can pass throug
 
 ## Gravity Fall body language
 
-After **12 airborne ticks** of Clinging/Reorientation-owned physics, a sustained fall starts Gravity Fall presentation unless another context already owns the moment. The macro body root blends over **6 ticks** toward actual world velocity.
+After **12 airborne ticks** of Clinging/Reorientation-owned physics, a sustained fall starts Gravity Fall presentation unless another context already owns the moment.
 
-Velocity remains the primary body axis. Near zero speed the last reliable frame is retained so gravity reversals do not produce numerical flips. The camera may pull the body only after gaze leaves a **35-degree neck deadzone**, capped at **7.5 degrees per tick**. A perfectly broadside body receives at most **1.3% additional drag per tick**.
+The macro body now keeps a **persistent world-space attitude** rather than treating velocity as a frame that transports the whole body every tick. Near zero speed the last reliable attitude is retained, avoiding numerical flips during gravity reversals.
+
+Player gaze expresses body-attitude intent. The camera can move freely inside a **35-degree neck deadzone**. Once gaze leaves that cone, the body follows by at most **7.5 degrees per tick**. Velocity contributes only a weak **1.25 degrees per tick** weathercock stabilization, using whichever head/feet orientation is already closer so stabilization cannot create an artificial 180-degree flip.
 
 Fresh Animations/EMF keeps ownership of limbs, head tracking, equipment and micro-animation. Clinging applies only the global Gravity Fall body root.
 
-## Air-diving with W
+## Posture-driven aerodynamics
 
-During sustained Gravity Fall, holding **W** bends existing momentum toward camera look direction.
+Gravity Fall no longer has a special **W air-diving** steering ability. Aerodynamics is a continuous consequence of the visible body attitude.
 
-- Maximum redirect is **6 degrees per tick**.
-- Steering authority is proportional to the positive dot product between velocity direction and gaze.
-- Perpendicular or backward gaze produces no steering authority.
-- The redirect preserves speed before aerodynamic drag.
-- It generates no free thrust or Elytra-style lift.
+The current velocity is decomposed relative to the body's long axis:
+
+- longitudinal momentum is retained;
+- transverse momentum receives **2.5% additional drag per tick**;
+- the resulting trajectory therefore bends gradually toward the body's axis while losing energy;
+- head-first and feet-first alignment are symmetric;
+- no thrust, lift or speed is created by the aerodynamic layer.
+
+This gives a direct causal chain: **look → body attitude → anisotropic drag → trajectory**. Releasing W does not switch physics off; W remains ordinary movement input where the surrounding movement system gives it meaning.
 
 ## Fast-air sound
 
@@ -45,11 +51,18 @@ At speed >= **0.75 blocks/tick**, Gravity Fall reuses vanilla's `ELYTRA_FLYING` 
 
 ## Landing commitment
 
-Clinging predicts a bounded trajectory using the real body, velocity, gravity and landing-surface providers. A candidate floor must be physically valid support under the active gravity.
+Clinging predicts a bounded trajectory using the real body, velocity, gravity, aerodynamic motion model and landing-surface providers. A candidate floor must be physically valid support under the active gravity, and the **first real contact** on the predicted path matters.
 
-Beta keeps the shared **10-tick / 500 ms** landing window introduced in alpha.14. Camera LAND and BODY_LANDING use that timing. This is separate from the shorter 180/240 ms tracked SNAP used by non-player entities.
+Acquisition and presentation are now separate:
 
-During `LANDING_COMMITTED`, new gravity requests are discarded rather than queued. If predicted support disappears while Clinging still owns flight, the exact current presentation becomes the held frame. If another subsystem takes ownership instead, Clinging releases obsolete landing state.
+- a future landing may be acquired and tracked up to **40 ticks / 2 seconds** ahead;
+- acquisition keeps stable surface identity and brief hysteresis rather than rediscovering the floor from scratch each tick;
+- the visible camera/body landing manoeuvre still lasts at most **10 ticks / 500 ms**;
+- when the candidate crosses that final window, the remaining ETA sets the transition duration so the rotation converges **at touchdown**, not after impact.
+
+The 10-tick local-player landing presentation remains separate from the shorter 180/240 ms tracked SNAP used by non-player entities.
+
+During `LANDING_COMMITTED`, new gravity requests are discarded rather than queued. A candidate retained only by hysteresis cannot start or maintain the visible landing transition without current physical confirmation. If predicted support disappears while Clinging still owns flight, the exact current presentation becomes the held frame; if another subsystem takes ownership, Clinging releases obsolete landing state.
 
 ## Fluids and water
 
@@ -57,7 +70,19 @@ Intersecting **any non-empty fluid volume** suspends Clinging support, landing c
 
 A seabed touched while the body is still submerged is not a Clinging floor and does not restore the one-turn budget. Recharge requires genuine gravity-relative support outside fluid context.
 
-Water keeps its deliberate gravity-request gesture: press Space, release it, then press again within **250 ms**. The ordinary/held press remains swimming input. While Clinging/Reorientation owns water movement, Space is world **+Y** and Shift is world **-Y**, regardless of current gravity. A gravity turn requested while already in water keeps the current camera frame stable; entering a fluid later from dry free flight still clears obsolete presentation state.
+Water keeps its deliberate gravity-request gesture: press Space, release it, then press again within **250 ms**. The ordinary/held press remains swimming input.
+
+While Clinging/Reorientation owns water movement:
+
+- **W/S** move along camera forward/backward, including real camera pitch;
+- **A/D** move along camera left/right;
+- **Space** is world **+Y**;
+- **Shift** is world **-Y**;
+- remapping preserves the input magnitude produced by vanilla/Gravity Changer and does not add acceleration for free.
+
+Logical gravity and the underwater visual frame are deliberately separate. While freely swimming without real support, the camera converges to a **world-up** presentation equivalent to ordinary DOWN gravity. When the body has genuine gravity-relative support, the camera converges to that support's up direction. Losing and regaining support uses brief hysteresis and a continuous transition; neither state rewrites the stored logical gravity.
+
+A gravity turn requested while already in fluid keeps its retained camera frame for that fluid epoch. Entering a fluid later from dry free flight still clears an obsolete dry-flight HOLD.
 
 ## Climbables
 
@@ -127,11 +152,48 @@ Alchemical Leather is optional. When it is installed, Clinging: Reoriented suppl
 
 Reorientation's humanoid slot declaration belongs to Clinging: Reoriented and remains **boots**. The integration is optional and linkage-safe, so none of these rules add an Alchemical Leather runtime requirement.
 
-## Mounts and pets
+## Mounts, pets and gravity-aware mobs
 
 Clinging itself does not grant mounted turning. With Reorientation, a fresh Space while a compatible root mount is airborne can turn the complete passenger hierarchy only when destination preflight succeeds for every member. Failure is atomic.
 
-Tamed animals with their own compatible effect can replay bounded owner-turn breadcrumbs while following. Sitting pets do not replay. Pets pursue each pending breadcrumb on their current gravity-relative movement plane, replay the turn there, release navigation while unsupported and resume after landing.
+### Pets
+
+Tamed animals with their own compatible effect no longer replay owner-turn breadcrumbs. Follow is **history-free** and uses the pet's current state, a filtered current owner target and current world geometry.
+
+The pet prefers vanilla surface navigation whenever it already solves follow. When gravity is actually necessary, the local planner may:
+
+1. choose a bounded launch frontier on the current support;
+2. walk there using ordinary navigation;
+3. stop and revalidate the complete support-to-support transition from the real position;
+4. commit the gravity change only if the current forecast is still legal;
+5. let real physics own the flight with no surface pathfinding in the air;
+6. require stable support before planning the next segment.
+
+An airborne owner remains a live objective. The pet tracks a filtered/projection-based anchor without copying the owner's gravity change or launching blindly at the owner's instantaneous 3D position. Sitting, leash/mount restrictions, foreign gravity ownership and other vanilla follow boundaries remain authoritative.
+
+### General mob goals
+
+The same gravity locomotion layer is available to ordinary mobs that legitimately have Clinging/Reorientation. It does **not** replace high-level AI:
+
+- `FollowOwnerGoal` still decides to follow;
+- melee goals still decide to pursue a valid target;
+- avoid/flee goals still decide to escape;
+- ordinary position goals still choose their destination.
+
+Vanilla navigation always gets the first chance. Only when the normal route cannot satisfy the intent can the gravity planner evaluate local support-to-support transitions. One local plan uses one mirror path plus at most four launch nodes × five alternate gravities, so it performs at most **20 physical transition forecasts**.
+
+Grounded planning is further budgeted per server level: at most **32 new gravity plans per tick globally** and **4 per 64×64 X/Z region per tick**. Excess work waits in `WAITING_PLAN` while preserving the goal's intent rather than pretending a partial vanilla path succeeded.
+
+### Dynamic flight and reaction
+
+During a committed special flight, the mob does not run surface pathfinding. A short volumetric monitor follows the current AABB, velocity and gravity and revalidates the exact committed landing independently.
+
+Material target/world changes start a reaction timer derived from the mob's **base movement-speed attribute**, not its current falling speed. The delay is bounded to **2–10 ticks**. Small target jitter does not continually restart strategy, and changing observations do not push the reaction deadline forward forever.
+
+- **Reorientation** may make an additional airborne correction only after the reaction delay and only if the new physical forecast is legal.
+- **Clinging** with its airborne turn already spent cannot invent a second change; it must continue physics/recovery until support restores the normal capability.
+- A danger that disappears before the deadline cancels the pending action.
+- A block placed too late can be hit before the mob is allowed to react. That collision is intended gameplay, not a planner failure.
 
 ## Languages
 
@@ -153,4 +215,4 @@ Vanilla collision geometry is the base provider. Scale Brews types remain outsid
 
 Client and server need matching versions plus Minecraft 26.2, Java 25, Fabric Loader 0.19.5+, Fabric API 0.159.0+26.2+, Alex's Mobs Continued 2.1.9, CodxLib 1.5.1+, Gravity Changer Unofficial Port 1.5.2-beta.5-mc26.2 and Cloth Config API.
 
-This remains a beta prerelease. Back up important worlds before updating.
+**0.1.0-beta.3 is the latest published prerelease.** The beta.4 behaviour documented above is currently unreleased development. Back up important worlds before testing development builds.
