@@ -37,6 +37,7 @@ public final class PetGravityFollowGoalGameTests {
         goal.tick();
         h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(wolf)==Direction.EAST,"real FollowOwnerGoal did not commit the revalidated EAST transition at frontier");
         h.assertTrue(state.phase()==PetGravityFollow.Phase.COMMITTED,"goal integration lost committed-flight ownership: "+state.phase());
+        h.assertTrue(goal.canContinueToUse(),"vanilla navigation completion killed FollowOwnerGoal during committed gravity flight");
         goal.stop();
         h.succeed();
     }
