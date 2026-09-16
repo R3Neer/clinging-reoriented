@@ -63,7 +63,9 @@ public final class MobGravityLocalPlanner {
 
         Vec3 projected=DirectionalMobAiUtil.projectOntoMovementPlane(currentPosition,focus,current);
         var targetNode=DirectionalGroundNodeEvaluator.nodePosition(projected,current);
-        Path path=mirror.createPath(targetNode,1);
+        // Strategic planning needs the exact tactical frontier. A positive reachRange lets PathFinder
+        // report success one or more Manhattan nodes early; gameplay tolerance belongs to Goal.satisfied().
+        Path path=mirror.createPath(targetNode,0);
         Vec3 frontier=currentPosition;
         if(path!=null&&path.getEndNode()!=null)
             frontier=DirectionalGroundNodeEvaluator.entityPosition(path.getEndNode().asBlockPos(),current);
