@@ -1,5 +1,6 @@
 package io.github.r3neer.clingingreoriented;
 
+import com.moigferdsrte.gravitychanger.entity.ai.DirectionalGroundNodeEvaluator;
 import com.moigferdsrte.gravitychanger.util.GravityDirectionUtil;
 import java.util.HashMap;
 import java.util.Map;
@@ -10,11 +11,12 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
+import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.Vec3;
 
 /**
  * Generic online gravity locomotion for mobs. Vanilla goals remain owners of intent; this controller
- * only owns a bounded gravity-specific movement segment when ordinary navigation cannot reach it.
+ * only owns a bounded gravity-specific movement segment when ordinary navigation cannot satisfy it.
  */
 public final class MobGravityNavigation {
     public enum Phase { IDLE, APPROACH, REVALIDATE, COMMITTED, LANDING_CONFIRM, RECOVERY }
@@ -95,6 +97,19 @@ public final class MobGravityNavigation {
         return mob instanceof TamableAnimal pet&&target!=null&&target==pet.getOwner();
     }
 
+    /**
+     * Vanilla PathFinder's reached flag is based on its reachRange, not on the semantic goal radius.
+     * Judge the actual terminal entity position instead, using Gravity Changer's directional node convention.
+     */
+    public static boolean ordinaryPathSatisfies(Mob mob,Intent intent,Path path){
+        if(mob==null||intent==null||path==null||path.getEndNode()==null||!intent.valid(mob))return false;
+        Direction gravity=GravityDirectionUtil.getOwnGravityDirection(mob);
+        Vec3 terminal=DirectionalGroundNodeEvaluator.entityPosition(path.getEndNode().asBlockPos(),gravity);
+        Vec3 focus=intent.focus();double radius=intent.satisfiedRadius(mob);
+        return finite(terminal)&&finite(focus)&&Double.isFinite(radius)&&radius>=0.0D
+            &&terminal.distanceToSqr(focus)<=radius*radius;
+    }
+
     /** Called at the HEAD of a vanilla navigation request. Active special movement owns the request. */
     public static boolean interceptEntityRequest(Mob mob,Entity target,double speed){
         if(mob==null||!active(mob))return false;
@@ -109,13 +124,13 @@ public final class MobGravityNavigation {
     }
 
     /** Called after vanilla attempted a route. Returns true only when a gravity segment took ownership. */
-    public static boolean requestEntityAfterVanilla(Mob mob,Entity target,double speed,boolean ordinaryReachable){
-        if(mob==null||target==null||reservedPetOwnerIntent(mob,target)||ordinaryReachable)return false;
+    public static boolean requestEntityAfterVanilla(Mob mob,Entity target,double speed,boolean ordinarySatisfied){
+        if(mob==null||target==null||reservedPetOwnerIntent(mob,target)||ordinarySatisfied)return false;
         return activate(mob,new EntityIntent(target),speed,false);
     }
 
-    public static boolean requestPositionAfterVanilla(Mob mob,Vec3 target,double speed,boolean ordinaryReachable){
-        if(mob==null||ordinaryReachable)return false;
+    public static boolean requestPositionAfterVanilla(Mob mob,Vec3 target,double speed,boolean ordinarySatisfied){
+        if(mob==null||ordinarySatisfied)return false;
         return activate(mob,new PositionIntent(target),speed,false);
     }
 
@@ -235,7 +250,7 @@ public final class MobGravityNavigation {
         Set<MobGravityLocalPlanner.ManeuverKey> excluded=Set.copyOf(s.excludedUntil.keySet());
         var plan=MobGravityLocalPlanner.plan(mob,goal,TRANSITION_HORIZON_TICKS,excluded);
         if(plan.kind()!=MobGravityLocalPlanner.Kind.TRANSITION||plan.maneuverKey()==null){
-            rememberIdleMiss(mob,intent,s,now);return false;
+            rememberIdleMiss(mob,intent,s,speed,now);return false;
         }
         s.phase=Phase.APPROACH;s.intent=intent;s.speed=sanitizeSpeed(speed);s.plan=plan;s.focusAnchor=focus;
         s.routeNavigation=null;s.routeOwned=false;s.committedKey=null;s.flightDeadline=0;s.landingTicks=0;s.forceReplan=false;
@@ -289,8 +304,8 @@ public final class MobGravityNavigation {
             ||focus.distanceToSqr(s.idleFocusAnchor)>INTENT_REPLAN_DISTANCE_SQR||now>=s.nextIdlePlanAt;
     }
 
-    private static void rememberIdleMiss(Mob mob,Intent intent,State s,long now){
-        s.intent=intent;s.speed=sanitizeSpeed(s.speed);s.idleFocusAnchor=intent.focus();
+    private static void rememberIdleMiss(Mob mob,Intent intent,State s,double speed,long now){
+        s.intent=intent;s.speed=sanitizeSpeed(speed);s.idleFocusAnchor=intent.focus();
         s.idleGravity=GravityDirectionUtil.getOwnGravityDirection(mob);s.nextIdlePlanAt=now+IDLE_REPLAN_TICKS;
     }
 
