@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+### Gravity Fall body, aerodynamics and landing
+
+- Replace the old W-specific air-diving redirect with persistent body attitude and posture-driven anisotropic aerodynamics: gaze drives macro-body intent, velocity contributes only weak stabilization, and transverse momentum receives extra drag without generating thrust or lift.
+- Keep full-sphere camera semantics while separating the visible body attitude from velocity transport, including stable head/feet symmetry through reversals.
+- Separate landing acquisition from presentation: future support can be tracked up to 40 ticks ahead while the visible LAND/BODY_LANDING transition remains at most 10 ticks and converges at predicted touchdown.
+- Reuse one shared `TrajectoryPrediction`/`AirMotion`/`LandingSurfaces` model across player landing and gravity-transition forecasts instead of maintaining parallel approximate physics.
+
+### Water controls and presentation
+
+- Make owned swimming W/S follow camera forward/back including pitch and A/D follow camera left/right while Space/Shift remain world +Y/-Y.
+- Separate underwater camera presentation from logical gravity: unsupported swimming converges to world-up, while real gravity-relative support converges to support-up with bounded hysteresis and continuous transition.
+- Preserve the generic fluid-context fence so water, lava and modded fluids still suspend Clinging support, landing and Gravity Fall body semantics.
+
+### Gravity-aware pets and mobs
+
+- Replace pet gravity-breadcrumb replay with history-free follow based on the pet's current state, a filtered current owner target and current world geometry.
+- Keep ordinary `FollowOwnerGoal` navigation first; when gravity is actually needed, pets walk to a validated launch frontier, revalidate before commit, fly under real physics and replan only after stable support/recovery.
+- Keep airborne owners trackable through filtered/tangential targeting without remotely commanding pets to copy owner gravity turns.
+- Add a general gravity-locomotion bridge for vanilla mob intents. Melee pursuit, flee/avoid and position goals keep ownership of high-level AI while the shared planner can use support-to-support gravity transitions when normal navigation cannot satisfy the intent.
+- Preserve vanilla goal cadence/semantics and external gravity ownership; no per-species gravity route tables are introduced.
+- Add committed-flight monitoring and finite 2–10 tick reaction latency derived from base movement speed. Reorientation may make a legal airborne correction after the delay; spent Clinging never receives a second turn, and late obstacles can still cause natural impacts.
+
+### Planning cost and validation
+
+- Bound one local gravity plan to one mirror navigation plus at most four launch nodes × five alternate gravities (`<=20` physical forecasts).
+- Add `MobGravityPlanningBudget`: at most 32 new grounded gravity plans per server level/tick and 4 per 64×64 X/Z region/tick, shared by generic mobs and pet follow.
+- Defer excess work through `WAITING_PLAN` while preserving the live vanilla intent instead of continuing an obsolete partial path or busy-looping the planner.
+- Shorten committed-flight monitoring to `reactionTicks + 2`, capped at 20 ticks, while revalidating the exact committed landing independently.
+- Add adversarial coverage for dynamic obstacles, stale/unknown geometry, target jitter/movement, Clinging/Reorientation capability boundaries, planning-budget fairness, trapped landings, airborne-owner follow and gravity-enabled flee.
+- Keep beta.4 development unreleased: this section records branch behaviour only and does not change version, tag, `main` or published prerelease state.
+
 ## [0.1.0-beta.3] - 2026-09-15
 
 ### Performance and stability
