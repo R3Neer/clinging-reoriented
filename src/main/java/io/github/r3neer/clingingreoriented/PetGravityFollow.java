@@ -189,6 +189,7 @@ public final class PetGravityFollow {
         long now=pet.level().getGameTime();pruneFailures(state,now);
         if(!force&&!idlePlanningDue(pet,owner,state,now))return false;
         Vec3 anchor=owner.position();double radius=Math.max(stopDistance,Math.max(.75D,pet.getBbWidth()));
+        if(!MobGravityPlanningBudget.tryAcquire(pet))return false;
         var goal=followGoal(anchor,radius);
         Set<MobGravityLocalPlanner.ManeuverKey> excluded=Set.copyOf(state.excludedUntil.keySet());
         var plan=MobGravityLocalPlanner.plan(pet,goal,TRANSITION_HORIZON_TICKS,excluded);
