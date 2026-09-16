@@ -33,7 +33,6 @@ public final class MountedGravity {
         Payloads.visual(p,transition);ClingingReoriented.applyYaw(p,transition);s.visualFrameOwned=true;
         s.airChangeUsed=true;root.positionRider(p);p.setOnGround(false);
         Payloads.publish(p);
-        GravityBreadcrumbs.record(p,direction);
         return ClingingReoriented.Result.SUCCESS;
     }
 }
