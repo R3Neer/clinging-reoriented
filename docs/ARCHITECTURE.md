@@ -44,7 +44,7 @@ First Person uses a blended body-center/camera pivot for the avatar root; the re
 
 ## Landing surfaces and fluids
 
-`LandingSurfaceProvider` / `LandingSurfaces` expose bounded support and swept-contact semantics with stable identity for revalidation. Vanilla collision geometry is the base provider. `FluidContext.intersects` fences any non-empty fluid volume before a provider can create Clinging support/landing semantics.
+`LandingSurfaceProvider` / `LandingSurfaces` expose bounded support and swept-contact semantics with stable identity for revalidation. Vanilla collision geometry is the base provider. `FluidContext.intersects` fences any non-empty fluid volume before a provider can create Clinging support/landing semantics. The same fluid-volume test also accepts hypothetical AABBs so planners and safe fallbacks can reject a future body without moving the entity first.
 
 `LandingPrediction.MAX_TICKS` is the 10-tick presentation window. `LandingState` commits only while the same candidate remains valid, matches physical gravity, revalidates and stays reachable.
 
@@ -76,7 +76,9 @@ Player-facing translation files are `en_us.json` and `es_es.json`. CI requires e
 
 `PlayerData` separates physical ownership, visual frame, airborne/landing state, Gravity Fall epoch/look/aero state, mace fall segment and safety frontier state. Teleports/transfers clear transient spatial state before context changes. Respawn/replacement preserves monotonic epochs without migrating obsolete entity-instance animation.
 
-Mounted gravity remains transactional over the root/passenger hierarchy. `GravityBreadcrumbs` keeps bounded pet route replay and lifecycle clearing; pets pursue pending breadcrumbs on their current gravity-relative movement plane, replay the turn after bounded arrival, release navigation while unsupported and resume after support returns.
+Mounted gravity remains transactional over the root/passenger hierarchy. Pet following is **history-free**: `MobGravityPlanner` forecasts one physical support-to-support transition without mutation, `MobGravityLocalPlanner` combines one gravity-aware tactical path with at most five transition forecasts, and `PetGravityFollow` executes only the next edge through APPROACH → REVALIDATE → COMMITTED → LANDING_CONFIRM/RECOVERY. Failed `ManeuverKey` edges are excluded temporarily instead of being retried forever. `FollowGravityMixin` delegates only special gravity segments; ordinary same-surface follow stays vanilla.
+
+Powered pets no longer use vanilla's DOWN-only teleport blindly. `PetGravityTeleport` first keeps ordinary navigation alive and only treats extreme separation as a fallback condition. A teleport candidate must fit the real body, be fluid/hazard free, have real support in the candidate gravity frame and expose at least one tangent egress. Current gravity is preferred; external/borrowed ownership cannot be stolen. There is no owner breadcrumb queue, TTL, replay coordinate or historical turn recording in runtime state.
 
 ## Alchemical Leather semantic-wear boundary
 
@@ -97,6 +99,6 @@ Production code does not compile against Scale Brews or Alchemical Leather. Firs
 
 ## State summary
 
-The major gravity states are GROUNDED, AIRBORNE, SUSTAINED_GRAVITY_FALL, LANDING_COMMITTED and context transfer. These remain orthogonal to effect acquisition, Gravity Charge projectile state, mount loans, pet breadcrumbs and external gravity ownership.
+The major gravity states are GROUNDED, AIRBORNE, SUSTAINED_GRAVITY_FALL, LANDING_COMMITTED and context transfer. These remain orthogonal to effect acquisition, Gravity Charge projectile state, mount loans, the pet follow executor and external gravity ownership.
 
 **0.1.0-beta.1** introduced Gravity Charge and the beta line. **0.1.0-beta.2** replaced the pole-singular Gravity Fall look representation while keeping gameplay authority unchanged. **0.1.0-beta.3** preserves those semantics while reducing hot-path allocation/CPU work and bounding rare recovery searches.
