@@ -14,7 +14,7 @@ import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 
-/** S06-B integration gates for real FollowOwnerGoal delegation, with no breadcrumb history. */
+/** S06/S07 integration gates for real FollowOwnerGoal delegation, with no breadcrumb history. */
 public final class PetGravityFollowGoalGameTests {
     @GameTest(padding=64)
     public void safeGravityPlanWakesFollowGoalInsideVanillaStartDeadZone(GameTestHelper h) throws Exception {
@@ -96,14 +96,39 @@ public final class PetGravityFollowGoalGameTests {
     }
 
     @GameTest(padding=64)
-    public void airborneOwnerInsideVanillaDeadZoneDoesNotWakeGravityFollow(GameTestHelper h) throws Exception {
+    public void airborneOwnerBehindBlockedProjectionCanWakeRealFollowGoal(GameTestHelper h) throws Exception {
         var owner=owner(h,new Vec3(14,13,5));Wolf wolf=wolf(h,owner,true);wall(h,9);
+        owner.setOnGround(false);owner.setDeltaMovement(new Vec3(.2D,0,0));
+        var goal=new FollowOwnerGoal(wolf,1.0D,10.0F,2.0F);
+        h.assertTrue(wolf.distanceToSqr(owner)<100.0D,"fixture must be inside vanilla start dead zone");
+
+        h.assertTrue(goal.canUse(),"airborne owner behind blocked projection did not wake gravity-aware FollowOwnerGoal");
+        var state=state(goal);
+        h.assertTrue(state.phase()==PetGravityFollow.Phase.APPROACH||state.phase()==PetGravityFollow.Phase.REVALIDATE,
+            "airborne owner woke unexpected executor phase: "+state.phase());
+        h.assertTrue(state.plan()!=null&&state.plan().kind()==MobGravityLocalPlanner.Kind.TRANSITION,
+            "airborne owner wake produced no support-to-support transition");
+        h.assertTrue(state.strategicOwnerAirborne(),"real FollowOwnerGoal did not enter airborne target mode");
+        h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(wolf)==Direction.DOWN,"airborne-owner canUse remotely changed pet gravity");
+
+        goal.start();goal.tick();
+        h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(wolf)==Direction.DOWN,
+            "airborne-owner approach committed gravity before the launch frontier");
+        goal.stop();h.succeed();
+    }
+
+    @GameTest(padding=48)
+    public void reachableAirborneProjectionInsideDeadZoneStaysVanilla(GameTestHelper h) throws Exception {
+        var owner=owner(h,new Vec3(9,13,5));Wolf wolf=wolf(h,owner,true);
         owner.setOnGround(false);owner.setDeltaMovement(Vec3.ZERO);
         var goal=new FollowOwnerGoal(wolf,1.0D,10.0F,2.0F);
         h.assertTrue(wolf.distanceToSqr(owner)<100.0D,"fixture must be inside vanilla start dead zone");
-        h.assertFalse(goal.canUse(),"airborne owner woke a new support-to-support gravity transition");
-        h.assertTrue(state(goal).phase()==PetGravityFollow.Phase.IDLE,"airborne-owner query changed special executor phase");
-        h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(wolf)==Direction.DOWN,"airborne owner remotely changed pet gravity");
+        h.assertFalse(goal.canUse(),"reachable airborne projection invented a gravity-specific follow segment");
+        var state=state(goal);
+        h.assertTrue(state.phase()==PetGravityFollow.Phase.IDLE&&state.plan()==null,
+            "reachable airborne projection left special planner state behind");
+        h.assertTrue(state.strategicOwnerAirborne(),"reachable airborne owner was not observed in airborne target mode");
+        h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(wolf)==Direction.DOWN,"reachable airborne projection changed gravity");
         h.succeed();
     }
 
