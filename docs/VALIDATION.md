@@ -1,5 +1,63 @@
 # Validation
 
+## Unreleased beta.4 — gravity navigation and gamefeel campaign
+
+The active `tm/gravity-navigation-gamefeel-beta4` campaign changes player gamefeel and adds general gravity-aware locomotion for mobs without changing the published version. **0.1.0-beta.3 remains the latest public prerelease.** No beta.4 tag/release is implied by this section.
+
+### Campaign invariants
+
+Automated coverage for the current development architecture preserves these rules:
+
+- player landing and mob transition forecasts share `TrajectoryPrediction`, `AirMotion` and `LandingSurfaces` rather than maintaining incompatible physics models;
+- landing acquisition may begin up to 40 ticks ahead, while visible LAND/BODY_LANDING remains at most 10 ticks and must be backed by a current physical prediction inside that final window;
+- Gravity Fall body attitude is persistent; gaze drives bounded body intent, velocity provides only weak stabilization, and anisotropic drag replaces the old W-specific airborne redirect without creating energy;
+- owned swimming uses camera-relative WASD plus world +Y/-Y Space/Shift, while unsupported underwater presentation converges to world-up and supported presentation converges to support-up without rewriting logical gravity;
+- ordinary navigation is always tried before gravity planning;
+- pet follow is history-free: no runtime owner breadcrumb queue/replay drives locomotion;
+- general follow/chase/flee use the same gravity locomotion machinery rather than species-specific route tables;
+- a local grounded gravity plan is bounded to one mirror path and at most four launch nodes × five alternate gravities (`<=20` transition forecasts);
+- new grounded gravity plans are limited to 32 per server level/tick and 4 per 64×64 X/Z region/tick, with excess work deferred through `WAITING_PLAN` while preserving the live goal intent;
+- committed flight performs no surface pathfinding; the dynamic monitor horizon is `reactionTicks + 2`, capped at 20 ticks, while the exact committed landing is revalidated independently;
+- reaction latency is derived from base `MOVEMENT_SPEED`, bounded to 2–10 ticks and never made instant by fall speed/knockback;
+- Reorientation may take a later airborne correction only after reaction delay and a fresh legal physical forecast; spent Clinging never receives a second turn;
+- unknown/unloaded geometry, blocking first contact, trapped landings and foreign gravity ownership fail closed.
+
+### Sprint evidence
+
+- **NAV-S03 — anticipated landing:** closed after separating 40-tick acquisition from 10-tick presentation and proving touchdown/invalidations across the full compatibility matrix.
+- **NAV-S04 — water controls/camera:** closed with camera-relative WASD, world-vertical Space/Shift, support/world-up presentation and explicitly registered client GameTests.
+- **NAV-S05 — general mob planner:** closed with pure physical transition evaluation, bounded launch-region search, first-contact safety and `<=20` forecasts per local plan.
+- **NAV-S06 — pet/general goal integration:** closed with history-free pet follow, safe teleport fallback, generic entity/position intents, Melee/Avoid wake seams and gravity-enabled flee while keeping vanilla high-level AI authoritative.
+- **NAV-S07 — dynamic target/world reaction:** closed at functional commit `370c2f4c8a40f87b9d89e1895cf0df4df8ba68bd`; **CI #1007 / run `35103896552`** passed build/JUnit, 168 server GameTests, default client, First Person, Scale Brews server/client, Fresh Animations and snapshots.
+- **NAV-S08 — efficiency/adversarial:** closed with reaction-bounded flight monitoring, shared global/regional planning budgets, deferred planning ownership and logical-work gates instead of unsupported percentage claims.
+- **Pre-convergence functional HEAD `b2de88e83e1e64416288d220c8d86d52aeca014d`: CI #1038 / run `35105097956`** passed the complete matrix after airborne-owner tracking, flee integration and S09 code gates.
+
+### Useful red history
+
+The campaign deliberately kept red results that exposed invalid fixtures or missing registration instead of weakening production contracts:
+
+- water client coverage initially produced a false green because new client GameTests were not registered; registration became part of the gate;
+- `MeleeAttackGoal` fixtures initially mixed a manually invoked goal with the mob's live scheduler, used a mock player that vanilla did not accept as a stable zombie target, and treated the goal cooldown as relative test time instead of absolute world `gameTime`; fixtures were isolated/corrected while preserving vanilla cadence;
+- an S07 rescue fixture accidentally left an alternate DOWN support while asserting that NORTH was the only legal correction; the world fixture was fixed rather than relaxing the reactor's safety/risk rules;
+- budget tests were extended to cover both global and regional concentration plus deferred ownership, preventing a nominal global cap from hiding local horde spikes.
+
+These failures are evidence that the tests challenged assumptions rather than merely confirming implementation-shaped fixtures.
+
+### Automated validation versus manual QA
+
+The beta.4 automation proves deterministic contracts: capability, first-contact geometry, transition purity, plan budgets, reaction timing, goal ownership, fluid boundaries, camera snapshots and compatibility lanes. It does **not** prove subjective gamefeel or real-modpack throughput.
+
+Manual QA is still required for:
+
+- feel/readability of posture-driven aerodynamics across long falls, reversals and head/feet orientations;
+- landing anticipation at low/high speed and on irregular/moving surfaces with realistic multiplayer latency;
+- water frame transitions near uneven support and current/knockback interactions;
+- pets, melee pursuit and flee behaviour in real terrain rather than compact GameTest arenas;
+- horde behaviour and scheduler fairness in representative mob-heavy modpacks;
+- interaction of beta.4 navigation with First Person, Fresh Animations and optional companions during longer sessions.
+
+No percentage performance improvement is claimed for beta.4 without reproducible profiling of a representative server/modpack. The enforced claims are structural budgets and bounded logical work.
+
 ## Alchemical Leather compatibility TM
 
 The Alchemical Leather semantic-wear integration was rebuilt on a fresh branch from current `main` rather than merging the stale first prototype, which had diverged by more than a hundred mainline commits.
