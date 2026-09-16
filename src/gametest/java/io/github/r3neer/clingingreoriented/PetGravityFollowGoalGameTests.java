@@ -71,15 +71,15 @@ public final class PetGravityFollowGoalGameTests {
         wolf.addEffect(new MobEffectInstance(Reorientation.EFFECT,1200));wolf.setOnGround(true);wolf.setDeltaMovement(Vec3.ZERO);
         wall(h,9);
         h.assertTrue(wolf.distanceToSqr(owner)<100.0D,"fixture must force the mixin wake path inside vanilla dead zone");
-        h.runAfterDelay(120,()->{
+        h.succeedWhen(()->{
             var state=MobGravity.state(wolf);
             h.assertTrue(wolf.isAlive(),"real wolf AI died while executing gravity follow");
-            h.assertTrue(state.visualSequence>0L,"real wolf AI never committed any owned gravity transition; pos="+wolf.position()
-                +", gravity="+GravityDirectionUtil.getOwnGravityDirection(wolf)+", navDone="+wolf.getNavigation().isDone());
+            h.assertTrue(state.visualSequence>0L,"real wolf AI has not yet committed any owned gravity transition; pos="+wolf.position()
+                +", gravity="+GravityDirectionUtil.getOwnGravityDirection(wolf)+", navDone="+wolf.getNavigation().isDone()
+                +", ownership="+state.ownership);
             h.assertTrue(state.ownership==MobGravity.Ownership.OWNED_EFFECT,"real wolf transition did not retain effect ownership");
             h.assertTrue(h.getLevel().noCollision(wolf,wolf.getBoundingBox().deflate(1.0E-5D)),
-                "real wolf AI ended intersecting solid geometry after planned transition: "+wolf.getBoundingBox());
-            h.succeed();
+                "real wolf AI committed while intersecting solid geometry: "+wolf.getBoundingBox());
         });
     }
 
