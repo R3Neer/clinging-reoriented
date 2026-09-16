@@ -35,4 +35,16 @@ final class MobReactionTimeTest {
         assertTrue(absurd>=MobReactionTime.MIN_TICKS,"absurd speed broke minimum latency");
         assertTrue(fast-absurd<=2,"high speed kept buying large linear reaction gains");
     }
+
+    @Test void flightMonitorOnlyLooksFarEnoughToUseReactionWindow(){
+        for(int reaction=MobReactionTime.MIN_TICKS;reaction<=MobReactionTime.MAX_TICKS;reaction++){
+            int horizon=MobFlightReactor.monitorHorizonForReactionTicks(reaction);
+            assertTrue(horizon>reaction,"monitor left no maneuver margin at reaction="+reaction);
+            assertTrue(horizon<=MobFlightMonitor.DEFAULT_HORIZON_TICKS,"monitor exceeded its hard horizon");
+            assertEquals(Math.min(MobFlightMonitor.DEFAULT_HORIZON_TICKS,reaction+MobFlightReactor.REACTION_MARGIN_TICKS),horizon);
+        }
+        int ordinaryReaction=MobReactionTime.ticksForBaseSpeed(.25D);
+        assertTrue(MobFlightReactor.monitorHorizonForReactionTicks(ordinaryReaction)<MobFlightMonitor.DEFAULT_HORIZON_TICKS,
+            "ordinary mobs still pay the old fixed 20-tick monitor cost");
+    }
 }
