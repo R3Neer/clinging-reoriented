@@ -17,7 +17,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
-/** S05-B integration tests for one-path + bounded-transition local planning. */
+/** S05-B integration tests for one-path + bounded launch-region transition planning. */
 public final class MobGravityLocalPlannerGameTests {
     @GameTest(padding=48)
     public void reachableSurfaceGoalReturnsWalkWithoutMutatingLiveNavigation(GameTestHelper h){
@@ -60,7 +60,7 @@ public final class MobGravityLocalPlannerGameTests {
     }
 
     @GameTest(padding=64)
-    public void blockedTargetUsesExactPartialPathFrontierAndOnlyFiveForecasts(GameTestHelper h){
+    public void blockedEffectFreeTargetStopsBeforeExpensiveGravityForecasts(GameTestHelper h){
         Wolf wolf=walkingWolf(h,false,1,22);
         for(int y=10;y<=14;y++)for(int z=-5;z<=15;z++)h.setBlock(new BlockPos(11,y,z),Blocks.STONE);
         Vec3 focus=wolf.position().add(12.0D,0.0D,0.0D);
@@ -70,9 +70,32 @@ public final class MobGravityLocalPlannerGameTests {
         h.assertTrue(plan.kind()==MobGravityLocalPlanner.Kind.NO_PLAN,"mob without gravity capability should not invent a blocked route");
         h.assertTrue(plan.walkPath()!=null&&!plan.walkPath().canReach(),"fixture did not produce the required partial path");
         Vec3 expected=DirectionalGroundNodeEvaluator.entityPosition(plan.walkPath().getEndNode().asBlockPos(),Direction.DOWN);
-        h.assertTrue(plan.frontier().distanceTo(expected)<1.0E-9D,"planner did not use exact partial-path endpoint as frontier: "+plan.frontier()+" vs "+expected);
-        h.assertTrue(plan.transitionEvaluations()==5,"local planner must evaluate exactly five alternative gravities after blocked WALK, got "+plan.transitionEvaluations());
+        h.assertTrue(plan.frontier().distanceTo(expected)<1.0E-9D,"NO_PLAN lost the exact tactical endpoint: "+plan.frontier()+" vs "+expected);
+        h.assertTrue(plan.transitionEvaluations()==0,"effect-free blocked mob spent gravity forecast budget: "+plan.transitionEvaluations());
         h.assertTrue(navigation.getPath()==beforePath&&equalsNullable(navigation.getTargetPos(),beforeTarget),"ephemeral path query leaked into live navigation");
+        h.succeed();
+    }
+
+    @GameTest(padding=64)
+    public void blockedWallCanBackOffFromUnsafeLastNodeAndChooseEarlierLaunch(GameTestHelper h){
+        Wolf wolf=walkingWolf(h,true,1,22);
+        for(int y=9;y<=16;y++)for(int z=0;z<=10;z++)h.setBlock(new BlockPos(9,y,z),Blocks.STONE);
+        Vec3 focus=h.absoluteVec(new Vec3(14,10,5));
+
+        var plan=MobGravityLocalPlanner.plan(wolf,distanceGoal(focus,1.5D,null),80);
+        h.assertTrue(plan.kind()==MobGravityLocalPlanner.Kind.TRANSITION,
+            "bounded launch region failed to recover a wall transition: kind="+plan.kind()+", evals="+plan.transitionEvaluations());
+        h.assertTrue(plan.terminalGravity()==Direction.EAST,"wall backoff fixture expected EAST, got "+plan.terminalGravity());
+        h.assertTrue(plan.walkPath()!=null,"wall transition lost its approach path");
+        Vec3 tacticalEnd=DirectionalGroundNodeEvaluator.entityPosition(
+            new net.minecraft.world.level.pathfinder.Node(8,10,5).asBlockPos(),Direction.DOWN);
+        h.assertTrue(plan.frontier().x<tacticalEnd.x-1.0E-6D,
+            "planner still chose the wall-adjacent endpoint instead of backing off: "+plan.frontier());
+        h.assertTrue(plan.transitionEvaluations()>0&&plan.transitionEvaluations()<=MobGravityLocalPlanner.MAX_LAUNCH_SAMPLES*5,
+            "launch-region search escaped its bounded forecast budget: "+plan.transitionEvaluations());
+        h.assertTrue(plan.walkPath().getEndNode()!=null&&
+            plan.frontier().distanceTo(DirectionalGroundNodeEvaluator.entityPosition(plan.walkPath().getEndNode().asBlockPos(),Direction.DOWN))<1.0E-9D,
+            "approach path was not truncated to the chosen launch frontier");
         h.succeed();
     }
 
@@ -95,10 +118,11 @@ public final class MobGravityLocalPlannerGameTests {
             h.assertTrue(plan.kind()==MobGravityLocalPlanner.Kind.TRANSITION,"gravity-specific goal should choose a physical transition, got "+plan.kind());
             h.assertTrue(plan.terminalGravity()==Direction.EAST&&plan.transition()!=null&&plan.transition().targetGravity()==Direction.EAST,
                 "planner chose wrong terminal gravity: "+plan.terminalGravity());
-            h.assertTrue(plan.walkPath()!=null&&plan.walkPath().canReach(),"planner lost the ordinary approach path to its launch frontier");
+            h.assertTrue(plan.walkPath()!=null,"planner lost the ordinary approach path to its launch frontier");
             h.assertTrue(plan.transition().launchPosition().distanceTo(plan.frontier())<1.0D,
                 "transition was forecast from current mob position instead of future frontier");
-            h.assertTrue(plan.transitionEvaluations()==5,"transition comparison exceeded or skipped the bounded five candidates");
+            h.assertTrue(plan.transitionEvaluations()>0&&plan.transitionEvaluations()<=MobGravityLocalPlanner.MAX_LAUNCH_SAMPLES*5,
+                "transition comparison exceeded bounded launch-region budget: "+plan.transitionEvaluations());
             h.assertTrue(wolf.position().equals(before),"local planning physically moved the wolf");
         }finally{registration.close();}
         h.succeed();
