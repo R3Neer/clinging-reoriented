@@ -25,14 +25,14 @@ import org.joml.Vector3f;
 public final class GravityFallClientGameTest implements FabricClientGameTest {
     private static final double VEC_EPS=3.0E-3D;
     private static final float QUAT_EPS=2.0E-4F;
+    private static final double BODY_STEP_EPS=Math.toRadians(.5D);
     private static final String FA_PACK="FreshAnimations_v1.10.5.zip";
     private static final String FA_PLAYER_PACK="FA+Player-v1.1.zip";
 
     @Override public void runTest(ClientGameTestContext context){
         AtomicLong sequence=new AtomicLong(10_000L);
         AtomicReference<Vec3> cameraStart=new AtomicReference<>();
-        AtomicReference<Quaternionf> eastBody=new AtomicReference<>();
-        AtomicReference<Quaternionf> westBody=new AtomicReference<>();
+        AtomicReference<Quaternionf> curvedBody=new AtomicReference<>();
         FreshAnimationsFixture fresh=FreshAnimationsFixture.enableIfPresent(context);
 
         try(var world=context.worldBuilder().create()){
@@ -98,28 +98,37 @@ public final class GravityFallClientGameTest implements FabricClientGameTest {
             context.takeScreenshot(fresh.active()?"fresh-animations-gravity-fall-sustained-down":"gravity-fall-sustained-down");
 
             context.runOnClient(mc->{
+                Quaternionf before=body(mc);
                 advance(mc,1,new Vec3(.20,0,0));
-                Quaternionf body=body(mc);eastBody.set(new Quaternionf(body));
-                assertVec(new Vec3(1,0,0),BodyOrientation.bodyUp(body),"90-degree velocity curve");
+                Quaternionf after=body(mc);curvedBody.set(new Quaternionf(after));
+                assertFiniteNormalized(after,"90-degree velocity curve body");
+                assertBoundedBodyStep(before,after,"90-degree velocity curve snapped body");
+                Vec3 up=BodyOrientation.bodyUp(after);
+                if(up.x<=0.0D||up.y>=-.90D)
+                    throw new AssertionError("90-degree velocity curve did not begin gradual EAST weathercock without snapping: "+up);
                 assertCamera(cameraStart.get(),mc,"90-degree body curve moved camera");
             });
             context.takeScreenshot("gravity-fall-curve-east");
 
             context.runOnClient(mc->{
                 advance(mc,5,Vec3.ZERO);
-                assertQuat(eastBody.get(),body(mc),"zero-speed crossing changed body twist/orientation");
+                assertFiniteNormalized(body(mc),"zero-speed body state");
                 assertCamera(cameraStart.get(),mc,"zero-speed hold moved camera");
             });
             context.takeScreenshot("gravity-fall-zero-hold");
             context.runOnClient(mc->{
+                Quaternionf before=body(mc);
                 advance(mc,1,new Vec3(-.20,0,0));
-                Quaternionf west=body(mc);westBody.set(new Quaternionf(west));
-                assertVec(new Vec3(-1,0,0),BodyOrientation.bodyUp(west),"WEST direction after zero crossing");
-                assertCamera(cameraStart.get(),mc,"180-degree velocity reversal moved camera");
+                Quaternionf after=body(mc);
+                assertFiniteNormalized(after,"velocity reversal body");
+                assertBoundedBodyStep(before,after,"velocity reversal manufactured an instantaneous head/feet flip");
+                if(equivalent(after,RotationUtil.getEntityRotationQuaternion(Direction.WEST)))
+                    throw new AssertionError("velocity reversal snapped body to canonical WEST instead of preserving attitude");
+                assertCamera(cameraStart.get(),mc,"velocity reversal moved camera");
             });
             context.takeScreenshot("gravity-fall-reverse-west");
 
-            // BODY_LANDING entry must begin exactly from the currently visible horizontal body.
+            // BODY_LANDING entry must begin exactly from the currently visible body.
             context.runOnClient(mc->{
                 Quaternionf before=body(mc);
                 mc.player.setDeltaMovement(Vec3.ZERO);
@@ -130,21 +139,26 @@ public final class GravityFallClientGameTest implements FabricClientGameTest {
             context.takeScreenshot("gravity-fall-landing-begin");
 
             // The screenshot above is allowed to consume real client ticks. Resume from whatever
-            // is visible now, re-establish a stable WEST body, then create a fresh LAND epoch for
-            // a deterministic one-tick midpoint assertion before any screenshot can advance it.
+            // is visible now, drive the persistent body for a few ticks, then create a fresh LAND
+            // epoch for a deterministic one-tick midpoint assertion before screenshots can advance it.
             context.runOnClient(mc->{
                 Quaternionf beforeResume=body(mc);
                 send(mc,sequence,GravityFallSync.Phase.RESUME,null,0.0F);
+                if(GravityFallVisuals.landing(mc.player))throw new AssertionError("post-begin RESUME left BODY_LANDING active");
                 assertQuat(beforeResume,body(mc),"post-begin RESUME snapped current body");
+                Quaternionf beforeDrive=body(mc);
                 advance(mc,8,new Vec3(-.20,0,0));
-                assertVec(new Vec3(-1,0,0),BodyOrientation.bodyUp(body(mc)),"WEST body was not restored before midpoint epoch");
+                Quaternionf afterDrive=body(mc);
+                assertFiniteNormalized(afterDrive,"persistent body before midpoint landing");
+                if(equivalent(beforeDrive,afterDrive))throw new AssertionError("RESUME did not restart persistent body attitude integration");
 
                 mc.player.setDeltaMovement(Vec3.ZERO);
+                Quaternionf landStart=body(mc);
                 send(mc,sequence,GravityFallSync.Phase.LAND,Direction.DOWN,4.0F);
                 GravityFallVisuals.tick(mc);
                 Quaternionf mid=body(mc);
                 Quaternionf target=RotationUtil.getEntityRotationQuaternion(Direction.DOWN);
-                if(equivalent(mid,target)||equivalent(mid,westBody.get()))throw new AssertionError("BODY_LANDING one-tick midpoint collapsed to an endpoint");
+                if(equivalent(mid,target)||equivalent(mid,landStart))throw new AssertionError("BODY_LANDING one-tick midpoint collapsed to an endpoint");
             });
             context.takeScreenshot(fresh.active()?"fresh-animations-gravity-fall-landing-mid":"gravity-fall-landing-mid");
 
@@ -157,16 +171,20 @@ public final class GravityFallClientGameTest implements FabricClientGameTest {
                 assertQuat(current,body(mc),"midpoint cleanup RESUME snapped current body");
                 advance(mc,8,new Vec3(-.20,0,0));
                 mc.player.setDeltaMovement(Vec3.ZERO);
+                Quaternionf landStart=body(mc);
                 send(mc,sequence,GravityFallSync.Phase.LAND,Direction.DOWN,4.0F);
                 GravityFallVisuals.tick(mc);
                 Quaternionf beforeResume=body(mc);
-                if(equivalent(beforeResume,RotationUtil.getEntityRotationQuaternion(Direction.DOWN))||equivalent(beforeResume,westBody.get()))
+                if(equivalent(beforeResume,RotationUtil.getEntityRotationQuaternion(Direction.DOWN))||equivalent(beforeResume,landStart))
                     throw new AssertionError("RESUME holdout did not reach a partial landing state");
                 send(mc,sequence,GravityFallSync.Phase.RESUME,null,0.0F);
                 if(GravityFallVisuals.landing(mc.player))throw new AssertionError("RESUME left BODY_LANDING active");
                 assertQuat(beforeResume,body(mc),"RESUME snapped instead of continuing from current partial presentation");
+                Quaternionf beforeDrive=body(mc);
                 advance(mc,8,new Vec3(-.20,0,0));
-                assertVec(new Vec3(-1,0,0),BodyOrientation.bodyUp(body(mc)),"RESUME did not return to velocity transport");
+                Quaternionf afterDrive=body(mc);
+                assertFiniteNormalized(afterDrive,"RESUME persistent body state");
+                if(equivalent(beforeDrive,afterDrive))throw new AssertionError("RESUME did not return to persistent body attitude integration");
             });
             context.takeScreenshot("gravity-fall-resume-west");
 
@@ -228,6 +246,23 @@ public final class GravityFallClientGameTest implements FabricClientGameTest {
 
     private static void assertQuat(Quaternionf expected,Quaternionf actual,String label){
         if(!equivalent(expected,actual))throw new AssertionError(label+": expected "+expected+" got "+actual);
+    }
+
+    private static void assertFiniteNormalized(Quaternionf value,String label){
+        if(value==null||!Float.isFinite(value.x())||!Float.isFinite(value.y())||!Float.isFinite(value.z())||!Float.isFinite(value.w()))
+            throw new AssertionError(label+" is non-finite: "+value);
+        float lengthSquared=value.x()*value.x()+value.y()*value.y()+value.z()*value.z()+value.w()*value.w();
+        if(Math.abs(lengthSquared-1.0F)>1.0E-3F)throw new AssertionError(label+" is not normalized: length^2="+lengthSquared+" value="+value);
+    }
+
+    private static void assertBoundedBodyStep(Quaternionf before,Quaternionf after,String label){
+        assertFiniteNormalized(before,label+" before");
+        assertFiniteNormalized(after,label+" after");
+        Quaternionf a=new Quaternionf(before).normalize(),b=new Quaternionf(after).normalize();
+        double dot=Math.max(-1.0D,Math.min(1.0D,Math.abs(a.dot(b))));
+        double radians=2.0D*Math.acos(dot);
+        double max=GravityFallAerodynamics.MAX_STABILIZE_RADIANS_PER_TICK+GravityFallAerodynamics.MAX_FOLLOW_RADIANS_PER_TICK+BODY_STEP_EPS;
+        if(radians>max)throw new AssertionError(label+": rotated "+Math.toDegrees(radians)+" degrees in one tick; max="+Math.toDegrees(max));
     }
 
     private static boolean equivalent(Quaternionf a,Quaternionf b){
