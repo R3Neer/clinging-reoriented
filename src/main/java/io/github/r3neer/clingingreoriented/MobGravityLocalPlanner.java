@@ -5,6 +5,7 @@ import com.moigferdsrte.gravitychanger.entity.ai.DirectionalGroundPathNavigation
 import com.moigferdsrte.gravitychanger.entity.ai.DirectionalMobAiUtil;
 import com.moigferdsrte.gravitychanger.util.GravityDirectionUtil;
 import com.moigferdsrte.gravitychanger.util.RotationUtil;
+import java.util.ArrayList;
 import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -15,11 +16,13 @@ import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * Bounded online strategic planner: one tactical surface path, then at most five physical gravity forecasts.
+ * Bounded online strategic planner: one tactical surface path, then a tiny launch region near its frontier.
  * It never queries the mob's live navigation with createPath, because that method mutates navigation metadata.
  */
 public final class MobGravityLocalPlanner {
     private static final double WALK_COST_PER_BLOCK=1.0D;
+    /** Last few tactical nodes only. 4 * 5 alternative gravities = at most 20 physical forecasts. */
+    static final int MAX_LAUNCH_SAMPLES=4;
 
     public enum Kind { WALK, TRANSITION, NO_PLAN }
 
@@ -77,42 +80,59 @@ public final class MobGravityLocalPlanner {
         // Strategic planning needs the exact tactical frontier. A positive reachRange lets PathFinder
         // report success one or more Manhattan nodes early; gameplay tolerance belongs to Goal.satisfied().
         Path path=mirror.createPath(targetNode,0);
-        Vec3 frontier=currentPosition;
+        Vec3 terminalFrontier=currentPosition;
         if(path!=null&&path.getEndNode()!=null)
-            frontier=DirectionalGroundNodeEvaluator.entityPosition(path.getEndNode().asBlockPos(),current);
-        double walkingCost=pathCost(currentPosition,path,current)*WALK_COST_PER_BLOCK;
-        if(!Double.isFinite(walkingCost))return noPlan(mob,path,frontier,Double.POSITIVE_INFINITY,0);
+            terminalFrontier=DirectionalGroundNodeEvaluator.entityPosition(path.getEndNode().asBlockPos(),current);
+        double terminalWalkingCost=pathCostThrough(currentPosition,path,current,path==null?-1:path.getNodeCount()-1)*WALK_COST_PER_BLOCK;
+        if(!Double.isFinite(terminalWalkingCost))return noPlan(mob,path,terminalFrontier,Double.POSITIVE_INFINITY,0);
 
-        if(path!=null&&path.canReach()&&safeSatisfied(goal,frontier,current))
-            return new Plan(Kind.WALK,path,frontier,current,null,null,walkingCost,0.0D,walkingCost,0);
+        if(path!=null&&path.canReach()&&safeSatisfied(goal,terminalFrontier,current))
+            return new Plan(Kind.WALK,path,terminalFrontier,current,null,null,terminalWalkingCost,0.0D,terminalWalkingCost,0);
+
+        // No gravity capability means the expensive launch-region search cannot possibly succeed.
+        if(!ClingingReoriented.hasEffect(mob)||!MobGravity.supported(mob))
+            return noPlan(mob,path,terminalFrontier,terminalWalkingCost,0);
 
         MobGravityPlanner.Transition best=null;
         ManeuverKey bestKey=null;
         Direction bestGravity=current;
+        Vec3 bestFrontier=terminalFrontier;
+        Path bestApproach=path;
+        double bestWalking=terminalWalkingCost;
         double bestHeuristic=Double.POSITIVE_INFINITY;
         double bestTotal=Double.POSITIVE_INFINITY;
         int evaluations=0;
+
+        int lastIndex=path==null?-1:path.getNodeCount()-1;
+        int minIndex=lastIndex<0?-1:Math.max(0,lastIndex-(MAX_LAUNCH_SAMPLES-1));
         for(Direction candidate:Direction.values()){
             if(candidate==current)continue;
-            ManeuverKey key=maneuverKey(current,frontier,candidate);
-            if(key==null||excluded.contains(key))continue;
-            evaluations++;
-            var evaluation=MobGravityPlanner.evaluateGroundedLaunch(mob,frontier,candidate,transitionHorizonTicks);
-            if(!evaluation.accepted())continue;
-            var transition=evaluation.transition();
-            Vec3 landingPosition=RotationUtil.getCenterAlignedPosition(
-                transition.landingBody(),mob.getDimensions(mob.getPose()),candidate);
-            double heuristic=safeHeuristic(goal,landingPosition,candidate);
-            if(!Double.isFinite(heuristic))continue;
-            double total=walkingCost+transition.physicalCost()+heuristic;
-            if(!Double.isFinite(total))continue;
-            if(total<bestTotal){
-                best=transition;bestKey=key;bestGravity=candidate;bestHeuristic=heuristic;bestTotal=total;
+            for(int index=lastIndex;index>=minIndex;index--){
+                Vec3 launchFrontier=index<0?currentPosition:
+                    DirectionalGroundNodeEvaluator.entityPosition(path.getNodePos(index),current);
+                ManeuverKey key=maneuverKey(current,launchFrontier,candidate);
+                if(key==null||excluded.contains(key))continue;
+                evaluations++;
+                var evaluation=MobGravityPlanner.evaluateGroundedLaunch(mob,launchFrontier,candidate,transitionHorizonTicks);
+                if(!evaluation.accepted())continue;
+                var transition=evaluation.transition();
+                Vec3 landingPosition=RotationUtil.getCenterAlignedPosition(
+                    transition.landingBody(),mob.getDimensions(mob.getPose()),candidate);
+                double heuristic=safeHeuristic(goal,landingPosition,candidate);
+                if(!Double.isFinite(heuristic))continue;
+                double walking=pathCostThrough(currentPosition,path,current,index)*WALK_COST_PER_BLOCK;
+                if(!Double.isFinite(walking))continue;
+                double total=walking+transition.physicalCost()+heuristic;
+                if(!Double.isFinite(total))continue;
+                if(total<bestTotal){
+                    best=transition;bestKey=key;bestGravity=candidate;bestFrontier=launchFrontier;
+                    bestApproach=prefixPath(path,index);bestWalking=walking;bestHeuristic=heuristic;bestTotal=total;
+                }
             }
         }
 
-        if(best==null)return noPlan(mob,path,frontier,walkingCost,evaluations);
-        return new Plan(Kind.TRANSITION,path,frontier,bestGravity,best,bestKey,walkingCost,bestHeuristic,bestTotal,evaluations);
+        if(best==null)return noPlan(mob,path,terminalFrontier,terminalWalkingCost,evaluations);
+        return new Plan(Kind.TRANSITION,bestApproach,bestFrontier,bestGravity,best,bestKey,bestWalking,bestHeuristic,bestTotal,evaluations);
     }
 
     static ManeuverKey maneuverKey(Direction sourceGravity,Vec3 frontier,Direction targetGravity){
@@ -137,10 +157,21 @@ public final class MobGravityLocalPlanner {
         return mirror;
     }
 
-    private static double pathCost(Vec3 start,Path path,Direction gravity){
-        if(path==null||path.getNodeCount()==0)return 0.0D;
+    /** Path prefix ends at the chosen launch node, so the executor never walks past its own frontier. */
+    private static Path prefixPath(Path path,int endIndex){
+        if(path==null||endIndex<0)return null;
+        int end=Math.min(endIndex,path.getNodeCount()-1);
+        ArrayList<net.minecraft.world.level.pathfinder.Node> nodes=new ArrayList<>(end+1);
+        for(int i=0;i<=end;i++)nodes.add(path.getNode(i));
+        BlockPos target=path.getNodePos(end);
+        return new Path(nodes,target,true);
+    }
+
+    private static double pathCostThrough(Vec3 start,Path path,Direction gravity,int endIndex){
+        if(path==null||path.getNodeCount()==0||endIndex<0)return 0.0D;
         Vec3 previous=start;double result=0.0D;
-        for(int i=0;i<path.getNodeCount();i++){
+        int end=Math.min(endIndex,path.getNodeCount()-1);
+        for(int i=0;i<=end;i++){
             Vec3 next=DirectionalGroundNodeEvaluator.entityPosition(path.getNodePos(i),gravity);
             double segment=previous.distanceTo(next);
             if(!Double.isFinite(segment))return Double.POSITIVE_INFINITY;
