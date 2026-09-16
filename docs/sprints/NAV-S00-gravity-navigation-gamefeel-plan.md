@@ -1,72 +1,120 @@
 # NAV-S00 — campaña TM: física, landing, agua y navegación gravitatoria
 
-Estado: **ACTIVO**. Rama: `tm/gravity-navigation-gamefeel-beta4`.
+Estado: **CERRADO**. Rama: `tm/gravity-navigation-gamefeel-beta4`.
 
-Base: `main` tras el merge de compatibilidad Alchemical Leather. Esta campaña integra los diseños previos de `design/pet-follow-redesign` y los convierte en implementación incremental con gates verdes por sprint.
+Base: `main` tras el merge de compatibilidad Alchemical Leather. La campaña integró los diseños previos de `design/pet-follow-redesign` y los convirtió en implementación incremental con gates verdes por sprint.
 
-## Orden de implementación
-
-### NAV-S00 — baseline, contratos y diseño consolidado
-- Importar a la rama TM los documentos de aerodinámica, agua, landing y navegación gravitatoria.
-- Fijar invariantes funcionales y de rendimiento.
-- Confirmar baseline CI antes de cambios de producción.
+## Resultado de la campaña
 
 ### NAV-S01 — núcleo compartido de predicción física
-Objetivo: crear una base común para predecir trayectorias volumétricas bajo gravedad arbitraria sin todavía cambiar gameplay.
 
-Debe poder responder: evolución de velocidad/posición, primer contacto, soporte válido, ETA, daño estimado y estado terminal. Landing y navegación de mobs deberán consumir este mismo concepto para no mantener dos físicas incompatibles.
+`TrajectoryPrediction` + `AirMotion` + `LandingSurfaces` constituyen el seam común de predicción volumétrica. El predictor avanza AABB, velocidad y gravedad reales, conserva primer contacto/ETA/soporte y falla cerrado ante geometría desconocida.
+
+Landing y navegación gravitatoria de mobs consumen esta misma base. La aerodinámica corporal de Gravity Fall modifica la **velocidad real** antes de predicciones posteriores; el predictor se refresca desde ese estado medido cada tick y no intenta adivinar inputs futuros de mirada/postura.
 
 ### NAV-S02 — aerodinámica corporal de Gravity Fall
-Depende de S01 porque el predictor debe conocer la misma física que mueve realmente al jugador.
 
-Cambiar la causalidad a `mirada -> postura corporal -> aerodinámica -> trayectoria`. Eliminar el papel especial de W en la redirección. Aplicar resistencia anisótropa longitudinal/transversal sin crear energía y conservar estabilidad cabeza/pies.
+Cerrado con causalidad `mirada -> actitud corporal -> drag anisótropo -> trayectoria`:
+
+- actitud corporal persistente en world-space;
+- deadzone cervical de 35°;
+- seguimiento de mirada limitado a 7,5°/tick;
+- estabilización débil por velocidad de 1,25°/tick;
+- drag transversal adicional del 2,5%/tick;
+- sin steering especial por W, sin thrust y sin lift.
 
 ### NAV-S03 — free-fall -> landing anticipado
-Depende de S01+S02.
 
-Separar horizonte de adquisición de la ventana visual de 10 ticks. Mantener candidato con confianza/histéresis, usar el modelo físico compartido y lograr que la rotación termine en touchdown en vez de comenzar al impactar.
+Cerrado separando adquisición y presentación:
+
+- `ACQUISITION_TICKS = 40`;
+- presentación final <=10 ticks;
+- candidato persistente con identidad/histéresis;
+- primer contacto autoritativo;
+- invalidación continua sin snap;
+- touchdown real libera presentación residual.
 
 ### NAV-S04 — agua: controles y cámara
-Independiente del planner de mobs, pero se ejecuta aquí para cerrar el modelo de frames del jugador antes de reutilizar predictores/soportes en IA.
 
-WASD sigue cámara; Space/Shift siguen vertical mundial. Con soporte submarino la cámara adopta el suelo efectivo; en nado libre vuelve suavemente a world-up sin reescribir la gravedad lógica.
+Cerrado con:
+
+- WASD camera-relative, incluido pitch;
+- Space/Shift mundo +Y/-Y;
+- natación libre visualmente world-up;
+- soporte real sumergido visualmente support-up;
+- gravedad lógica separada del frame acuático;
+- fluidos como frontera genérica de soporte/landing/Gravity Fall.
 
 ### NAV-S05 — planner gravitatorio general de mobs
-Depende de S01 porque las aristas gravitatorias necesitan simulación segura/costada.
 
-El planner no conoce “mascotas”: recibe un objetivo de alto nivel y elige entre navegación normal y transiciones soporte->soporte. Daño es coste no lineal, imposibilidad geométrica es veto. Búsqueda local, perezosa y presupuestada.
+Cerrado con evaluación pura de maniobras soporte->soporte y planner local vanilla-first:
+
+- AABB real y primer contacto;
+- geometría imposible = veto;
+- daño/riesgo = coste fuerte no lineal;
+- una navegación espejo por plan;
+- hasta 4 nodos de lanzamiento × 5 gravedades alternativas = `<=20` forecasts físicos;
+- `ManeuverKey` por arista concreta y memoria acotada.
 
 ### NAV-S06 — integración de objetivos de IA
-- Follow owner para mascotas sin breadcrumbs.
-- Chase/attack para hostiles.
-- Flee para objetivos de huida, pudiendo elegir pared/techo si mejora la ventaja de escape.
-- Mantener goals vanilla como propietarios de la intención; el planner sólo amplía locomoción.
+
+Cerrado para mascotas y mobs generales:
+
+- pet follow history-free, sin breadcrumbs;
+- owner airborne sigue siendo objetivo mediante tracking filtrado/proyección tangencial, nunca una orden remota de giro;
+- `FollowOwnerGoal`, melee, flee/avoid y posiciones mantienen la intención vanilla;
+- wake adapters sólo exponen intents que vanilla abortaría antes de `moveTo`;
+- approach/revalidate/commit/landing/recovery mantienen ownership explícito;
+- teleport de mascota es fallback validado, no locomoción oculta.
 
 ### NAV-S07 — mundo dinámico, tracking móvil y reacción
-Depende del planner funcional.
 
-Target observado continuamente con filtrado e histéresis. Tiempo de reacción derivado de velocidad base de movimiento mediante curva suave, saturante y acotada. Obstáculos tardíos pueden causar impacto; cambios con margen permiten replan legal. Clinging/Reorientation nunca obtienen capacidades extra por reaccionar antes.
+Cerrado con observación continua pero acción retardada:
 
-### NAV-S08 — eficiencia, adversarial y retirada del legado
-- Presupuestos por tick y planificación distribuida.
-- Reutilización/invalidation local de conocimiento geométrico.
-- Casos adversariales de muchos mobs.
-- Eliminar breadcrumbs y contratos obsoletos sólo cuando el reemplazo general esté demostrado.
+- `MobFlightMonitor` sin pathfinding de superficie;
+- target/world changes materiales con histéresis;
+- `MobReactionTime` derivado de `MOVEMENT_SPEED` base, 2–10 ticks;
+- Reorientation puede corregir sólo tras delay y forecast legal;
+- Clinging gastado no obtiene un segundo giro;
+- amenaza desaparecida cancela la reacción pendiente;
+- obstáculo demasiado tardío produce impacto natural.
+
+### NAV-S08 — eficiencia, presupuestos y adversarial
+
+Cerrado con límites estructurales:
+
+- monitor aéreo `min(20, reactionTicks + 2)`;
+- landing comprometido revalidado aparte del horizonte corto;
+- máximo 32 nuevas planificaciones grounded por nivel/tick;
+- máximo 4 por región X/Z de 64×64/tick;
+- exceso de trabajo pasa a `WAITING_PLAN` preservando intent;
+- pet follow comparte el mismo presupuesto;
+- memoria de maniobras fallidas limitada a 8 entradas por executor.
 
 ### NAV-S09 — convergencia final
-- Matriz completa de JUnit/GameTests/client snapshots/compat.
-- Docs ARCHITECTURE/GUIDE/VALIDATION/CHANGELOG.
-- Revisión adversarial final y preparación de prerelease sólo después de que toda la campaña esté verde.
 
-## Gates TM
-Cada sprint debe: (1) declarar invariantes antes de tocar producción, (2) añadir/actualizar tests que fallen con el comportamiento viejo cuando corresponda, (3) implementar el mínimo cambio coherente, (4) ejecutar gates focalizados, (5) ejecutar matriz amplia antes de cerrar dependencias públicas, y (6) documentar cualquier intento rojo útil en vez de rebajar tests.
+Cerrado tras sincronizar código, tests y documentación pública:
 
-## Invariantes globales
+- README/GUIDE/ARCHITECTURE/CONFIGURATION/COMPATIBILITY actualizados al comportamiento beta.4 unreleased;
+- VALIDATION y CHANGELOG documentan gates, rojos útiles y límites reales;
+- diseños pre-implementación quedan marcados explícitamente como archivo histórico;
+- breadcrumbs eliminados del runtime;
+- estado servidor `gravityFallForwardIntent` eliminado; el campo homónimo permanece únicamente en el layout wire `gravity_fall_look_v1` por continuidad de protocolo y se ignora en beta.4.
+
+## Invariantes globales cerrados
+
 - No inventar capacidades gravitatorias: Clinging y Reorientation conservan exactamente sus reglas.
-- Ningún predictor puede atravesar geometría desconocida como si fuese aire.
+- Ningún predictor atraviesa geometría desconocida como si fuese aire.
 - El volumen corporal real manda, no raycasts puntuales.
-- El mismo modelo conceptual de movimiento debe alimentar física real, landing y simulación de transiciones.
+- Player landing y transiciones de mobs comparten el mismo seam `TrajectoryPrediction`/`AirMotion`/`LandingSurfaces`.
+- La aerodinámica de postura actúa sobre la velocidad real; las predicciones futuras parten de ese estado actualizado y no adivinan input futuro.
 - Daño/riesgo es coste fuerte; geometría físicamente inválida es veto.
 - El planner gravitatorio no sustituye pathfinding vanilla cuando éste ya resuelve el objetivo.
-- El trabajo por tick debe estar acotado; muchos mobs no pueden provocar búsquedas globales simultáneas.
-- Las transiciones visuales deben preservar continuidad de cámara/cuerpo y ownership.
+- El trabajo caro por tick está acotado local, regional y globalmente.
+- Las transiciones visuales preservan continuidad y ownership.
+
+## Evidencia final
+
+El HEAD funcional/documental previo al cierre `48311e9d994a0335c15242491328ac4fbfd82188` pasó **Build and test #1039 / run `35112406795`** completo: localización, build/JUnit, server GameTests, cliente base, First Person, Scale Brews server/client, Fresh Animations y validación de snapshots.
+
+El commit de cierre de S00/S09 sólo cambia estos documentos de estado. La campaña queda cerrada sin cambiar versión, tag, `main` ni publicar prerelease; `0.1.0-beta.3` sigue siendo la última versión publicada.
