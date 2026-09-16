@@ -120,19 +120,24 @@ public final class MobFlightMonitorGameTests {
 
     @GameTest(padding=64,maxTicks=100)
     public void disappearingFarCommittedLandingIsDetectedBeforeShortMonitorCouldRediscoverIt(GameTestHelper h){
-        clear(h);floor(h);
+        clear(h);
         Wolf wolf=h.spawn(EntityTypes.WOLF,new BlockPos(5,10,5));
-        wolf.setNoAi(true);wolf.setNoGravity(true);wolf.setOnGround(true);wolf.setDeltaMovement(Vec3.ZERO);
+        wolf.setNoAi(true);wolf.setNoGravity(true);wolf.setOnGround(false);wolf.setDeltaMovement(Vec3.ZERO);
         wolf.addEffect(new MobEffectInstance(Reorientation.EFFECT,800));
         AtomicBoolean eastValid=new AtomicBoolean(true);
         double farX=wolf.getX()+25.0D;
 
         var provider=new LandingSurfaceProvider(){
+            private LocalContact launch(){return new LocalContact("launch-down",1L,new Vec3(0,1,0));}
             private LocalContact east(){return new LocalContact("far-east",1L,new Vec3(-1,0,0));}
-            @Override public Optional<LocalContact> currentSupport(Query query){return Optional.empty();}
+            @Override public Optional<LocalContact> currentSupport(Query query){
+                return query.entity()==wolf&&query.gravity()==Direction.DOWN?Optional.of(launch()):Optional.empty();
+            }
             @Override public Optional<LocalSweep> sweep(Query query,AABB start,AABB end){
                 if(query.entity()!=wolf)return Optional.empty();
                 Vec3 a=start.getCenter(),b=end.getCenter();
+                if(query.gravity()==Direction.DOWN&&b.y<a.y-1.0E-8D)
+                    return Optional.of(new LocalSweep(launch(),0.0D,true));
                 if(query.gravity()==Direction.EAST&&b.x>a.x+1.0E-8D){
                     if(a.x>=farX-1.0E-7D)return Optional.of(new LocalSweep(east(),0.0D,true));
                     if(b.x>=farX){
@@ -146,6 +151,7 @@ public final class MobFlightMonitorGameTests {
             }
             @Override public boolean revalidate(Query query,LocalContact contact){
                 if(query.entity()!=wolf)return false;
+                if("launch-down".equals(contact.localId()))return query.gravity()==Direction.DOWN;
                 return !"far-east".equals(contact.localId())||eastValid.get();
             }
         };
