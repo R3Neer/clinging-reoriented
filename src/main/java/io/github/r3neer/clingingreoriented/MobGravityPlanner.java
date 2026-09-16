@@ -12,7 +12,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * S05 physical planner kernel. It evaluates one immediate gravity transition without mutating the mob.
+ * S05 physical planner kernel. It evaluates gravity transitions without mutating the mob.
  * Goal semantics and launch-point search live above this layer.
  */
 public final class MobGravityPlanner {
@@ -69,16 +69,46 @@ public final class MobGravityPlanner {
         Rejection preflight=preflight(mob,targetGravity,horizonTicks);
         if(preflight!=Rejection.NONE)return rejected(preflight);
 
-        Direction current=GravityDirectionUtil.getOwnGravityDirection(mob);
         var state=MobGravity.state(mob);
         boolean grounded=AirChanges.grounded(mob);
         if(!grounded&&state.airUsed&&!mob.hasEffect(Reorientation.EFFECT))return rejected(Rejection.CAPABILITY_SPENT);
 
-        Vec3 launch=launchPosition(mob,targetGravity);
+        Vec3 nominal=mob.position();
+        Vec3 launch=launchPosition(mob,mob.getBoundingBox(),nominal,targetGravity);
         if(launch==null)return rejected(Rejection.NO_SPACE);
+        return evaluatePrepared(mob,targetGravity,horizonTicks,nominal,launch,mob.getDeltaMovement());
+    }
+
+    /**
+     * Evaluates the maneuver expected after ordinary surface navigation reaches a future supported position.
+     * The mob is assumed stabilized there: current logical gravity is unchanged and launch velocity is zero.
+     * No entity or navigation state is modified.
+     */
+    public static Evaluation evaluateGroundedLaunch(LivingEntity mob,Vec3 supportPosition,Direction targetGravity){
+        return evaluateGroundedLaunch(mob,supportPosition,targetGravity,DEFAULT_TRANSITION_HORIZON_TICKS);
+    }
+
+    public static Evaluation evaluateGroundedLaunch(LivingEntity mob,Vec3 supportPosition,Direction targetGravity,int horizonTicks){
+        Rejection preflight=preflight(mob,targetGravity,horizonTicks);
+        if(preflight!=Rejection.NONE)return rejected(preflight);
+        if(!finite(supportPosition))return rejected(Rejection.INVALID_TRACE);
+
+        Direction current=GravityDirectionUtil.getOwnGravityDirection(mob);
+        var dimensions=mob.getDimensions(mob.getPose());
+        AABB supportBody=RotationUtil.makeBoxFromDimensions(dimensions,current,supportPosition).deflate(BODY_EPS);
+        if(!known(mob,supportBody))return rejected(Rejection.UNKNOWN_GEOMETRY);
+        if(!MobGravity.fits(mob,supportBody))return rejected(Rejection.NO_SPACE);
+        if(!hasSupport(mob,current,supportBody))return rejected(Rejection.STALE_CONTACT);
+
+        Vec3 launch=launchPosition(mob,supportBody,supportPosition,targetGravity);
+        if(launch==null)return rejected(Rejection.NO_SPACE);
+        return evaluatePrepared(mob,targetGravity,horizonTicks,supportPosition,launch,Vec3.ZERO);
+    }
+
+    private static Evaluation evaluatePrepared(LivingEntity mob,Direction targetGravity,int horizonTicks,Vec3 nominalPosition,
+                                               Vec3 launch,Vec3 startVelocity){
         AABB startBody=RotationUtil.makeBoxFromDimensions(mob.getDimensions(mob.getPose()),targetGravity,launch).deflate(BODY_EPS);
         if(!known(mob,startBody))return rejected(Rejection.UNKNOWN_GEOMETRY);
-        Vec3 startVelocity=mob.getDeltaMovement();
         if(!ImpactPhysics.finite(startVelocity))return rejected(Rejection.INVALID_TRACE);
 
         Rejection[] probeFailure={Rejection.NONE};
@@ -106,7 +136,7 @@ public final class MobGravityPlanner {
         double equivalent=hit.vanillaEquivalentFallDistance();
         double damage=predictedDamagePoints(equivalent);
         double risk=riskCost(equivalent,mob.getHealth());
-        double relocation=Math.sqrt(launch.distanceToSqr(mob.position()));
+        double relocation=Math.sqrt(launch.distanceToSqr(nominalPosition));
         double physical=hit.etaTicks()+TURN_BASE_COST+relocation*RELOCATION_COST_PER_BLOCK
             +(1.0D-robustness)*FRAGILITY_COST+risk;
         if(!Double.isFinite(physical))return rejected(Rejection.INVALID_TRACE);
@@ -166,13 +196,12 @@ public final class MobGravityPlanner {
         return Rejection.NONE;
     }
 
-    private static Vec3 launchPosition(LivingEntity mob,Direction targetGravity){
-        Vec3 current=mob.position();
+    private static Vec3 launchPosition(LivingEntity mob,AABB sourceBody,Vec3 nominalPosition,Direction targetGravity){
         var dimensions=mob.getDimensions(mob.getPose());
-        AABB direct=RotationUtil.makeBoxFromDimensions(dimensions,targetGravity,current);
-        if(MobGravity.fits(mob,direct))return current;
-        Vec3 centered=RotationUtil.getCenterAlignedPosition(mob.getBoundingBox(),dimensions,targetGravity);
-        if(centered.distanceToSqr(current)<=1.0E-12D)return null;
+        AABB direct=RotationUtil.makeBoxFromDimensions(dimensions,targetGravity,nominalPosition);
+        if(MobGravity.fits(mob,direct))return nominalPosition;
+        Vec3 centered=RotationUtil.getCenterAlignedPosition(sourceBody,dimensions,targetGravity);
+        if(centered.distanceToSqr(nominalPosition)<=1.0E-12D)return null;
         AABB centeredBody=RotationUtil.makeBoxFromDimensions(dimensions,targetGravity,centered);
         return MobGravity.fits(mob,centeredBody)?centered:null;
     }
@@ -188,6 +217,8 @@ public final class MobGravityPlanner {
             if(!level.hasChunkAt(new BlockPos(x<<4,y,z<<4)))return false;
         return true;
     }
+
+    private static boolean finite(Vec3 value){return value!=null&&Double.isFinite(value.x+value.y+value.z);}
 
     private static Evaluation rejected(Rejection rejection){return new Evaluation(null,rejection);}
 }
