@@ -17,8 +17,13 @@ public final class FluidContext {
     private FluidContext() {}
 
     public static boolean intersects(LivingEntity entity){
-        if(entity==null||entity.level()==null)return false;
-        AABB body=entity.getBoundingBox().deflate(EPS);
+        return entity!=null&&intersects(entity,entity.getBoundingBox());
+    }
+
+    /** Same fluid-volume test for a hypothetical body, used by pure planning and safe fallback queries. */
+    public static boolean intersects(LivingEntity entity,AABB candidateBody){
+        if(entity==null||entity.level()==null||candidateBody==null)return false;
+        AABB body=candidateBody.deflate(EPS);
         if(body.getXsize()<=0.0D||body.getYsize()<=0.0D||body.getZsize()<=0.0D)return false;
 
         int minX=(int)Math.floor(body.minX);
