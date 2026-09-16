@@ -14,6 +14,7 @@
       "io.github.r3neer.clingingreoriented.MobGravityOnlinePlannerGameTests",
       "io.github.r3neer.clingingreoriented.PetGravityCommitGameTests",
       "io.github.r3neer.clingingreoriented.PetGravityFollowGameTests",
+      "io.github.r3neer.clingingreoriented.PetGravityFollowGoalGameTests",
       "io.github.r3neer.clingingreoriented.HardeningAdversarialTests",
       "io.github.r3neer.clingingreoriented.WaterClingingGameTests",
       "io.github.r3neer.clingingreoriented.ClimbableGravityGameTests",
