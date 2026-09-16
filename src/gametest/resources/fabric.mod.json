@@ -9,6 +9,7 @@
       "io.github.r3neer.clingingreoriented.ClingingGameTests",
       "io.github.r3neer.clingingreoriented.ReorientationTests",
       "io.github.r3neer.clingingreoriented.AnimalGravityTests",
+      "io.github.r3neer.clingingreoriented.MobGravityPlannerGameTests",
       "io.github.r3neer.clingingreoriented.HardeningAdversarialTests",
       "io.github.r3neer.clingingreoriented.WaterClingingGameTests",
       "io.github.r3neer.clingingreoriented.ClimbableGravityGameTests",
