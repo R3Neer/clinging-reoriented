@@ -77,24 +77,46 @@ public final class MobGravityLocalPlannerGameTests {
     }
 
     @GameTest(padding=64)
-    public void blockedWallCanBackOffFromUnsafeLastNodeAndChooseEarlierLaunch(GameTestHelper h){
+    public void launchRegionCanChooseEarlierNodeWhenPreferredTransitionRejectsTerminalFrontier(GameTestHelper h){
         Wolf wolf=walkingWolf(h,true,1,22);
         for(int y=9;y<=16;y++)for(int z=0;z<=10;z++)h.setBlock(new BlockPos(9,y,z),Blocks.STONE);
         Vec3 focus=h.absoluteVec(new Vec3(14,10,5));
-
-        var plan=MobGravityLocalPlanner.plan(wolf,distanceGoal(focus,1.5D,null),80);
-        h.assertTrue(plan.kind()==MobGravityLocalPlanner.Kind.TRANSITION,
-            "bounded launch region failed to recover a wall transition: kind="+plan.kind()+", evals="+plan.transitionEvaluations());
-        h.assertTrue(plan.terminalGravity()==Direction.EAST,"wall backoff fixture expected EAST, got "+plan.terminalGravity());
-        h.assertTrue(plan.walkPath()!=null,"wall transition lost its approach path");
         double wallX=h.absolutePos(new BlockPos(9,10,5)).getX();
-        h.assertTrue(wallX-plan.frontier().x>1.25D,
-            "planner still chose a wall-adjacent launch instead of backing off: frontier="+plan.frontier()+", wallX="+wallX);
-        h.assertTrue(plan.transitionEvaluations()>0&&plan.transitionEvaluations()<=MobGravityLocalPlanner.MAX_LAUNCH_SAMPLES*5,
-            "launch-region search escaped its bounded forecast budget: "+plan.transitionEvaluations());
-        h.assertTrue(plan.walkPath().getEndNode()!=null&&
-            plan.frontier().distanceTo(DirectionalGroundNodeEvaluator.entityPosition(plan.walkPath().getEndNode().asBlockPos(),Direction.DOWN))<1.0E-9D,
-            "approach path was not truncated to the chosen launch frontier");
+        double preferredCutoff=wallX-1.25D;
+
+        var provider=new LandingSurfaceProvider(){
+            private LocalContact contact(){return new LocalContact("backoff-up",1L,new Vec3(0,-1,0));}
+            @Override public Optional<LocalContact> currentSupport(Query query){return Optional.empty();}
+            @Override public Optional<LocalSweep> sweep(Query query,AABB start,AABB end){
+                if(!query.entity().getUUID().equals(wolf.getUUID())||query.gravity()!=Direction.UP)return Optional.empty();
+                if(start.getCenter().x>preferredCutoff)return Optional.empty();
+                return Optional.of(new LocalSweep(contact(),.5D,true));
+            }
+            @Override public boolean revalidate(Query query,LocalContact contact){
+                return query.entity().getUUID().equals(wolf.getUUID())&&query.gravity()==Direction.UP;
+            }
+        };
+        var registration=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","launch_backoff"),provider);
+        try{
+            var goal=new MobGravityLocalPlanner.Goal(){
+                @Override public Vec3 focus(){return focus;}
+                @Override public boolean satisfied(Vec3 position,Direction gravity){return false;}
+                @Override public double heuristic(Vec3 position,Direction gravity){
+                    return gravity==Direction.UP?position.distanceTo(focus):1000.0D+position.distanceTo(focus);
+                }
+            };
+            var plan=MobGravityLocalPlanner.plan(wolf,goal,80);
+            h.assertTrue(plan.kind()==MobGravityLocalPlanner.Kind.TRANSITION,
+                "bounded launch region failed to recover a preferred transition: kind="+plan.kind()+", evals="+plan.transitionEvaluations());
+            h.assertTrue(plan.terminalGravity()==Direction.UP,"backoff fixture expected preferred UP transition, got "+plan.terminalGravity());
+            h.assertTrue(plan.frontier().x<=preferredCutoff+1.0E-9D,
+                "preferred transition was forecast from a frontier that provider deliberately rejects: "+plan.frontier());
+            h.assertTrue(plan.walkPath()!=null&&plan.walkPath().getEndNode()!=null,"backoff transition lost its approach path");
+            h.assertTrue(plan.transitionEvaluations()>0&&plan.transitionEvaluations()<=MobGravityLocalPlanner.MAX_LAUNCH_SAMPLES*5,
+                "launch-region search escaped its bounded forecast budget: "+plan.transitionEvaluations());
+            h.assertTrue(plan.frontier().distanceTo(DirectionalGroundNodeEvaluator.entityPosition(plan.walkPath().getEndNode().asBlockPos(),Direction.DOWN))<1.0E-9D,
+                "approach path was not truncated to the chosen launch frontier");
+        }finally{registration.close();}
         h.succeed();
     }
 
