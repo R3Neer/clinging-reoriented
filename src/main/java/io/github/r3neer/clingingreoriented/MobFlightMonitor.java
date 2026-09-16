@@ -17,6 +17,7 @@ public final class MobFlightMonitor {
 
     public enum Status {
         CLEAR,
+        SAFE_SUPPORT,
         EXPECTED_SUPPORT,
         SAFE_CHANGED_SUPPORT,
         BLOCKING_CONTACT,
@@ -38,19 +39,14 @@ public final class MobFlightMonitor {
 
     private MobFlightMonitor() {}
 
-    public static Observation observe(LivingEntity mob,MobGravityPlanner.Transition committed){
-        return observe(mob,committed,DEFAULT_HORIZON_TICKS);
-    }
+    /** Basal forecast for a flight that did not hand S07 its original committed transition. */
+    public static Observation forecast(LivingEntity mob){return forecast(mob,DEFAULT_HORIZON_TICKS);}
 
-    public static Observation observe(LivingEntity mob,MobGravityPlanner.Transition committed,int horizonTicks){
-        if(mob==null||committed==null||!mob.isAlive()||horizonTicks<1||horizonTicks>TrajectoryPrediction.MAX_TICKS)
+    public static Observation forecast(LivingEntity mob,int horizonTicks){
+        if(mob==null||!mob.isAlive()||horizonTicks<1||horizonTicks>TrajectoryPrediction.MAX_TICKS)
             return new Observation(Status.INVALID_TRACE,null);
         if(FluidContext.intersects(mob))return new Observation(Status.FLUID,null);
-
         Direction gravity=GravityDirectionUtil.getOwnGravityDirection(mob);
-        if(gravity!=committed.targetGravity())return new Observation(Status.INVALID_TRACE,null);
-        if(!LandingSurfaces.revalidate(mob,gravity,committed.landingContact()))
-            return new Observation(Status.EXPECTED_STALE,null);
 
         boolean[] unknown={false};
         var trace=TrajectoryPrediction.simulate(mob.getBoundingBox(),mob.getDeltaMovement(),horizonTicks,
@@ -69,10 +65,31 @@ public final class MobFlightMonitor {
             return new Observation(Status.EXPECTED_STALE,hit);
         if(!MobGravity.fits(mob,hit.impactBody())||MobGravityPlanner.egressDirections(mob,gravity,hit.impactBody())==0)
             return new Observation(Status.TRAPPED_CONTACT,hit);
+        return new Observation(Status.SAFE_SUPPORT,hit);
+    }
 
-        var expected=committed.landingContact().key();
-        var actual=hit.surface().contact().key();
-        return new Observation(expected.equals(actual)?Status.EXPECTED_SUPPORT:Status.SAFE_CHANGED_SUPPORT,hit);
+    public static Observation observe(LivingEntity mob,MobGravityPlanner.Transition committed){
+        return observe(mob,committed,DEFAULT_HORIZON_TICKS);
+    }
+
+    public static Observation observe(LivingEntity mob,MobGravityPlanner.Transition committed,int horizonTicks){
+        if(mob==null||committed==null||!mob.isAlive()||horizonTicks<1||horizonTicks>TrajectoryPrediction.MAX_TICKS)
+            return new Observation(Status.INVALID_TRACE,null);
+        Direction gravity=GravityDirectionUtil.getOwnGravityDirection(mob);
+        if(gravity!=committed.targetGravity())return new Observation(Status.INVALID_TRACE,null);
+        return observe(mob,committed.landingContact(),horizonTicks);
+    }
+
+    public static Observation observe(LivingEntity mob,LandingSurfaces.Contact expected,int horizonTicks){
+        if(mob==null||expected==null||!mob.isAlive()||horizonTicks<1||horizonTicks>TrajectoryPrediction.MAX_TICKS)
+            return new Observation(Status.INVALID_TRACE,null);
+        Direction gravity=GravityDirectionUtil.getOwnGravityDirection(mob);
+        if(expected.gravity()!=gravity)return new Observation(Status.INVALID_TRACE,null);
+        if(!LandingSurfaces.revalidate(mob,gravity,expected))return new Observation(Status.EXPECTED_STALE,null);
+        var current=forecast(mob,horizonTicks);
+        if(current.status()!=Status.SAFE_SUPPORT)return current;
+        var actual=current.hit().surface().contact().key();
+        return new Observation(expected.key().equals(actual)?Status.EXPECTED_SUPPORT:Status.SAFE_CHANGED_SUPPORT,current.hit());
     }
 
     private static boolean known(LivingEntity mob,AABB box){
