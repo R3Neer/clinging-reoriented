@@ -145,10 +145,12 @@ public final class MobFlightMonitorGameTests {
         };
         var registration=LandingSurfaces.register(
             Identifier.fromNamespaceAndPath("clinging_reoriented_test","s07_far_committed"),provider);
+        var evaluation=MobGravityPlanner.evaluateGroundedLaunch(wolf,wolf.position(),Direction.EAST,80);
+        h.assertTrue(evaluation.accepted(),"far EAST fixture rejected before commit: "+evaluation.rejection());
+        h.assertTrue(evaluation.transition().etaTicks()>MobFlightMonitor.DEFAULT_HORIZON_TICKS,
+            "fixture landing is not actually beyond short monitor horizon: eta="+evaluation.transition().etaTicks());
         var committed=MobGravity.executePlannedTransition(wolf,Direction.EAST,80);
-        h.assertTrue(committed!=null,"fixture failed to commit far EAST landing");
-        h.assertTrue(committed.etaTicks()>MobFlightMonitor.DEFAULT_HORIZON_TICKS,
-            "fixture landing is not actually beyond short monitor horizon: eta="+committed.etaTicks());
+        h.assertTrue(committed!=null,"far EAST evaluation passed but commit seam rejected the same fixture");
         eastValid.set(false);
 
         h.runAfterDelay(20,()->{
