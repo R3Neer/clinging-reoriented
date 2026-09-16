@@ -42,6 +42,47 @@ public final class PetGravityFollowGoalGameTests {
         h.succeed();
     }
 
+    @GameTest(padding=64)
+    public void sittingPetReleasesApproachAndCanReplanWhenStanding(GameTestHelper h) throws Exception {
+        var owner=owner(h,new Vec3(14,10,5));Wolf wolf=wolf(h,owner,true);wall(h,9);
+        var goal=new FollowOwnerGoal(wolf,1.0D,10.0F,2.0F);
+        h.assertTrue(goal.canUse(),"standing powered pet did not acquire special follow");
+        goal.start();goal.tick();
+        h.assertTrue(state(goal).phase()==PetGravityFollow.Phase.APPROACH,"fixture never entered APPROACH");
+        h.assertTrue(wolf.getNavigation().getPath()!=null&&!wolf.getNavigation().isDone(),"fixture never acquired an approach path");
+
+        wolf.setOrderedToSit(true);
+        h.assertFalse(goal.canContinueToUse(),"sitting pet kept special FollowOwnerGoal alive");
+        goal.stop();
+        h.assertTrue(wolf.getNavigation().isDone(),"stopping a sitting pet did not release the planner-authored path");
+        h.assertTrue(state(goal).phase()==PetGravityFollow.Phase.IDLE,"sitting stop left stale special follow state");
+        h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(wolf)==Direction.DOWN,"sitting remotely committed a gravity turn");
+
+        wolf.setOrderedToSit(false);
+        h.assertTrue(goal.canUse(),"standing again could not replan the safe gravity transition");
+        h.assertTrue(state(goal).phase()==PetGravityFollow.Phase.APPROACH,"resumed goal did not rebuild APPROACH state");
+        goal.stop();h.succeed();
+    }
+
+    @GameTest(padding=64,maxTicks=180)
+    public void realWolfAiExecutesAtLeastOneSafeGravityTransitionWithoutBreadcrumbs(GameTestHelper h){
+        var owner=owner(h,new Vec3(14,10,5));clear(h);floor(h);
+        Wolf wolf=h.spawn(EntityTypes.WOLF,new BlockPos(5,10,5));wolf.tame(owner);wolf.setOrderedToSit(false);
+        wolf.addEffect(new MobEffectInstance(Reorientation.EFFECT,1200));wolf.setOnGround(true);wolf.setDeltaMovement(Vec3.ZERO);
+        wall(h,9);
+        h.assertTrue(wolf.distanceToSqr(owner)<100.0D,"fixture must force the mixin wake path inside vanilla dead zone");
+        h.runAfterDelay(120,()->{
+            var state=MobGravity.state(wolf);
+            h.assertTrue(wolf.isAlive(),"real wolf AI died while executing gravity follow");
+            h.assertTrue(state.visualSequence>0L,"real wolf AI never committed any owned gravity transition; pos="+wolf.position()
+                +", gravity="+GravityDirectionUtil.getOwnGravityDirection(wolf)+", navDone="+wolf.getNavigation().isDone());
+            h.assertTrue(state.ownership==MobGravity.Ownership.OWNED_EFFECT,"real wolf transition did not retain effect ownership");
+            h.assertTrue(h.getLevel().noCollision(wolf,wolf.getBoundingBox().deflate(1.0E-5D)),
+                "real wolf AI ended intersecting solid geometry after planned transition: "+wolf.getBoundingBox());
+            h.succeed();
+        });
+    }
+
     @GameTest(padding=48)
     public void reachableOwnerInsideVanillaDeadZoneDoesNotWakeSpecialFollow(GameTestHelper h) throws Exception {
         var owner=owner(h,new Vec3(9,10,5));Wolf wolf=wolf(h,owner,true);
