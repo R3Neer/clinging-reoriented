@@ -17,36 +17,42 @@ import net.minecraft.world.phys.Vec3;
 /** S06-E gates for vanilla goal adapters. Goals own intent; generic gravity navigation owns locomotion. */
 public final class MobGravityGoalAdapterGameTests {
     @GameTest(padding=64)
-    public void meleeAttackGoalCanWakeThroughSafeGravityTransition(GameTestHelper h){
+    public void meleeAttackGoalHandsBlockedPartialPathToGravityNavigation(GameTestHelper h) throws Exception {
         Zombie zombie=zombie(h,true);var target=player(h,new Vec3(14,10,5));wall(h,9);zombie.setTarget(target);
-        var goal=new MeleeAttackGoal(zombie,1.0D,false);
+        var goal=new MeleeAttackGoal(zombie,1.0D,true);
+        bypassCanUseCooldown(goal,zombie);
 
-        h.assertTrue(goal.canUse(),"powered melee goal with a safe gravity route did not wake");
-        h.assertTrue(MobGravityNavigation.active(zombie),"melee wake did not activate generic gravity locomotion");
-        h.assertTrue(MobGravityNavigation.state(zombie).plan()!=null,"melee wake produced no gravity plan");
-        goal.start();
-        h.assertTrue(goal.canContinueToUse(),"gravity-owned melee goal died immediately after wake");
+        // Vanilla accepts a non-null partial Path here. The gravity layer must not pretend canUse failed;
+        // it takes over when the running goal emits its live entity intent through moveTo(target,...).
+        h.assertTrue(goal.canUse(),"blocked melee fixture never reached vanilla path logic after cooldown");
+        h.assertFalse(MobGravityNavigation.active(zombie),"partial-path canUse prematurely stole locomotion before the goal emitted intent");
+        goal.start();goal.tick();
+        h.assertTrue(MobGravityNavigation.active(zombie),"running melee goal did not hand its blocked entity intent to gravity navigation");
+        h.assertTrue(MobGravityNavigation.state(zombie).plan()!=null,"melee handoff produced no gravity plan");
+        h.assertTrue(goal.canContinueToUse(),"gravity-owned melee goal died immediately after handoff");
         goal.stop();
         h.assertFalse(MobGravityNavigation.active(zombie),"stopping pre-commit melee goal left stale gravity navigation");
         h.succeed();
     }
 
     @GameTest(padding=64)
-    public void effectFreeMeleeGoalCannotWakeAcrossBlockedGeometry(GameTestHelper h){
+    public void effectFreeBlockedMeleeGoalRemainsVanillaEvenWhenPartialPathExists(GameTestHelper h) throws Exception {
         Zombie zombie=zombie(h,false);var target=player(h,new Vec3(14,10,5));wall(h,9);zombie.setTarget(target);
-        var goal=new MeleeAttackGoal(zombie,1.0D,false);
-        h.assertFalse(goal.canUse(),"effect-free melee goal gained a gravity-only route");
-        h.assertFalse(MobGravityNavigation.active(zombie),"effect-free melee query activated gravity locomotion");
-        h.succeed();
+        var goal=new MeleeAttackGoal(zombie,1.0D,true);bypassCanUseCooldown(goal,zombie);
+        h.assertTrue(goal.canUse(),"fixture expected vanilla to accept its non-null partial path");
+        goal.start();goal.tick();
+        h.assertFalse(MobGravityNavigation.active(zombie),"effect-free melee goal gained gravity locomotion from a partial path");
+        goal.stop();h.succeed();
     }
 
     @GameTest(padding=64)
-    public void reachableMeleeGoalStaysVanilla(GameTestHelper h){
+    public void reachableMeleeGoalStaysVanilla(GameTestHelper h) throws Exception {
         Zombie zombie=zombie(h,true);var target=player(h,new Vec3(10,10,5));zombie.setTarget(target);
-        var goal=new MeleeAttackGoal(zombie,1.0D,false);
-        h.assertTrue(goal.canUse(),"reachable vanilla melee goal unexpectedly failed");
+        var goal=new MeleeAttackGoal(zombie,1.0D,true);bypassCanUseCooldown(goal,zombie);
+        h.assertTrue(goal.canUse(),"reachable vanilla melee goal unexpectedly failed after cooldown");
+        goal.start();goal.tick();
         h.assertFalse(MobGravityNavigation.active(zombie),"reachable melee path was stolen by gravity locomotion");
-        h.succeed();
+        goal.stop();h.succeed();
     }
 
     @GameTest(padding=64)
@@ -71,6 +77,11 @@ public final class MobGravityGoalAdapterGameTests {
         h.assertTrue(state.plan()==planned,"avoid start discarded the active gravity plan");
         h.assertTrue(zombie.getNavigation().getPath()==ownedPath,"avoid start overwrote planner-owned approach path");
         goal.stop();h.succeed();
+    }
+
+    private static void bypassCanUseCooldown(MeleeAttackGoal goal,Zombie zombie) throws Exception {
+        Field field=MeleeAttackGoal.class.getDeclaredField("lastCanUseCheck");field.setAccessible(true);
+        field.setLong(goal,zombie.level().getGameTime()-100L);
     }
 
     private static void set(Object target,String name,Object value) throws Exception {
