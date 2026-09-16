@@ -87,10 +87,9 @@ public final class MobGravityLocalPlannerGameTests {
             "bounded launch region failed to recover a wall transition: kind="+plan.kind()+", evals="+plan.transitionEvaluations());
         h.assertTrue(plan.terminalGravity()==Direction.EAST,"wall backoff fixture expected EAST, got "+plan.terminalGravity());
         h.assertTrue(plan.walkPath()!=null,"wall transition lost its approach path");
-        Vec3 tacticalEnd=DirectionalGroundNodeEvaluator.entityPosition(
-            new net.minecraft.world.level.pathfinder.Node(8,10,5).asBlockPos(),Direction.DOWN);
-        h.assertTrue(plan.frontier().x<tacticalEnd.x-1.0E-6D,
-            "planner still chose the wall-adjacent endpoint instead of backing off: "+plan.frontier());
+        double wallX=h.absolutePos(new BlockPos(9,10,5)).getX();
+        h.assertTrue(wallX-plan.frontier().x>1.25D,
+            "planner still chose a wall-adjacent launch instead of backing off: frontier="+plan.frontier()+", wallX="+wallX);
         h.assertTrue(plan.transitionEvaluations()>0&&plan.transitionEvaluations()<=MobGravityLocalPlanner.MAX_LAUNCH_SAMPLES*5,
             "launch-region search escaped its bounded forecast budget: "+plan.transitionEvaluations());
         h.assertTrue(plan.walkPath().getEndNode()!=null&&
