@@ -1,6 +1,6 @@
 # NAV-S07 — target tracking, mundo dinámico y tiempo de reacción
 
-Estado: **EN PROGRESO**. Rama: `tm/gravity-navigation-gamefeel-beta4`.
+Estado: **CERRADO**. Rama: `tm/gravity-navigation-gamefeel-beta4`.
 
 ## Objetivo
 
@@ -111,12 +111,7 @@ Mantener la física real. Impactar no es un bug cuando la amenaza apareció dema
 
 El flight monitor sólo existe mientras hay una transición especial comprometida. No corre para todos los mobs del mundo.
 
-Primera versión:
-
-- una simulación corta por tick y por mob `COMMITTED`;
-- sin pathfinding durante vuelo;
-- acciones/replans sólo tras cambios materiales y latencia;
-- S08 medirá estrés y podrá escalonar probes si muchos mobs vuelan a la vez.
+La primera implementación de S07 usa una simulación corta por tick y mob `COMMITTED`, sin pathfinding de superficie. S08 reduce ese horizonte en función del tiempo de reacción manteniendo intacta la identidad/revalidación del landing comprometido.
 
 ## Gates S07
 
@@ -130,4 +125,11 @@ Primera versión:
 - Reorientation puede corregir sólo si la nueva maniobra es legal;
 - Clinging gastado nunca recibe un segundo giro;
 - el monitor no ejecuta pathfinding de superficie durante `COMMITTED`;
-- desaparecido el peligro antes de vencer la latencia, no se ejecuta una maniobra fantasma.
+- desaparecido el peligro antes de vencer la latencia, no se ejecuta una maniobra fantasma;
+- la identidad del landing comprometido se conserva aunque quede fuera del horizonte corto del monitor.
+
+## Evidencia de cierre
+
+- **Commit de cierre funcional:** `370c2f4c8a40f87b9d89e1895cf0df4df8ba68bd`.
+- **CI #1007 / run `35103896552`:** build/JUnit, 168 server GameTests, cliente base, First Person, Scale Brews server/client, Fresh Animations y validación de snapshots, todo verde.
+- El único rojo inmediatamente anterior era una fixture adversarial que dejaba accidentalmente un soporte DOWN alternativo mientras afirmaba que NORTH era la única maniobra de rescate. Se corrigió la fixture; no se relajó el reactor ni la política de seguridad.
