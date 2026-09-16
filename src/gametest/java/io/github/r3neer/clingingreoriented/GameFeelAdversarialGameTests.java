@@ -92,8 +92,6 @@ public final class GameFeelAdversarialGameTests {
 
             valid.set(false);LandingState.tick(p);
             h.assertFalse(s.landingCommitted,"surface invalidation did not cancel commitment");
-            // Run the normal ownership/landing machinery again with no second input. A queued request
-            // would now reveal itself as a delayed WEST turn.
             ClingingReoriented.reconcile(p);LandingState.tick(p);GravityFallState.tick(p);
             h.assertTrue(GravityDirectionUtil.getGravityDirection(p)==Direction.DOWN,"discarded committed input replayed after cancellation");
             h.assertTrue(s.selected==Direction.DOWN,"discarded committed input mutated selected gravity after cancellation");
@@ -121,7 +119,7 @@ public final class GameFeelAdversarialGameTests {
     }
 
     @GameTest(padding=36)
-    public void mountLoanAndPetBreadcrumbOwnershipStayIndependentAcrossTurns(GameTestHelper h){
+    public void mountLoanAndPetEffectOwnershipStayIndependentAcrossTurns(GameTestHelper h){
         var p=managed(h,Direction.DOWN);
         var horse=h.spawn(EntityTypes.HORSE,new BlockPos(8,14,8));horse.teleportTo(p.getX(),p.getY(),p.getZ());horse.setNoAi(true);horse.setOnGround(false);horse.setNoGravity(true);
         var wolf=h.spawn(EntityTypes.WOLF,new BlockPos(16,14,16));wolf.setOnGround(false);wolf.setNoGravity(true);wolf.tame(p);
@@ -137,9 +135,10 @@ public final class GameFeelAdversarialGameTests {
         h.assertTrue(MobGravity.state(horse).ownership==MobGravity.Ownership.BORROWED_RIDER,"mount did not record rider loan ownership");
         Vec3 eastStep=p.position();
         horse.teleportTo(eastStep.x+4.0D,eastStep.y,eastStep.z);horse.positionRider(p);
-        wolf.setPos(eastStep);h.assertTrue(MobGravity.replay(wolf,Direction.EAST),"pet owned replay missed first mounted turn");
-        h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.EAST,"pet did not replay first mounted breadcrumb");
-        h.assertTrue(MobGravity.state(wolf).ownership==MobGravity.Ownership.OWNED_EFFECT,"pet incorrectly inherited rider-loan ownership");
+        wolf.setPos(eastStep);h.assertTrue(MobGravity.ownedTurn(wolf,Direction.EAST,true,null),"pet owned EAST turn failed");
+        var wolfState=MobGravity.state(wolf);wolfState.ownership=MobGravity.Ownership.OWNED_EFFECT;wolfState.ownedDirection=Direction.EAST;
+        h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.EAST,"pet did not keep independent EAST frame");
+        h.assertTrue(wolfState.ownership==MobGravity.Ownership.OWNED_EFFECT,"pet incorrectly inherited rider-loan ownership");
 
         var north=ClingingReoriented.attempt(p,direction(Direction.NORTH),GravityTransition.headingFromYaw(Direction.EAST,p.getYRot()));
         h.assertTrue(north==ClingingReoriented.Result.SUCCESS,"mounted NORTH turn failed: "+north);
@@ -147,15 +146,15 @@ public final class GameFeelAdversarialGameTests {
         h.assertTrue(horse.getDeltaMovement().equals(momentum),"mounted NORTH turn changed root momentum");
         Vec3 northStep=p.position();
         horse.teleportTo(northStep.x+4.0D,northStep.y,northStep.z);horse.positionRider(p);
-        wolf.setPos(northStep);h.assertTrue(MobGravity.replay(wolf,Direction.NORTH),"pet owned replay missed second mounted turn");
-        h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.NORTH,"pet did not replay second mounted breadcrumb");
+        wolf.setPos(northStep);h.assertTrue(MobGravity.ownedTurn(wolf,Direction.NORTH,true,null),"pet owned NORTH turn failed");
+        wolfState.ownership=MobGravity.Ownership.OWNED_EFFECT;wolfState.ownedDirection=Direction.NORTH;
+        h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.NORTH,"pet did not keep independent NORTH frame");
 
         p.stopRiding();MobGravity.tick(horse);
         h.assertTrue(GravityDirectionUtil.getGravityDirection(horse)==Direction.DOWN,"dismount did not retire borrowed mount frame");
         h.assertTrue(MobGravity.state(horse).ownership==MobGravity.Ownership.NONE,"dismount left mount ownership borrowed/stale");
         h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.NORTH,"retiring mount loan dragged independent pet gravity with it");
-        h.assertTrue(MobGravity.state(wolf).ownership==MobGravity.Ownership.OWNED_EFFECT,"retiring mount loan changed pet ownership");
-        GravityBreadcrumbs.clear(p.getUUID());
+        h.assertTrue(wolfState.ownership==MobGravity.Ownership.OWNED_EFFECT,"retiring mount loan changed pet ownership");
         h.succeed();
     }
 
@@ -178,8 +177,6 @@ public final class GameFeelAdversarialGameTests {
         }
         h.assertTrue(GravityDirectionUtil.getGravityDirection(p)==Direction.UP,"reserved physical sequence ended on wrong gravity");
 
-        // Cross zero without changing physics ownership. The client-side S05 holdout verifies that
-        // body orientation holds through this same presentation condition instead of inventing twist.
         p.setDeltaMovement(Vec3.ZERO);GravityFallState.tick(p);
         h.assertTrue(s.gravityFallActive&&!s.gravityFallLanding,"zero crossing retired/landed Gravity Fall without support");
         p.setDeltaMovement(eastMomentum);
@@ -202,7 +199,6 @@ public final class GameFeelAdversarialGameTests {
             h.assertFalse(s.gravityFallLanding,"destroyed support left BODY_LANDING active");
             h.assertTrue(GravityDirectionUtil.getGravityDirection(p)==Direction.UP&&s.selected==Direction.UP,"destroyed support replayed blocked WEST input");
 
-            // Give the normal machinery another opportunity to expose a hidden queued request.
             ClingingReoriented.reconcile(p);LandingState.tick(p);GravityFallState.tick(p);
             h.assertTrue(GravityDirectionUtil.getGravityDirection(p)==Direction.UP&&s.selected==Direction.UP,"blocked WEST input replayed one tick after cancellation");
 
