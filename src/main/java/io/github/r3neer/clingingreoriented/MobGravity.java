@@ -22,6 +22,7 @@ public final class MobGravity {
         public boolean airUsed;
         public long retryAt;
         public long visualSequence;
+        public final MobGravityNavigation.State navigation=new MobGravityNavigation.State();
         public void clearBorrow(){borrowedPreviousOwnership=Ownership.NONE;borrowedPreviousDirection=Direction.DOWN;}
     }
     public interface Holder { State clinging$mobGravity(); }
