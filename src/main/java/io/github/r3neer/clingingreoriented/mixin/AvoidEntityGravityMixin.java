@@ -40,6 +40,9 @@ public abstract class AvoidEntityGravityMixin {
 
     @Inject(method="start",at=@At("HEAD"),cancellable=true)
     private void clinging$gravityStart(CallbackInfo ci){
+        // canUse may already have activated the generic controller. Do not let vanilla replace
+        // the planner-owned approach with its null/partial escape path.
+        if(MobGravityNavigation.active(mob)){ci.cancel();return;}
         if(path==null||path.canReach())return;
         Vec3 focus=clinging$escapeFocus();
         if(focus!=null&&MobGravityNavigation.requestPositionAfterVanilla(mob,focus,walkSpeedModifier,false))ci.cancel();
