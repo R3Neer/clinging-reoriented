@@ -19,7 +19,7 @@ import net.minecraft.world.phys.Vec3;
  * only owns a bounded gravity-specific movement segment when ordinary navigation cannot satisfy it.
  */
 public final class MobGravityNavigation {
-    public enum Phase { IDLE, APPROACH, REVALIDATE, COMMITTED, LANDING_CONFIRM, RECOVERY }
+    public enum Phase { IDLE, WAITING_PLAN, APPROACH, REVALIDATE, COMMITTED, LANDING_CONFIRM, RECOVERY }
 
     private static final int TRANSITION_HORIZON_TICKS=80;
     private static final int LANDING_CONFIRM_TICKS=2;
@@ -123,7 +123,7 @@ public final class MobGravityNavigation {
         return true;
     }
 
-    /** Called after vanilla attempted a route. Returns true only when a gravity segment took ownership. */
+    /** Called after vanilla attempted a route. Returns true when gravity locomotion owns or defers the intent. */
     public static boolean requestEntityAfterVanilla(Mob mob,Entity target,double speed,boolean ordinarySatisfied){
         if(mob==null||target==null||reservedPetOwnerIntent(mob,target)||ordinarySatisfied)return false;
         return activate(mob,new EntityIntent(target),speed,false);
@@ -152,6 +152,9 @@ public final class MobGravityNavigation {
             tickFlight(mob,s);return;
         }
         if(!planningContext(mob)){clear(mob,s,true);return;}
+        if(s.phase==Phase.WAITING_PLAN){
+            attemptDeferredPlan(mob,s);return;
+        }
 
         Vec3 focus=intent.focus();
         if(!finite(focus)){clear(mob,s,true);return;}
@@ -207,7 +210,7 @@ public final class MobGravityNavigation {
 
     public static void goalStopped(Mob mob){
         if(mob==null)return;State s=state(mob);releaseRoute(mob,s);
-        if(s.phase==Phase.APPROACH||s.phase==Phase.REVALIDATE)clear(mob,s,true);
+        if(s.phase==Phase.WAITING_PLAN||s.phase==Phase.APPROACH||s.phase==Phase.REVALIDATE)clear(mob,s,true);
     }
 
     private static void tickFlight(Mob mob,State s){
@@ -246,17 +249,42 @@ public final class MobGravityNavigation {
         State s=state(mob);long now=mob.level().getGameTime();pruneFailures(s,now);
         if(!force&&!idlePlanningDue(mob,intent,s,now))return false;
         Vec3 focus=intent.focus();if(!finite(focus))return false;
+        if(!MobGravityPlanningBudget.tryAcquire(mob)){
+            deferPlan(mob,s,intent,speed,focus);return true;
+        }
+        return planNow(mob,intent,speed,s,now,focus);
+    }
+
+    private static void attemptDeferredPlan(Mob mob,State s){
+        Intent intent=s.intent;
+        if(intent==null||!intent.valid(mob)){clear(mob,s,true);return;}
+        Vec3 focus=intent.focus();if(!finite(focus)){clear(mob,s,true);return;}
+        if(!MobGravityPlanningBudget.tryAcquire(mob))return;
+        long now=mob.level().getGameTime();pruneFailures(s,now);
+        planNow(mob,intent,s.speed,s,now,focus);
+    }
+
+    private static boolean planNow(Mob mob,Intent intent,double speed,State s,long now,Vec3 focus){
         double radius=intent.satisfiedRadius(mob);var goal=goal(focus,radius);
         Set<MobGravityLocalPlanner.ManeuverKey> excluded=Set.copyOf(s.excludedUntil.keySet());
         var plan=MobGravityLocalPlanner.plan(mob,goal,TRANSITION_HORIZON_TICKS,excluded);
         if(plan.kind()!=MobGravityLocalPlanner.Kind.TRANSITION||plan.maneuverKey()==null){
-            rememberIdleMiss(mob,intent,s,speed,now);return false;
+            clearPlanOnly(s);rememberIdleMiss(mob,intent,s,speed,now);return false;
         }
         s.phase=Phase.APPROACH;s.intent=intent;s.speed=sanitizeSpeed(speed);s.plan=plan;s.focusAnchor=focus;
         s.routeNavigation=null;s.routeOwned=false;s.committedKey=null;s.flightDeadline=0;s.landingTicks=0;s.forceReplan=false;
         s.bestFrontierDistance=mob.position().distanceTo(plan.frontier());s.progressAt=now;clearIdleThrottle(s);
         if(s.bestFrontierDistance<=Math.clamp(Math.max(.55D,mob.getBbWidth()*.75D),.55D,1.25D))s.phase=Phase.REVALIDATE;
         return true;
+    }
+
+    private static void deferPlan(Mob mob,State s,Intent intent,double speed,Vec3 focus){
+        // The vanilla path just failed the semantic intent; do not keep walking that partial route while
+        // waiting for a gravity-planner token. Waiting preserves intent, not an obsolete path.
+        mob.getNavigation().stop();
+        s.phase=Phase.WAITING_PLAN;s.intent=intent;s.speed=sanitizeSpeed(speed);s.plan=null;s.focusAnchor=focus;
+        s.routeNavigation=null;s.routeOwned=false;s.committedKey=null;s.flightDeadline=0;s.landingTicks=0;
+        s.bestFrontierDistance=Double.POSITIVE_INFINITY;s.progressAt=0;s.forceReplan=false;clearIdleThrottle(s);
     }
 
     private static void observeIntent(Mob mob,Intent next,double speed){
