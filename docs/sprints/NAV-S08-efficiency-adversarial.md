@@ -1,10 +1,10 @@
 # NAV-S08 — eficiencia, presupuestos y adversarial
 
-Estado: **EN PROGRESO**. Rama: `tm/gravity-navigation-gamefeel-beta4`.
+Estado: **CERRADO**. Rama: `tm/gravity-navigation-gamefeel-beta4`.
 
 ## Objetivo
 
-S08 demuestra y endurece el coste del sistema gravitatorio general construido en S05-S07. No se aceptan benchmarks de pared como contrato: los gates principales cuentan trabajo lógico (consultas de path, forecasts y sweeps) y verifican presupuestos deterministas.
+S08 demuestra y endurece el coste del sistema gravitatorio general construido en S05-S07. Los gates principales cuentan trabajo lógico —consultas de path, forecasts y sweeps— y verifican presupuestos deterministas; no se convierten benchmarks aislados en promesas de rendimiento porcentual.
 
 ## Invariantes de coste
 
@@ -12,68 +12,92 @@ S08 demuestra y endurece el coste del sistema gravitatorio general construido en
 2. **Sin capacidad, sin física cara.** Un mob sin Clinging/Reorientation puede atravesar los bridges de intención, pero no evalúa transiciones.
 3. **Planner local acotado.** Una planificación estratégica usa una única navegación espejo y como máximo cuatro nodos de lanzamiento por cinco gravedades alternativas: `<= 20` forecasts físicos.
 4. **No planner de superficie en vuelo.** Un mob `COMMITTED` usa sólo monitor volumétrico corto y reacción; no llama a pathfinding táctico hasta soporte/recovery.
-5. **Horizonte de monitor ligado a reacción.** La identidad del landing comprometido se revalida aparte; el forecast dinámico sólo necesita cubrir `reactionTicks + margen`, acotado por el máximo del monitor. Un peligro detectado más tarde que su propia latencia ya no sería legalmente esquivable.
-6. **Presupuesto global grounded.** Varios mobs bloqueados en el mismo tick no pueden iniciar simultáneamente un número ilimitado de planificaciones gravitatorias caras. Las solicitudes excedentes se difieren sin inventar una ruta vanilla ni perder la intención.
-7. **Equidad eventual.** El presupuesto por tick no puede condenar siempre a los mismos mobs; una solicitud diferida debe adquirir turno en ticks posteriores si continúa siendo válida.
+5. **Horizonte de monitor ligado a reacción.** La identidad del landing comprometido se revalida aparte; el forecast dinámico cubre `reactionTicks + 2`, limitado por el horizonte máximo del monitor de 20 ticks. Un peligro descubierto más tarde que su propia latencia ya no sería legalmente esquivable.
+6. **Presupuesto global grounded.** Nuevas planificaciones gravitatorias grounded están limitadas por nivel y tick: como máximo 32 globales y 4 dentro de cada región X/Z de 64×64 bloques.
+7. **Equidad eventual.** Las solicitudes que no obtienen presupuesto pasan a `WAITING_PLAN`, conservan intención y vuelven a intentarlo en ticks posteriores; no continúan siguiendo una ruta parcial obsoleta mientras esperan.
 8. **Cooldowns siguen mandando.** Un miss o una maniobra fallida no relanza el planner cada tick.
-9. **Memoria acotada.** Las exclusiones de maniobras y estados reactivos no crecen sin límite y se limpian al perder ownership/entidad.
-10. **Nada de trabajo para mobs quiescentes.** NONE/EXTERNAL sin `airUsed` sigue saliendo antes de `MobGravity.tick`/`MobFlightReactor.tick`.
+9. **Memoria acotada.** Las exclusiones de maniobras fallidas se limitan a ocho entradas por ejecutor y el estado reactivo se libera al perder ownership/entidad.
+10. **Nada de trabajo para mobs quiescentes.** NONE/EXTERNAL sin `airUsed` sigue saliendo antes del runtime gravitatorio caro.
 
 ## S08-A — horizonte aéreo mínimo suficiente
 
-El monitor dinámico se ejecuta sólo para mobs realmente en vuelo owned. Su horizonte será:
+`MobFlightReactor` calcula:
 
-`monitorHorizon = min(DEFAULT_HORIZON, reactionTicks + REACTION_MARGIN_TICKS)`
+`monitorHorizon = min(20, reactionTicks + 2)`
 
-con un margen pequeño explícito. La landing comprometida lejana no depende de ese horizonte porque su `Contact` se conserva y revalida directamente.
+con `reactionTicks` previamente acotado por `MobReactionTime` a 2–10 ticks.
 
-Gates:
+La superficie comprometida no depende de ese horizonte corto: su `LandingSurfaces.Contact` se conserva y revalida de forma independiente. El monitor sólo busca cambios materiales del segmento próximo; no intenta volver a resolver toda la ruta.
 
-- mínimo de reacción conserva un horizonte > reacción;
-- máximo de reacción nunca supera `DEFAULT_HORIZON`;
-- velocidades de mob normales producen menos trabajo que el horizonte fijo de 20 ticks;
-- la regresión de landing comprometida lejana sigue verde;
-- bloqueo temprano sigue permitiendo reacción y bloqueo demasiado tardío sigue produciendo impacto natural.
+Gates cerrados:
 
-## S08-B — presupuesto global de planificación
+- el horizonte siempre supera la propia latencia de reacción;
+- nunca excede el límite del monitor;
+- mobs normales observan menos futuro que el horizonte fijo anterior de 20 ticks;
+- un landing comprometido lejano sigue siendo revalidado aunque quede fuera del forecast corto;
+- un bloqueo temprano conserva una ventana de reacción y uno demasiado tardío termina en impacto natural;
+- el monitor no invoca navegación de superficie.
 
-Se introduce un presupuesto server-side por `ServerLevel` y tick para **nuevas planificaciones gravitatorias grounded**. No limita física ya comprometida ni navegación vanilla.
+## S08-B — presupuesto global y regional de planificación
 
-Primera política:
+`MobGravityPlanningBudget` limita sólo el comienzo de **nuevas planificaciones gravitatorias grounded**. No limita navegación vanilla, física ya comprometida, ni el monitor aéreo.
 
-- tokens renovados por tick;
-- coste de una planificación local = un token independientemente de cuántos candidatos descarte internamente, porque S05 ya limita ese trabajo a `<=20` forecasts;
-- solicitudes genéricas que no obtienen token conservan su intención en una fase `WAITING_PLAN` y se reintentan en ticks posteriores;
-- `PetGravityFollow` no necesita reclamar ownership para esperar: simplemente no despierta/replica planificación hasta disponer de token;
-- no se consume token si el contexto ya demuestra que no hay capacidad gravitatoria.
+Política cerrada:
 
-El número de tokens se mantiene pequeño y explícito; S08 lo documentará con tests de equidad, no con porcentajes inventados.
+- `GLOBAL_PLANS_PER_TICK = 32` por nivel;
+- `REGION_PLANS_PER_TICK = 4`;
+- región X/Z de `64×64` bloques (`REGION_SHIFT = 6`);
+- el contador se renueva con `level.getGameTime()`;
+- una planificación local consume un slot, mientras S05 mantiene su propio límite interno de `<=20` forecasts;
+- una petición generic que no obtiene slot pasa a `WAITING_PLAN` sin perder la intención;
+- pet follow comparte el mismo presupuesto en vez de mantener una vía paralela ilimitada;
+- un mob sin capacidad no consume presupuesto gravitatorio.
+
+Esta política evita dos extremos igualmente inútiles: permitir que una horda dispare todas las búsquedas caras en el mismo tick o imponer un límite global tan pequeño que una región distante pueda quedar hambrienta porque otra concentra todo el trabajo.
 
 ## Gates de trabajo lógico
+
+Quedan cubiertos en tests de planner/runtime:
 
 - effect-free blocked mob: 0 transition evaluations;
 - powered reachable path: 0 transition evaluations;
 - powered blocked local planner: `1..20` transition evaluations;
 - exclusiones locales nunca elevan el máximo sobre 20;
-- varios mobs bloqueados en el mismo tick respetan el presupuesto global;
-- solicitudes diferidas progresan en ticks siguientes;
-- un intent repetido mientras ya existe APPROACH no crea otro plan;
-- un miss negativo respeta el throttle de 10 ticks;
-- flight monitor no invoca navegación de superficie.
+- varios mobs bloqueados en el mismo tick respetan los límites global y regional;
+- solicitudes diferidas entran en `WAITING_PLAN` y progresan en ticks siguientes cuando reciben presupuesto;
+- un intent repetido mientras existe `APPROACH` no crea otro plan;
+- un miss negativo conserva el throttle de 10 ticks;
+- flight monitor no invoca navegación de superficie;
+- pet follow y navegación genérica comparten presupuesto en lugar de duplicarlo.
 
-## Adversarial
+## Adversarial cerrado
 
-- obstáculo dinámico aparece con margen: percepción inmediata, reacción sólo tras latencia, corrección legal si existe;
-- obstáculo aparece demasiado tarde: impacto natural antes de poder reaccionar;
+- obstáculo dinámico con margen: percepción inmediata, reacción sólo tras latencia y corrección únicamente si existe una maniobra legal;
+- obstáculo demasiado tardío: impacto natural antes de poder reaccionar;
 - soporte comprometido lejano desaparece fuera del horizonte corto: se detecta por revalidación del `Contact` guardado;
 - target jitter sub-umbral: no thrash;
-- target cambia sostenidamente durante vuelo largo: intención se actualiza;
-- Clinging gastado nunca recibe segundo giro;
-- Reorientation no toma una corrección que aumente riesgo sólo para ahorrar distancia de target;
-- entrada inesperada en fluido cancela ownership de locomoción especial y deja recuperación al contexto acuático;
+- target cambia sostenidamente durante vuelo largo: la intención se actualiza;
+- Clinging gastado nunca recibe un segundo giro;
+- Reorientation no acepta una corrección hacia target que aumente el riesgo sólo para ahorrar distancia;
+- entrada inesperada en fluido libera la locomoción especial y deja recuperación al contexto correspondiente;
 - geometría/chunk desconocido falla cerrado;
-- memoria de maniobras fallidas sigue limitada a ocho entradas por ejecutor.
+- memoria de maniobras fallidas permanece limitada a ocho entradas por ejecutor.
 
-## Criterio de cierre
+## Evidencia de cierre
 
-S08 se cierra sólo con matriz amplia verde y evidencia de que el coste caro está acotado por construcción. No se publican cifras de rendimiento porcentuales sin perfilado reproducible del servidor/modpack real.
+Implementación principal de S08:
+
+- `850105d7`: acota el flight monitor por horizonte de reacción.
+- `2b925c77`: añade gates del horizonte dinámico.
+- `ae78f39c`: introduce presupuesto grounded por nivel/región.
+- `f6b27700`: cubre límites globales y regionales.
+- `cb723a34`: difiere trabajo excedente mediante `WAITING_PLAN`.
+- `9325b647`: integra pet follow en el mismo presupuesto.
+- `29820358`: cubre ownership mientras una planificación está diferida.
+- `8400842a`: registra los GameTests de presupuesto.
+
+La convergencia posterior añadió además los gates de goals vivos, owner aéreo y flee sobre la misma infraestructura. El HEAD `b2de88e83e1e64416288d220c8d86d52aeca014d` pasó la matriz completa en **CI #1038 / run `35105097956`**: build/JUnit, GameTests de servidor, cliente base, First Person, Scale Brews server/client, Fresh Animations y validación de snapshots.
+
+## Cierre
+
+S08 queda cerrado. El trabajo restante de la campaña es S09: convergencia documental y verificación de que código, tests y documentación describen la misma semántica. No se publica ningún porcentaje de mejora de rendimiento sin perfilado reproducible de un servidor/modpack representativo.
