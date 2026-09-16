@@ -89,9 +89,16 @@ public final class MobFlightReactor {
             if(farther.hit()!=null&&farther.hit().support())baseline=landingPosition(mob,farther.hit().impactBody(),GravityDirectionUtil.getOwnGravityDirection(mob));
         }
         Candidate candidate=bestCandidate(mob,focus,danger,baseline);
-        if(candidate==null||!executeCorrection(mob,candidate.transition()))return false;
-        state.expectedContact=candidate.transition().landingContact();state.expectedLanding=candidate.landing();
-        MobFlightReaction.begin(state.reaction,candidate.transition(),focus);
+        if(candidate==null)return false;
+
+        // Re-run the winning physical forecast at the commit seam. A block can still appear between
+        // comparison and action; execution must fail closed rather than trusting stale candidate data.
+        var committed=MobGravity.executeAirborneCorrection(
+            mob,candidate.transition().targetGravity(),REACTION_FORECAST_TICKS);
+        if(committed==null)return false;
+        Vec3 landing=landingPosition(mob,committed.landingBody(),committed.targetGravity());
+        state.expectedContact=committed.landingContact();state.expectedLanding=landing;
+        MobFlightReaction.begin(state.reaction,committed,focus);
         return true;
     }
 
@@ -112,20 +119,6 @@ public final class MobFlightReactor {
             if(best==null||score<best.score())best=new Candidate(transition,landing,score);
         }
         return best;
-    }
-
-    /** Fresh evaluateImmediate output is committed in the same tick; momentum is preserved across the reorientation. */
-    private static boolean executeCorrection(Mob mob,MobGravityPlanner.Transition transition){
-        if(transition==null||!mob.hasEffect(Reorientation.EFFECT)||AirChanges.grounded(mob)||!MobGravity.canOwnEffectTransition(mob))return false;
-        Direction previous=GravityDirectionUtil.getOwnGravityDirection(mob),target=transition.targetGravity();
-        if(previous==target)return false;
-        Vec3 velocity=mob.getDeltaMovement();
-        var visual=GravityTransition.plan(previous,target,GravityTransition.headingFromYaw(previous,mob.getYRot()));
-        if(!MobGravity.relocateTree(mob,target,transition.launchPosition()))return false;
-        Payloads.visual(mob,visual);GravityTransition.applyYawGauge(mob,visual.yawDelta());mob.setDeltaMovement(velocity);
-        var state=MobGravity.state(mob);state.ownership=MobGravity.Ownership.OWNED_EFFECT;state.ownedDirection=target;
-        state.airUsed=true;state.retryAt=0;state.clearBorrow();
-        return true;
     }
 
     private static Vec3 currentFocus(Mob mob){
