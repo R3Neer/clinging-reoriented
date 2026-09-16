@@ -5,6 +5,8 @@ import com.moigferdsrte.gravitychanger.entity.ai.DirectionalGroundPathNavigation
 import com.moigferdsrte.gravitychanger.entity.ai.DirectionalMobAiUtil;
 import com.moigferdsrte.gravitychanger.util.GravityDirectionUtil;
 import com.moigferdsrte.gravitychanger.util.RotationUtil;
+import java.util.Set;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.navigation.GroundPathNavigation;
@@ -13,13 +15,16 @@ import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * S05-B bounded strategic planner: one tactical surface path, then at most five physical gravity forecasts.
+ * Bounded online strategic planner: one tactical surface path, then at most five physical gravity forecasts.
  * It never queries the mob's live navigation with createPath, because that method mutates navigation metadata.
  */
 public final class MobGravityLocalPlanner {
     private static final double WALK_COST_PER_BLOCK=1.0D;
 
     public enum Kind { WALK, TRANSITION, NO_PLAN }
+
+    /** Stable identity for one local support-graph edge. S06 may temporarily blacklist failed keys. */
+    public record ManeuverKey(Direction sourceGravity,BlockPos frontierNode,Direction targetGravity) {}
 
     /** Goal semantics are supplied by follow/chase/flee layers in S06. */
     public interface Goal {
@@ -34,6 +39,7 @@ public final class MobGravityLocalPlanner {
         Vec3 frontier,
         Direction terminalGravity,
         MobGravityPlanner.Transition transition,
+        ManeuverKey maneuverKey,
         double walkingCost,
         double heuristicCost,
         double totalCost,
@@ -45,18 +51,23 @@ public final class MobGravityLocalPlanner {
     private MobGravityLocalPlanner() {}
 
     public static Plan plan(Mob mob,Goal goal){
-        return plan(mob,goal,MobGravityPlanner.DEFAULT_TRANSITION_HORIZON_TICKS);
+        return plan(mob,goal,MobGravityPlanner.DEFAULT_TRANSITION_HORIZON_TICKS,Set.of());
     }
 
     public static Plan plan(Mob mob,Goal goal,int transitionHorizonTicks){
+        return plan(mob,goal,transitionHorizonTicks,Set.of());
+    }
+
+    public static Plan plan(Mob mob,Goal goal,int transitionHorizonTicks,Set<ManeuverKey> excludedKeys){
         if(mob==null||goal==null||!mob.isAlive())return noPlan(mob,null,null,0.0D,0);
         Vec3 focus=safeFocus(goal);
         if(!finite(focus))return noPlan(mob,null,mob.position(),0.0D,0);
+        Set<ManeuverKey> excluded=excludedKeys==null?Set.of():excludedKeys;
 
         Direction current=GravityDirectionUtil.getOwnGravityDirection(mob);
         Vec3 currentPosition=mob.position();
         if(safeSatisfied(goal,currentPosition,current))
-            return new Plan(Kind.WALK,null,currentPosition,current,null,0.0D,0.0D,0.0D,0);
+            return new Plan(Kind.WALK,null,currentPosition,current,null,null,0.0D,0.0D,0.0D,0);
 
         GroundPathNavigation mirror=mirrorNavigation(mob,current);
         if(mirror==null)return noPlan(mob,null,currentPosition,0.0D,0);
@@ -73,15 +84,18 @@ public final class MobGravityLocalPlanner {
         if(!Double.isFinite(walkingCost))return noPlan(mob,path,frontier,Double.POSITIVE_INFINITY,0);
 
         if(path!=null&&path.canReach()&&safeSatisfied(goal,frontier,current))
-            return new Plan(Kind.WALK,path,frontier,current,null,walkingCost,0.0D,walkingCost,0);
+            return new Plan(Kind.WALK,path,frontier,current,null,null,walkingCost,0.0D,walkingCost,0);
 
         MobGravityPlanner.Transition best=null;
+        ManeuverKey bestKey=null;
         Direction bestGravity=current;
         double bestHeuristic=Double.POSITIVE_INFINITY;
         double bestTotal=Double.POSITIVE_INFINITY;
         int evaluations=0;
         for(Direction candidate:Direction.values()){
             if(candidate==current)continue;
+            ManeuverKey key=maneuverKey(current,frontier,candidate);
+            if(key==null||excluded.contains(key))continue;
             evaluations++;
             var evaluation=MobGravityPlanner.evaluateGroundedLaunch(mob,frontier,candidate,transitionHorizonTicks);
             if(!evaluation.accepted())continue;
@@ -93,12 +107,18 @@ public final class MobGravityLocalPlanner {
             double total=walkingCost+transition.physicalCost()+heuristic;
             if(!Double.isFinite(total))continue;
             if(total<bestTotal){
-                best=transition;bestGravity=candidate;bestHeuristic=heuristic;bestTotal=total;
+                best=transition;bestKey=key;bestGravity=candidate;bestHeuristic=heuristic;bestTotal=total;
             }
         }
 
         if(best==null)return noPlan(mob,path,frontier,walkingCost,evaluations);
-        return new Plan(Kind.TRANSITION,path,frontier,bestGravity,best,walkingCost,bestHeuristic,bestTotal,evaluations);
+        return new Plan(Kind.TRANSITION,path,frontier,bestGravity,best,bestKey,walkingCost,bestHeuristic,bestTotal,evaluations);
+    }
+
+    static ManeuverKey maneuverKey(Direction sourceGravity,Vec3 frontier,Direction targetGravity){
+        if(sourceGravity==null||targetGravity==null||!finite(frontier)||sourceGravity==targetGravity)return null;
+        BlockPos node=DirectionalGroundNodeEvaluator.nodePosition(frontier,sourceGravity).immutable();
+        return new ManeuverKey(sourceGravity,node,targetGravity);
     }
 
     /** New mirror, same mob/world and movement capabilities; mutations stay inside this throwaway navigation. */
@@ -147,7 +167,7 @@ public final class MobGravityLocalPlanner {
     private static Plan noPlan(Mob mob,Path path,Vec3 frontier,double walkingCost,int evaluations){
         Direction gravity=mob==null?Direction.DOWN:GravityDirectionUtil.getOwnGravityDirection(mob);
         Vec3 position=frontier!=null?frontier:mob==null?Vec3.ZERO:mob.position();
-        return new Plan(Kind.NO_PLAN,path,position,gravity,null,walkingCost,Double.POSITIVE_INFINITY,Double.POSITIVE_INFINITY,evaluations);
+        return new Plan(Kind.NO_PLAN,path,position,gravity,null,null,walkingCost,Double.POSITIVE_INFINITY,Double.POSITIVE_INFINITY,evaluations);
     }
 
     private static boolean finite(Vec3 value){return value!=null&&Double.isFinite(value.x+value.y+value.z);}
