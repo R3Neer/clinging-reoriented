@@ -1,6 +1,6 @@
 # Configuration
 
-Clinging: Reoriented exposes **no mod-owned configuration file**. **0.1.0-beta.3** remains the latest published prerelease; the values below describe the fixed semantics of the current **unreleased beta.4 navigation/gamefeel development branch**, not user preferences.
+Clinging: Reoriented exposes **no mod-owned configuration file**. **0.1.0-beta.4** is the current prerelease; the values below describe its fixed navigation/gamefeel semantics, not user preferences.
 
 ## Local-player camera and landing
 
@@ -24,7 +24,7 @@ Fixed current values:
 - maximum macro-body gaze follow: **7.5 degrees/tick**;
 - passive velocity/weathercock stabilization: **1.25 degrees/tick**;
 - additional transverse aerodynamic drag: **2.5%/tick**;
-- special W air-diving redirect: **none** in beta.4 development;
+- special W air-diving redirect: **none** in beta.4;
 - fast-air sound admission: **0.75 blocks/tick**, with **10-tick** fade-in;
 - Clinging-controlled airborne world-speed cap: **3.92 blocks/tick**.
 
@@ -47,6 +47,8 @@ During a committed gravity flight there is no surface pathfinding. Dynamic monit
 `min(20, reactionTicks + 2)`
 
 where reaction latency is derived from the mob's **base movement-speed attribute** and bounded to **2–10 ticks**. Falling faster does not grant faster reflexes.
+
+A short vanilla navigation jump during `APPROACH` keeps the already-owned route/intent for at most **20 ticks**. No new planning or gravity commit is allowed while unsupported; a longer loss of support fails and cools down that maneuver.
 
 These limits are gameplay/performance contracts, not tunable difficulty knobs.
 

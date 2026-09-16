@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [0.1.0-beta.4] - 2026-09-16
 
 ### Gravity Fall body, aerodynamics and landing
 
@@ -22,6 +22,7 @@
 - Keep airborne owners trackable through filtered/tangential targeting without remotely commanding pets to copy owner gravity turns.
 - Add a general gravity-locomotion bridge for vanilla mob intents. Melee pursuit, flee/avoid and position goals keep ownership of high-level AI while the shared planner can use support-to-support gravity transitions when normal navigation cannot satisfy the intent.
 - Preserve vanilla goal cadence/semantics and external gravity ownership; no per-species gravity route tables are introduced.
+- Preserve an owned `APPROACH` across short vanilla navigation jumps for at most 20 ticks without replanning or committing gravity while unsupported; longer support loss fails and cools down the maneuver instead of looping approach -> jump -> clear -> replan.
 - Add committed-flight monitoring and finite 2–10 tick reaction latency derived from base movement speed. Reorientation may make a legal airborne correction after the delay; spent Clinging never receives a second turn, and late obstacles can still cause natural impacts.
 
 ### Planning cost and validation
@@ -31,7 +32,8 @@
 - Defer excess work through `WAITING_PLAN` while preserving the live vanilla intent instead of continuing an obsolete partial path or busy-looping the planner.
 - Shorten committed-flight monitoring to `reactionTicks + 2`, capped at 20 ticks, while revalidating the exact committed landing independently.
 - Add adversarial coverage for dynamic obstacles, stale/unknown geometry, target jitter/movement, Clinging/Reorientation capability boundaries, planning-budget fairness, trapped landings, airborne-owner follow and gravity-enabled flee.
-- Keep beta.4 development unreleased: this section records branch behaviour only and does not change version, tag, `main` or published prerelease state.
+- Re-run the complete server/client compatibility matrix, including First Person, Scale Brews, Fresh Animations and semantic camera snapshots.
+- Publish beta.4 only from the exact successful `main` CI artifact rather than rebuilding for release.
 
 ## [0.1.0-beta.3] - 2026-09-15
 

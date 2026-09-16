@@ -11,7 +11,7 @@
 
 Fabric API 0.159.0+26.2, Fabric Loader 0.19.5 and Java 25 are also required for Minecraft 26.2. Client and server need matching Clinging: Reoriented versions.
 
-**0.1.0-beta.3** remains the latest published prerelease. Gravity-aware mob navigation, posture-driven aerodynamics and the other beta.4 behaviour described in current development documentation are unreleased branch work.
+**0.1.0-beta.4** is the current published prerelease. It includes the gravity-aware mob navigation, posture-driven aerodynamics, earlier landing acquisition and water-control/presentation work described below.
 
 ## Gravity Charge and vanilla projectile semantics
 
@@ -78,7 +78,8 @@ Beta.4 adds no optional AI dependency and does not replace Minecraft's high-leve
 - `MeleeAttackGoal` / `AvoidEntityGoal` wake adapters expose otherwise-lost intents but do not become species-specific combat/fear AIs;
 - pet follow is history-free and no longer depends on owner gravity breadcrumbs;
 - external gravity ownership is never stolen;
-- committed gravity flight does not run surface pathfinding.
+- committed gravity flight does not run surface pathfinding;
+- a short vanilla navigation jump during `APPROACH` preserves the already-owned route/intent for at most 20 ticks, but no planning or gravity commit is allowed until real support returns.
 
 Planning remains bounded independently of optional mods: at most 20 physical transition forecasts per local plan, 32 new grounded gravity plans per level/tick and 4 per 64×64 region/tick.
 

@@ -2,7 +2,7 @@
 
 The floor is wherever you decide it is.
 
-**Clinging: Reoriented** turns the Clinging effect from Alex's Mobs into an airborne gravity ability for Minecraft 26.2 on Fabric. Leave your local floor, release **Space**, look toward another world-cardinal direction and press Space again. Clinging grants one voluntary airborne gravity decision; **Reorientation** removes that one-turn limit. **0.1.0-beta.3** is the latest published prerelease; this branch contains the **unreleased beta.4 gravity-navigation/gamefeel campaign**.
+**Clinging: Reoriented** turns the Clinging effect from Alex's Mobs into an airborne gravity ability for Minecraft 26.2 on Fabric. Leave your local floor, release **Space**, look toward another world-cardinal direction and press Space again. Clinging grants one voluntary airborne gravity decision; **Reorientation** removes that one-turn limit. **0.1.0-beta.4** is the current prerelease and includes the gravity-navigation/gamefeel campaign described below.
 
 [![Minecraft 26.2](https://img.shields.io/badge/Minecraft-26.2-62B47A)](https://www.minecraft.net/)
 [![Fabric](https://img.shields.io/badge/Loader-Fabric-DDBD3B)](https://fabricmc.net/)
@@ -77,6 +77,8 @@ Pet following is **history-free**: pets no longer replay owner gravity breadcrum
 
 The same locomotion layer is available to ordinary mobs with legitimate Clinging/Reorientation capability. Vanilla goals remain owners of intent: melee pursuit, escape and ordinary position goals try vanilla navigation first, then may use bounded support-to-support gravity transitions when the normal route cannot satisfy the intent. The planner has no per-species route table.
 
+During a gravity-aware `APPROACH`, a brief vanilla navigation jump may temporarily remove real support. The executor keeps the already-owned route/intent for at most **20 ticks**, but performs no new planning and cannot commit a gravity transition until support returns; a longer support loss fails and cools down that maneuver.
+
 During a committed gravity flight the mob monitors the real trajectory without surface pathfinding. Material target/world changes become actionable only after a **2–10 tick reaction delay derived from base movement speed**. Reorientation may make another airborne correction only when that correction is physically legal; spent Clinging never receives a second turn. A block placed too late can therefore still result in a perfectly ordinary collision.
 
 Non-player entities keep Clinging's owned **180/240 ms tracked snap** presentation; the 500 ms landing manoeuvre and full-sphere camera are local-player Gravity Fall rules.
@@ -98,7 +100,7 @@ Install the regular JAR on **both client and server** with:
 - Gravity Changer Unofficial Port 1.5.2-beta.5-mc26.2
 - Cloth Config API
 
-**0.1.0-beta.3 is the latest published prerelease.** The beta.4 navigation/gamefeel work described above is currently unreleased development. Back up important worlds before testing development builds and use matching versions on every multiplayer participant.
+**0.1.0-beta.4 is the current prerelease.** Back up important worlds before testing prereleases and use matching versions on every multiplayer participant.
 
 ## Optional companions and compatibility
 
@@ -111,9 +113,9 @@ The exact Alchemical Leather ownership and validation contract is recorded in [t
 
 ## Project status
 
-**0.1.0-beta.3** remains the latest published beta. The active unreleased beta.4 campaign unifies Gravity Fall aerodynamics, earlier landing acquisition, camera-relative water controls and general gravity-aware mob locomotion on the same physical/support model. Grounded gravity planning is bounded to at most **20 transition forecasts per local plan**, **32 new plans per level/tick** and **4 per 64×64 region/tick**; committed flight uses only a short reaction-bound monitor until support/recovery.
+**0.1.0-beta.4** is the current beta. It unifies Gravity Fall aerodynamics, earlier landing acquisition, camera-relative water controls and general gravity-aware mob locomotion on the same physical/support model. Grounded gravity planning is bounded to at most **20 transition forecasts per local plan**, **32 new plans per level/tick** and **4 per 64×64 region/tick**; committed flight uses only a short reaction-bound monitor until support/recovery.
 
-The current development gate covers localization parity, build/JUnit, required server GameTests, default client, First Person, optional Scale Brews server/client, pinned Fresh Animations/Player Extension and semantic screenshot validation. No version, tag or prerelease is created until an explicitly prepared release HEAD passes that complete matrix on `main`.
+The release gate covers localization parity, build/JUnit, required server GameTests, default client, First Person, optional Scale Brews server/client, pinned Fresh Animations/Player Extension and semantic screenshot validation. Prerelease artifacts are created only from the exact successful `main` CI artifact, never from a second build.
 
 ## Build and documentation
 

@@ -95,11 +95,12 @@ Cerrado con límites estructurales:
 
 Cerrado tras sincronizar código, tests y documentación pública:
 
-- README/GUIDE/ARCHITECTURE/CONFIGURATION/COMPATIBILITY actualizados al comportamiento beta.4 unreleased;
+- README/GUIDE/ARCHITECTURE/CONFIGURATION/COMPATIBILITY actualizados al comportamiento beta.4;
 - VALIDATION y CHANGELOG documentan gates, rojos útiles y límites reales;
 - diseños pre-implementación quedan marcados explícitamente como archivo histórico;
 - breadcrumbs eliminados del runtime;
-- estado servidor `gravityFallForwardIntent` eliminado; el campo homónimo permanece únicamente en el layout wire `gravity_fall_look_v1` por continuidad de protocolo y se ignora en beta.4.
+- estado servidor `gravityFallForwardIntent` eliminado; el campo homónimo permanece únicamente en el layout wire `gravity_fall_look_v1` por continuidad de protocolo y se ignora en beta.4;
+- un salto breve de `PathNavigation` durante `APPROACH` conserva el plan especial durante como máximo 20 ticks sin planificar ni comprometer gravedad mientras falta soporte.
 
 ## Invariantes globales cerrados
 
@@ -115,6 +116,6 @@ Cerrado tras sincronizar código, tests y documentación pública:
 
 ## Evidencia final
 
-El HEAD funcional/documental previo al cierre `48311e9d994a0335c15242491328ac4fbfd82188` pasó **Build and test #1039 / run `35112406795`** completo: localización, build/JUnit, server GameTests, cliente base, First Person, Scale Brews server/client, Fresh Animations y validación de snapshots.
+El HEAD técnico final `5a294ad4daa448b184388e35616eeb3e7357341a` pasó **Build and test #1043 / run `35117601744`** completo: localización, build/JUnit, server GameTests, cliente base, First Person, Scale Brews server/client, Fresh Animations y validación de snapshots.
 
-El commit de cierre de S00/S09 sólo cambia estos documentos de estado. La campaña queda cerrada sin cambiar versión, tag, `main` ni publicar prerelease; `0.1.0-beta.3` sigue siendo la última versión publicada.
+La campaña queda cerrada en ese HEAD. La preparación de `0.1.0-beta.4` posterior sólo cambia metadatos/documentación de release y añade el workflow de publicación; no altera gameplay. El prerelease se publica únicamente desde el artefacto del CI verde de `main`.

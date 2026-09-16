@@ -4,7 +4,7 @@ Estado: **CERRADO**. Rama: `tm/gravity-navigation-gamefeel-beta4`.
 
 ## Objetivo
 
-S09 demuestra que NAV-S01…S08 converge en un único producto coherente: código, tests, documentación y compatibilidad describen la misma semántica beta.4 unreleased. No añade una nueva mecánica.
+S09 demuestra que NAV-S01…S08 converge en un único producto coherente: código, tests, documentación y compatibilidad describen la misma semántica de `0.1.0-beta.4`. No añade una nueva mecánica.
 
 ## Gates de código cerrados
 
@@ -47,13 +47,13 @@ Los tres documentos reflejan:
 - budgets de 32 planes globales/tick y 4 por región 64×64/tick;
 - frame acuático separado de gravedad lógica;
 - ownership vanilla/Gravity Changer/Clinging/optional mods actualizado;
-- beta.3 sigue siendo la última versión publicada y beta.4 permanece unreleased.
+- beta.4 es la versión candidata/publicada por la tubería de release exacta desde `main`.
 
 ### VALIDATION / CHANGELOG / diseño histórico
 
 - VALIDATION contiene evidencia de sprints, rojos útiles y separación entre automatización y QA manual;
 - no se afirma ningún porcentaje de rendimiento beta.4 sin perfilado reproducible de modpack real;
-- CHANGELOG `Unreleased` recoge gameplay, IA, agua/landing/aerodinámica y eficiencia;
+- CHANGELOG contiene la sección fechada `0.1.0-beta.4` con gameplay, IA, agua/landing/aerodinámica, eficiencia y el hardening de `APPROACH`;
 - alpha.15 conserva breadcrumbs y alpha.14 conserva W air-diving únicamente como historia fechada;
 - `docs/design/README.md` marca los cinco documentos de diseño pre-implementación como archivo histórico y apunta a los documentos normativos actuales.
 
@@ -78,8 +78,9 @@ Resultado de las búsquedas de cierre:
 - HEAD tras convergencia documental y limpieza de estado legado: `48311e9d994a0335c15242491328ac4fbfd82188`, **Build and test #1039 / run `35112406795`**, verde en localización, build/JUnit, server GameTests, cliente base, First Person, Scale Brews server/client, Fresh Animations y snapshots.
 - El primer HEAD documental de cierre (`df2f0051024b37d6a05beebc441b27987c963313`) produjo un rojo útil en **#1040 / run `35114000226`** sólo en Scale Brews server: el wolf real seguía con `navDone=false` al tick 120 y el fixture exigía commit exactamente en ese tick. El mismo código había pasado esa lane en #1039 y baseline server/client/First Person seguían verdes.
 - El primer hardening del fixture (`c402d03be9188e22b4b06e2c6e217ef0e539125d`) reveló en **#1041 / run `35115667401`** que el problema no era sólo el instante 120: el lobo podía seguir sin commit al agotar 180 ticks. El diagnóstico del executor mostró que un salto vanilla de `PathNavigation` durante `APPROACH` hacía fallar `planningContext`, borraba el plan y devolvía el tick a `FollowOwnerGoal`, permitiendo un bucle approach→jump→clear→replan. El fix mantiene ownership/ruta hasta 20 ticks de pérdida transitoria de soporte en ambos executors, no ejecuta planning ni commit mientras están airborne y falla/cooldown la arista si la pérdida deja de ser transitoria. Los gates directos de pet y navegación genérica incorporan esa regresión; el real-wolf gate conserva `maxTicks=180` y espera la transición real con `succeedWhen`.
-- **#1042 / run `35117011829`** no alcanzó a evaluar el fix de comportamiento: al añadir inicialmente dos GameTests separados de la regresión, las fixtures paralelas consumieron slots adicionales del presupuesto regional/global en el mismo tick y el gate existente de owner aéreo no obtuvo token. Eso demuestra precisamente que el budget S08 se aplica también dentro de la batería. La regresión se integró en dos tests ya existentes que de todos modos solicitaban esos planes, devolviendo el número de invocaciones del planner al baseline anterior sin resetear ni saltarse el budget.
+- **#1042 / run `35117011829`** no alcanzó a evaluar el fix de comportamiento: al añadir inicialmente dos GameTests separados de la regresión, las fixtures paralelas consumieron slots adicionales del presupuesto regional/global en el mismo tick y el gate existente de owner aéreo no obtuvo token. La regresión se integró en dos tests ya existentes que de todos modos solicitaban esos planes, devolviendo el número de invocaciones del planner al baseline anterior sin resetear ni saltarse el budget.
+- HEAD técnico final `5a294ad4daa448b184388e35616eeb3e7357341a`: **Build and test #1043 / run `35117601744`**, verde completo en todas las lanes, incluida Scale Brews server que había destapado la regresión del lobo.
 
 ## Cierre
 
-NAV-S09 queda cerrado únicamente cuando el HEAD que contiene el hardening de `APPROACH` y los gates sin carga presupuestaria adicional pasa la matriz completa. Este cierre no cambia versión, etiqueta, `main` ni publica prerelease. `0.1.0-beta.3` sigue siendo la última versión publicada; la campaña beta.4 queda lista como rama convergida para una futura decisión explícita de integración/release.
+NAV-S09 queda cerrado en `5a294ad4daa448b184388e35616eeb3e7357341a`. La preparación posterior de `0.1.0-beta.4` sólo cambia versión, changelog, documentación y workflow de publicación. El prerelease se crea únicamente desde el artefacto exacto de un `Build and test` verde de `main`; no se recompila para publicar.
