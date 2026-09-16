@@ -38,6 +38,27 @@ public final class MobGravityLocalPlannerGameTests {
         h.succeed();
     }
 
+    @GameTest(padding=48)
+    public void eastGravityWalkUsesDirectionalNodeEntityPosition(GameTestHelper h){
+        clear(h);
+        for(int y=4;y<=16;y++)for(int z=0;z<=12;z++)h.setBlock(new BlockPos(6,y,z),Blocks.STONE);
+        Wolf wolf=h.spawn(EntityTypes.WOLF,new BlockPos(5,10,5));wolf.setNoAi(true);wolf.setNoGravity(true);
+        GravityDirectionUtil.setGravityDirection(wolf,Direction.EAST);
+        Vec3 start=DirectionalGroundNodeEvaluator.entityPosition(h.absolutePos(new BlockPos(5,10,5)),Direction.EAST);
+        Vec3 focus=DirectionalGroundNodeEvaluator.entityPosition(h.absolutePos(new BlockPos(5,10,9)),Direction.EAST);
+        wolf.setPos(start.x,start.y,start.z);wolf.setOnGround(true);wolf.setDeltaMovement(Vec3.ZERO);
+
+        var plan=MobGravityLocalPlanner.plan(wolf,distanceGoal(focus,.8D,null),20);
+        h.assertTrue(plan.kind()==MobGravityLocalPlanner.Kind.WALK&&plan.walkPath()!=null&&plan.walkPath().canReach(),
+            "EAST wall target was not reachable through directional navigation: "+plan.kind());
+        Vec3 expected=DirectionalGroundNodeEvaluator.entityPosition(plan.walkPath().getEndNode().asBlockPos(),Direction.EAST);
+        Vec3 naive=Vec3.atCenterOf(plan.walkPath().getEndNode().asBlockPos());
+        h.assertTrue(plan.frontier().distanceTo(expected)<1.0E-9D,"lateral frontier did not use Gravity Changer entityPosition convention");
+        h.assertTrue(plan.frontier().distanceTo(naive)>.4D,"fixture failed to distinguish directional entity anchor from naive block center");
+        h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(wolf)==Direction.EAST,"planning changed EAST logical gravity");
+        h.succeed();
+    }
+
     @GameTest(padding=64)
     public void blockedTargetUsesExactPartialPathFrontierAndOnlyFiveForecasts(GameTestHelper h){
         Wolf wolf=walkingWolf(h,false,1,22);
@@ -108,12 +129,16 @@ public final class MobGravityLocalPlannerGameTests {
     }
 
     private static Wolf walkingWolf(GameTestHelper h,boolean reorientation,int floorMinX,int floorMaxX){
-        for(var pos:BlockPos.betweenClosed(h.absolutePos(new BlockPos(-6,3,-6)),h.absolutePos(new BlockPos(30,18,16))))
-            h.getLevel().setBlockAndUpdate(pos,Blocks.AIR.defaultBlockState());
+        clear(h);
         for(int x=floorMinX;x<=floorMaxX;x++)for(int z=0;z<=10;z++)h.setBlock(new BlockPos(x,9,z),Blocks.STONE);
         Wolf wolf=h.spawn(EntityTypes.WOLF,new BlockPos(5,10,5));wolf.setNoAi(true);wolf.setNoGravity(true);wolf.setOnGround(true);wolf.setDeltaMovement(Vec3.ZERO);
         if(reorientation)wolf.addEffect(new MobEffectInstance(Reorientation.EFFECT,600));
         return wolf;
+    }
+
+    private static void clear(GameTestHelper h){
+        for(var pos:BlockPos.betweenClosed(h.absolutePos(new BlockPos(-6,3,-6)),h.absolutePos(new BlockPos(30,18,16))))
+            h.getLevel().setBlockAndUpdate(pos,Blocks.AIR.defaultBlockState());
     }
 
     private static boolean equalsNullable(Object a,Object b){return a==null?b==null:a.equals(b);}
