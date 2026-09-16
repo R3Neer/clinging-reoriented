@@ -128,12 +128,18 @@ public final class MobFlightMonitorGameTests {
         double farX=wolf.getX()+25.0D;
 
         var provider=new LandingSurfaceProvider(){
+            private LocalContact east(){return new LocalContact("far-east",1L,new Vec3(-1,0,0));}
             @Override public Optional<LocalContact> currentSupport(Query query){return Optional.empty();}
             @Override public Optional<LocalSweep> sweep(Query query,AABB start,AABB end){
                 if(query.entity()!=wolf)return Optional.empty();
                 Vec3 a=start.getCenter(),b=end.getCenter();
-                if(query.gravity()==Direction.EAST&&b.x>a.x+1.0E-8D&&b.x>=farX)
-                    return Optional.of(new LocalSweep(new LocalContact("far-east",1L,new Vec3(-1,0,0)),.5D,true));
+                if(query.gravity()==Direction.EAST&&b.x>a.x+1.0E-8D){
+                    if(a.x>=farX-1.0E-7D)return Optional.of(new LocalSweep(east(),0.0D,true));
+                    if(b.x>=farX){
+                        double fraction=Math.clamp((farX-a.x)/(b.x-a.x),0.0D,1.0D);
+                        return Optional.of(new LocalSweep(east(),fraction,true));
+                    }
+                }
                 if(query.gravity()==Direction.NORTH&&b.z<a.z-1.0E-8D)
                     return Optional.of(new LocalSweep(new LocalContact("north-rescue",1L,new Vec3(0,0,1)),.5D,true));
                 return Optional.empty();
