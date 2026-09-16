@@ -3,6 +3,7 @@ package io.github.r3neer.clingingreoriented;
 import com.moigferdsrte.gravitychanger.entity.ai.DirectionalGroundNodeEvaluator;
 import io.github.r3neer.clingingreoriented.api.LandingSurfaceProvider;
 import io.github.r3neer.clingingreoriented.api.LandingSurfaces;
+import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
@@ -17,10 +18,10 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
-/** S05-C: the support graph is explored online by excluding failed local edges between replans. */
+/** S05-C: the support graph is explored online by excluding failed local launch edges between replans. */
 public final class MobGravityOnlinePlannerGameTests {
     @GameTest(padding=48)
-    public void excludingBestManeuverSelectsNextSafeEdgeWithoutMutation(GameTestHelper h){
+    public void excludingConcreteLaunchesEventuallySelectsNextSafeDirectionWithoutMutation(GameTestHelper h){
         Wolf wolf=wolf(h,true);Vec3 before=wolf.position();
         Vec3 focus=wolf.position().add(4.0D,0.0D,0.0D);
         var goal=new MobGravityLocalPlanner.Goal(){
@@ -51,17 +52,27 @@ public final class MobGravityOnlinePlannerGameTests {
         };
         var registration=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","online_edges"),provider);
         try{
-            var first=MobGravityLocalPlanner.plan(wolf,goal,20,Set.of());
-            h.assertTrue(first.kind()==MobGravityLocalPlanner.Kind.TRANSITION&&first.terminalGravity()==Direction.EAST,
-                "lowest-cost safe edge should be EAST, got "+first.kind()+"/"+first.terminalGravity());
-            h.assertTrue(first.maneuverKey()!=null,"transition did not expose a stable maneuver key");
-            h.assertTrue(first.transitionEvaluations()==5,"unfiltered local expansion should forecast five directions");
+            Set<MobGravityLocalPlanner.ManeuverKey> excluded=new HashSet<>();
+            var plan=MobGravityLocalPlanner.plan(wolf,goal,20,excluded);
+            h.assertTrue(plan.kind()==MobGravityLocalPlanner.Kind.TRANSITION&&plan.terminalGravity()==Direction.EAST,
+                "lowest-cost safe launch should be EAST, got "+plan.kind()+"/"+plan.terminalGravity());
+            h.assertTrue(plan.maneuverKey()!=null,"transition did not expose a stable maneuver key");
+            h.assertTrue(plan.transitionEvaluations()>0&&plan.transitionEvaluations()<=MobGravityLocalPlanner.MAX_LAUNCH_SAMPLES*5,
+                "local expansion escaped bounded launch-region budget: "+plan.transitionEvaluations());
 
-            var second=MobGravityLocalPlanner.plan(wolf,goal,20,Set.of(first.maneuverKey()));
-            h.assertTrue(second.kind()==MobGravityLocalPlanner.Kind.TRANSITION&&second.terminalGravity()==Direction.NORTH,
-                "excluding failed EAST edge should expose next safe NORTH edge, got "+second.kind()+"/"+second.terminalGravity());
-            h.assertTrue(second.maneuverKey()!=null&&!second.maneuverKey().equals(first.maneuverKey()),"excluded maneuver key was selected again");
-            h.assertTrue(second.transitionEvaluations()==4,"excluded edge should be skipped before physical forecast, got "+second.transitionEvaluations());
+            int eastExcluded=0;
+            while(plan.kind()==MobGravityLocalPlanner.Kind.TRANSITION&&plan.terminalGravity()==Direction.EAST
+                &&eastExcluded<MobGravityLocalPlanner.MAX_LAUNCH_SAMPLES){
+                h.assertTrue(excluded.add(plan.maneuverKey()),"planner repeated an already-excluded EAST launch key");
+                eastExcluded++;
+                plan=MobGravityLocalPlanner.plan(wolf,goal,20,Set.copyOf(excluded));
+            }
+            h.assertTrue(eastExcluded>0,"fixture never exercised concrete EAST exclusions");
+            h.assertTrue(plan.kind()==MobGravityLocalPlanner.Kind.TRANSITION&&plan.terminalGravity()==Direction.NORTH,
+                "exhausting bounded EAST launches should expose safe NORTH edge, got "+plan.kind()+"/"+plan.terminalGravity());
+            h.assertTrue(plan.maneuverKey()!=null&&!excluded.contains(plan.maneuverKey()),"excluded maneuver key was selected again");
+            h.assertTrue(plan.transitionEvaluations()<=MobGravityLocalPlanner.MAX_LAUNCH_SAMPLES*5,
+                "replan escaped bounded launch-region budget: "+plan.transitionEvaluations());
             h.assertTrue(wolf.position().equals(before),"online replanning moved the real mob");
         }finally{registration.close();}
         h.succeed();
