@@ -1,6 +1,7 @@
 package io.github.r3neer.clingingreoriented;
 
 import com.moigferdsrte.gravitychanger.util.GravityDirectionUtil;
+import com.moigferdsrte.gravitychanger.util.RotationUtil;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -30,6 +31,28 @@ public final class MobGravityNavigationGameTests {
             "fixture expected EAST wall transition, got "+state.plan().terminalGravity());
         h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(zombie)==Direction.DOWN,
             "recording navigation intent remotely changed zombie gravity");
+        h.succeed();
+    }
+
+    @GameTest(padding=64)
+    public void fleePositionIntentCanUseWallWhenItImprovesSeparation(GameTestHelper h){
+        Zombie zombie=zombie(h,true);wall(h,9);
+        Vec3 threat=h.absoluteVec(new Vec3(3,10,5));
+        Vec3 escape=h.absoluteVec(new Vec3(14,10,5));
+        double before=zombie.position().distanceTo(threat);
+
+        h.assertTrue(MobGravityNavigation.requestPositionAfterVanilla(zombie,escape,1.2D,false),
+            "blocked flee intent was not accepted by generic gravity locomotion");
+        var state=MobGravityNavigation.state(zombie);var plan=state.plan();
+        h.assertTrue(plan!=null&&plan.kind()==MobGravityLocalPlanner.Kind.TRANSITION,
+            "flee intent did not obtain a gravity transition");
+        h.assertTrue(plan.terminalGravity()==Direction.EAST,
+            "fixture expected escape via EAST wall, got "+plan.terminalGravity());
+        Vec3 landing=RotationUtil.getCenterAlignedPosition(plan.transition().landingBody(),zombie.getDimensions(zombie.getPose()),plan.terminalGravity());
+        h.assertTrue(landing.distanceTo(threat)>before,
+            "gravity escape did not improve separation from threat: before="+before+" landing="+landing.distanceTo(threat));
+        h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(zombie)==Direction.DOWN,
+            "planning an escape changed gravity before the launch frontier");
         h.succeed();
     }
 
