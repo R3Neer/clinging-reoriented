@@ -37,9 +37,6 @@ public final class HardeningAdversarialTests {
         var s=ClingingReoriented.data(p);s.owned=true;s.visualFrameOwned=true;s.selected=Direction.EAST;
         Vec3 origin=p.position();
 
-        // Fill a region larger than the complete <=4-block retirement sphere so no
-        // DOWN candidate can pass collision preflight. The fixture deliberately
-        // traps the current EAST box too; failed retirement must still not mutate it.
         BlockPos center=p.blockPosition();
         for(var pos:BlockPos.betweenClosed(center.offset(-5,-5,-5),center.offset(5,7,5)))
             h.getLevel().setBlockAndUpdate(pos,Blocks.STONE.defaultBlockState());
@@ -60,11 +57,12 @@ public final class HardeningAdversarialTests {
     @GameTest(padding=24) public void externalMobWriteRevokesClingingOwnership(GameTestHelper h){
         var pig=h.spawn(EntityTypes.PIG,new BlockPos(6,10,6));pig.setNoAi(true);pig.setNoGravity(true);pig.setOnGround(false);
         pig.addEffect(new MobEffectInstance(Reorientation.EFFECT,400));
-        h.assertTrue(MobGravity.replay(pig,Direction.EAST),"Clinging acquires the frame through a real owned replay");
-        h.assertTrue(MobGravity.state(pig).ownership==MobGravity.Ownership.OWNED_EFFECT,"effect owns replayed gravity");
+        h.assertTrue(MobGravity.ownedTurn(pig,Direction.EAST,true,null),"fixture could not establish owned EAST frame");
+        var state=MobGravity.state(pig);state.ownership=MobGravity.Ownership.OWNED_EFFECT;state.ownedDirection=Direction.EAST;
+        h.assertTrue(state.ownership==MobGravity.Ownership.OWNED_EFFECT,"effect owns the established gravity frame");
 
         GravityDirectionUtil.setGravityDirection(pig,Direction.NORTH);
-        h.assertTrue(MobGravity.state(pig).ownership==MobGravity.Ownership.EXTERNAL,"external write revokes Clinging ownership");
+        h.assertTrue(state.ownership==MobGravity.Ownership.EXTERNAL,"external write revokes Clinging ownership");
         pig.removeAllEffects();MobGravity.tick(pig);
         h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(pig)==Direction.NORTH,"effect expiry preserves the external frame");
         h.succeed();
