@@ -94,7 +94,7 @@ La dependencia ya sustituye `GroundPathNavigation` vanilla por `DirectionalGroun
 - `DirectionalGroundNodeEvaluator.nodePosition(entityPosition,gravity)`;
 - `DirectionalGroundNodeEvaluator.entityPosition(nodePosition,gravity)`.
 
-Por tanto S05 no debe implementar otro pathfinder para paredes/techos. La navegación existente es la capa táctica; nuestro planner sólo decide **cuándo y hacia qué soporte cambiar de gravedad**.
+Por tanto S05 no debe implementar otro pathfinder para paredes/techos. La navegación de Gravity Changer es la capa táctica; nuestro planner sólo decide **cuándo y hacia qué soporte cambiar de gravedad**.
 
 ### Objetivo abstracto
 
@@ -106,15 +106,42 @@ S05-B introduce un objetivo neutral con tres operaciones conceptuales:
 
 Follow/chase/flee implementarán estas políticas en S06. S05-B no conoce dueño, enemigo ni miedo.
 
+### Pureza del pathfinding táctico
+
+Una revisión de Minecraft 26.2 mostró que `PathNavigation.createPath(...)` **no es una consulta pura**: aunque no llame a `moveTo`, actualiza metadatos internos como `targetPos`, `reachRange` y el timeout de atasco. Por tanto S05-B no puede consultar la navegación viva del mob.
+
+La consulta táctica se hace mediante una **navegación espejo efímera**:
+
+- DOWN → `GroundPathNavigation` nueva;
+- gravedad lateral → `DirectionalGroundPathNavigation` nueva;
+- se copian del `NodeEvaluator` activo las capacidades tácticas relevantes (`canFloat`, abrir/pasar puertas y caminar sobre vallas), siguiendo la misma política que usa Gravity Changer al sustituir navegaciones;
+- el `Path` calculado puede formar parte del resultado declarativo, pero la navegación viva no cambia de target, path ni stuck timers durante planificación.
+
+### Lanzamiento futuro sin mutación
+
+El final de un path parcial es una **posición futura**, no la posición física actual del mob. Por tanto S05-B no puede llamar sin más a `evaluateImmediate`, porque simularía el giro desde el lugar equivocado.
+
+S05-A se amplía con una entrada pura de **lanzamiento soportado hipotético**:
+
+- posición de soporte futura;
+- gravedad actual real;
+- velocidad inicial estabilizada `Vec3.ZERO`;
+- AABB del mob en esa posición/gravedad;
+- soporte actual revalidado geométricamente;
+- recolocación centro-a-centro al rotar el AABB hacia la gravedad candidata;
+- después, exactamente la misma simulación de trayectoria/primer contacto/landing que `evaluateImmediate`.
+
+Esto modela la maniobra real prevista por el diseño: caminar hasta la zona de lanzamiento, estabilizarse y sólo entonces cambiar gravedad. No se teletransporta ni se modifica la entidad para preguntar qué ocurriría.
+
 ### Algoritmo acotado
 
 1. Proyectar `focus` al plano de movimiento actual con `DirectionalMobAiUtil`.
 2. Convertir esa proyección a nodo con `DirectionalGroundNodeEvaluator.nodePosition`.
-3. Pedir **una sola** ruta a la navegación actual sin ejecutarla.
+3. Pedir **una sola** ruta a una navegación espejo efímera, nunca a la navegación activa.
 4. Si el path llega y el estado terminal satisface el objetivo, devolver `WALK`.
 5. Si el path es parcial, usar su `getEndNode()` convertido a posición de entidad como frontera caminable.
 6. Si no existe path, la posición actual es la única frontera permitida en S05-B.
-7. Desde esa frontera evaluar como máximo las cinco gravedades distintas de la actual mediante el kernel S05-A.
+7. Desde esa frontera evaluar como máximo las cinco gravedades distintas de la actual mediante el lanzamiento soportado hipotético del kernel S05-A.
 8. Coste candidato = coste de aproximación caminando + coste físico S05-A + heurística del objetivo desde el landing.
 9. Elegir el candidato finito de menor coste; si ninguno existe, devolver `NO_PLAN`.
 
@@ -122,10 +149,11 @@ Follow/chase/flee implementarán estas políticas en S06. S05-B no conoce dueño
 
 - **Una consulta de pathfinding** por planificación local.
 - **Como máximo cinco simulaciones** gravitatorias.
-- Crear un `Path` no inicia `moveTo` ni modifica la navegación activa.
+- El pathfinding de planificación usa navegación espejo y no modifica `navigation.getPath()`, `targetPos`, reach range ni stuck timers de la navegación viva.
 - Nunca se escanean cubos 3D ni todos los bloques cercanos.
 - Un path parcial sirve de frontera, no se interpreta como llegada al objetivo.
 - La posición de frontera se obtiene con la misma convención de nodos que Gravity Changer, no con `BlockPos.containing` ingenuo bajo gravedad lateral.
+- Las transiciones se simulan desde la frontera futura estabilizada, no desde la posición actual.
 - WALK domina a un giro cuando ya cumple el objetivo con navegación ordinaria.
 - La gravedad actual no se reevalúa como “transición”.
 - Un landing rechazado por S05-A no puede reaparecer por una heurística barata.
@@ -133,10 +161,11 @@ Follow/chase/flee implementarán estas políticas en S06. S05-B no conoce dueño
 
 ### Tests TM S05-B
 
-- objetivo caminable en la superficie actual devuelve WALK y cero evaluaciones gravitatorias aceptadas;
+- objetivo caminable en la superficie actual devuelve WALK;
 - obstáculo que produce path parcial usa exactamente el último nodo como frontera;
 - gravedad lateral usa la conversión `nodePosition/entityPosition` de Gravity Changer;
-- ninguna consulta cambia posición, gravedad, navegación ni estado de capacidad;
+- ninguna consulta cambia posición, gravedad, path/target de navegación ni estado de capacidad;
+- un lanzamiento hipotético desde una frontera futura no mueve el mob y usa esa frontera como origen físico;
 - nunca se evalúan más de cinco gravedades;
 - una transición físicamente válida pero más cara que WALK no desplaza a WALK;
 - una transición barata hacia un landing que mejora el objetivo vence a permanecer bloqueado;
