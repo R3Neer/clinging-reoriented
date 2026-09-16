@@ -36,7 +36,9 @@ public final class PetGravityFollowGameTests {
 
         var landing=state.plan().transition().landingBody();
         Vec3 landed=RotationUtil.getCenterAlignedPosition(landing,wolf.getDimensions(wolf.getPose()),Direction.EAST);
-        wolf.setPos(landed.x,landed.y,landed.z);wolf.setDeltaMovement(Vec3.ZERO);wolf.setOnGround(true);
+        // setPos is a transport primitive, not a promise to preserve a gravity-oriented test AABB.
+        // Install the exact forecast terminal body so the landing detector sees the same geometry production will.
+        wolf.setPos(landed.x,landed.y,landed.z);wolf.setBoundingBox(landing);wolf.setDeltaMovement(Vec3.ZERO);wolf.setOnGround(true);
         h.assertTrue(PetGravityFollow.tick(wolf,owner,state,1.0D,2.0F),"first landing contact should remain owned for debounce");
         h.assertTrue(state.phase()==PetGravityFollow.Phase.LANDING_CONFIRM,"first support tick did not enter LANDING_CONFIRM");
 
