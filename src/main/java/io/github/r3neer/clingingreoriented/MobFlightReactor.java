@@ -17,6 +17,7 @@ import net.minecraft.world.phys.Vec3;
  */
 public final class MobFlightReactor {
     private static final int REACTION_FORECAST_TICKS=80;
+    static final int REACTION_MARGIN_TICKS=2;
     private static final double TARGET_CORRECTION_MIN_IMPROVEMENT=1.5D;
     private static final double RISK_EPS=1.0E-9D;
     private static final Map<LivingEntity,FlightState> STATES=new WeakHashMap<>();
@@ -53,18 +54,19 @@ public final class MobFlightReactor {
 
         FlightState state=STATES.get(entity);
         Vec3 focus=currentFocus(mob);
+        int monitorHorizon=monitorHorizonTicks(entity);
         if(state==null){
             state=new FlightState();STATES.put(entity,state);
             MobFlightReaction.begin(state.reaction,null,focus);
-            var baseline=MobFlightMonitor.forecast(entity);
+            var baseline=MobFlightMonitor.forecast(entity,monitorHorizon);
             adoptSafeBaseline(entity,state,baseline);
             MobFlightReaction.observeDanger(entity,state.reaction,baseline);
             return;
         }
 
         var observation=state.expectedContact==null
-            ?MobFlightMonitor.forecast(entity)
-            :MobFlightMonitor.observe(entity,state.expectedContact,MobFlightMonitor.DEFAULT_HORIZON_TICKS);
+            ?MobFlightMonitor.forecast(entity,monitorHorizon)
+            :MobFlightMonitor.observe(entity,state.expectedContact,monitorHorizon);
         if(observation.status()==MobFlightMonitor.Status.SAFE_SUPPORT
             ||observation.status()==MobFlightMonitor.Status.SAFE_CHANGED_SUPPORT
             ||observation.status()==MobFlightMonitor.Status.EXPECTED_SUPPORT)
@@ -83,6 +85,20 @@ public final class MobFlightReactor {
             if(tryCorrection(mob,state,latest,false))return;
             MobFlightReaction.consumeTarget(state.reaction);
         }
+    }
+
+    /**
+     * A newly observed obstacle is only actionable after the mob's reaction delay. Looking farther than
+     * that delay plus a small maneuver margin cannot make a legal correction happen any earlier; the exact
+     * committed landing is revalidated independently before this short forecast.
+     */
+    static int monitorHorizonTicks(LivingEntity entity){
+        return monitorHorizonForReactionTicks(MobReactionTime.ticks(entity));
+    }
+
+    static int monitorHorizonForReactionTicks(int reactionTicks){
+        int reaction=Math.clamp(reactionTicks,MobReactionTime.MIN_TICKS,MobReactionTime.MAX_TICKS);
+        return Math.min(MobFlightMonitor.DEFAULT_HORIZON_TICKS,reaction+REACTION_MARGIN_TICKS);
     }
 
     private static void adoptSafeBaseline(LivingEntity mob,FlightState state,MobFlightMonitor.Observation observation){
