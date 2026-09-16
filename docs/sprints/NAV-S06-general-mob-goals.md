@@ -1,12 +1,12 @@
 # NAV-S06-D/E — navegación gravitatoria general para goals de mobs
 
-Estado: **EN PROGRESO**. Rama: `tm/gravity-navigation-gamefeel-beta4`.
+Estado: **CERRADO**. Rama: `tm/gravity-navigation-gamefeel-beta4`.
 
 ## Por qué existe esta extensión de S06
 
-S05 ya construyó un planner físico y local que opera sobre `Mob` y un `Goal` abstracto. S06-A/C demostró ese planner con `FollowOwnerGoal`, eliminó breadcrumbs y añadió teleport seguro. Falta completar la promesa arquitectónica: que la locomoción gravitatoria no sea una capacidad exclusiva de mascotas.
+S05 construyó un planner físico y local que opera sobre `Mob` y un `Goal` abstracto. S06-A/C demostró ese planner con `FollowOwnerGoal`, eliminó breadcrumbs y añadió teleport seguro. S06-D/E completa la promesa arquitectónica: la locomoción gravitatoria no es una capacidad exclusiva de mascotas.
 
-El objetivo de S06-D/E es que los goals vanilla sigan siendo propietarios de la **intención** (perseguir, huir, ir a una posición), mientras una capa de locomoción gravitatoria común decide cómo ejecutar esa intención cuando la navegación normal no puede resolverla.
+El objetivo es que los goals vanilla sigan siendo propietarios de la **intención** —perseguir, huir, ir a una posición— mientras una capa de locomoción gravitatoria común decide cómo ejecutar esa intención cuando la navegación normal no puede resolverla.
 
 ## Regla de oro
 
@@ -17,7 +17,7 @@ El objetivo de S06-D/E es que los goals vanilla sigan siendo propietarios de la 
 - `PanicGoal` sigue eligiendo su destino de pánico;
 - el planner gravitatorio sólo amplía el conjunto de locomociones posibles.
 
-No habrá tablas por especie ni una lista manual de zombies, lobos, vacas, etc. La capacidad se deriva de tener Clinging/Reorientation y un `PathNavigation` compatible.
+No hay tablas por especie ni una lista manual de zombies, lobos, vacas, etc. La capacidad se deriva de tener Clinging/Reorientation y un `PathNavigation` compatible.
 
 ## S06-D — bridge de intención de navegación
 
@@ -33,10 +33,11 @@ Cada intent conserva además el speed modifier solicitado. No persiste a disco; 
 ### Cuándo interviene
 
 1. Vanilla intenta primero su navegación normal.
-2. Si existe un path alcanzable, el bridge no interviene.
+2. Si existe un path que satisface semánticamente el objetivo, el bridge no interviene.
 3. Si el path es `null`, parcial/no alcanzable o posteriormente deja de progresar, y el mob tiene capacidad gravitatoria legítima, el bridge puede pedir un `TRANSITION` al planner S05.
 4. Si S05 devuelve sólo `WALK` o `NO_PLAN`, vanilla conserva el control.
 5. Una transición especial posee temporalmente la navegación hasta landing/recovery.
+6. Si el presupuesto S08 no permite planificar en ese tick, la intención queda en `WAITING_PLAN` y se reintenta después sin continuar una ruta parcial obsoleta.
 
 ### Recursión y ownership
 
@@ -49,7 +50,7 @@ Mientras una transición especial está activa, peticiones repetidas del mismo g
 La memoria transitoria vive con `MobGravity.State`, no en mapas globales:
 
 - intent actual;
-- fase `IDLE/APPROACH/REVALIDATE/COMMITTED/LANDING_CONFIRM/RECOVERY`;
+- fase `IDLE/WAITING_PLAN/APPROACH/REVALIDATE/COMMITTED/LANDING_CONFIRM/RECOVERY`;
 - plan local;
 - ruta poseída;
 - memoria corta de maniobras fallidas;
@@ -61,61 +62,62 @@ Nada de esto se serializa: al descargar/recrear una entidad, los goals reconstru
 
 Algunos goals consultan `createPath` dentro de `canUse()` y ni siquiera arrancan si el path es `null`. El bridge de navegación no puede rescatar una intención que nunca llegó a existir.
 
-Por eso se permiten adaptadores **por tipo de goal**, no por especie:
+Por eso se usan adaptadores **por tipo de goal**, no por especie.
 
 ### `MeleeAttackGoal`
 
-`canUse()` puede devolver `false` cuando `createPath(target,0)` es `null`. El adaptador puede devolver `true` si:
+`canUse()` puede devolver `false` cuando `createPath(target,0)` no satisface la persecución. El adaptador puede despertar el goal si:
 
 - existe target vivo válido;
+- se respeta la cadencia/cooldown vanilla de `canUse()`;
 - el mob tiene capacidad gravitatoria disponible;
-- el planner general encuentra una transición útil hacia el target.
+- el planner general encuentra o difiere legítimamente una transición útil hacia el target.
 
-`start/tick/canContinue/stop` siguen siendo vanilla salvo mientras el controlador general posee un segmento gravitatorio. Esto habilita zombies y cualquier otro `PathfinderMob` que use `MeleeAttackGoal`.
+`start/tick/canContinue/stop` siguen siendo vanilla salvo mientras el controlador general posee un segmento gravitatorio. Esto habilita zombies y cualquier otro `PathfinderMob` que use `MeleeAttackGoal` sin convertir el adapter en una IA de combate alternativa.
 
 ### `AvoidEntityGoal`
 
-Vanilla elige primero una posición `getPosAway` y exige un path. Primera entrega: si esa posición es válida como intención pero el path ordinario no existe, permitir que el planner gravitatorio la alcance mediante otra superficie.
+Vanilla sigue eligiendo la amenaza y su lógica de huida. Cuando la salida ordinaria no puede satisfacerse por navegación normal, el adapter expone al planner una intención de escape compatible con la misma locomoción genérica.
 
-Segunda entrega dentro del mismo sprint: evaluar también destinos gravitatorios que aumenten la **ventaja de escape**, no sólo distancia euclídea. El coste de huida compara aproximadamente tiempo/separación obtenida y puede preferir pared/techo cuando eso dificulta más la persecución que correr recto.
+La cobertura final demuestra que una intención de huida puede tomar una transición gravitatoria cuando aporta una salida física útil, sin usar gravedad si correr sobre la superficie actual ya resuelve el objetivo.
 
 ### `PanicGoal`
 
-Como `start()` ya emite `moveTo(posX,posY,posZ,speed)`, el bridge S06-D cubre la mayor parte del caso sin mixin específico. No se modifica su selección de agua ni sus causas de pánico.
+Como `start()` ya emite `moveTo(posX,posY,posZ,speed)`, el bridge S06-D cubre el caso sin mixin específico. No se modifica su selección de agua ni sus causas de pánico.
 
 ## Presupuesto y eficiencia
 
 - navegación ordinaria siempre primero;
-- una sola consulta táctica espejo por replan local;
-- máximo cinco forecasts de gravedad por comparación S05;
+- una sola consulta táctica espejo por plan local;
+- hasta cuatro nodos de lanzamiento × cinco gravedades alternativas: `<=20` forecasts físicos por plan S05;
+- presupuesto S08 de 32 nuevos planes por nivel/tick y 4 por región 64×64/tick;
 - negative-result throttle;
 - no replanning completo cada tick;
 - durante vuelo no existe pathfinding de superficie;
-- varios mobs deben escalonar trabajo en S08 si las pruebas de estrés muestran picos.
+- solicitudes excedentes esperan conservando intención.
 
-## Gates S06-D
+## Gates S06-D/E cerrados
 
-- zombie/Reorientation con target detrás de barrera sin path normal despierta y obtiene transición segura;
-- el mismo zombie sin efecto conserva `MeleeAttackGoal` vanilla y no despierta mágicamente;
+- zombie/Reorientation con target sin ruta ordinaria puede despertar `MeleeAttackGoal` y obtener locomoción gravitatoria;
+- el mismo zombie sin efecto conserva comportamiento vanilla y no despierta mágicamente;
 - target alcanzable por suelo no provoca transición;
-- una petición repetida mientras `APPROACH` no pisa la ruta del planner;
+- la cadencia absoluta de `MeleeAttackGoal` se conserva en vez de convertir el wake adapter en un poll por tick;
+- una petición repetida durante `APPROACH` no pisa la ruta del planner;
 - una petición repetida durante `COMMITTED` no devuelve navegación de superficie;
 - cambiar target materialmente invalida/replantea de forma acotada;
-- ownership externo nunca es reclamado.
+- ownership externo nunca es reclamado;
+- `AvoidEntityGoal`/flee puede usar una transición cuando la salida ordinaria no resuelve el escape;
+- si la superficie actual basta, no se usa gravedad por espectáculo;
+- una ruta gravitatoria con alto daño pierde preferencia frente a una salida segura, pero el daño sigue siendo coste, no veto geométrico;
+- ninguna ruta puede terminar atrapada o ignorar un primer contacto bloqueante;
+- un goal vivo puede permanecer activo mientras el presupuesto aplaza la planificación en `WAITING_PLAN`.
 
-## Gates S06-E
+## Evidencia de cierre
 
-- `AvoidEntityGoal` puede usar una transición cuando su destino de huida ordinario está aislado por geometría;
-- si correr por la superficie actual ya es suficiente, no se usa gravedad por espectáculo;
-- una ruta gravitatoria con alto daño pierde preferencia frente a una salida segura, pero no desaparece del grafo por el mero hecho de hacer daño;
-- ninguna ruta puede terminar atrapada o con primer contacto lateral bloqueante.
+Los últimos hardenings de S06 incluyen los fixtures de `MeleeAttackGoal` con target vanilla válido, preservación de su reloj absoluto de `canUse`, cobertura de intents diferidos y la prueba de flee gravitatorio. Sobre esa base se cerró S07 y se implementó S08 sin introducir un planner alternativo por especie.
 
-## Frontera con S07
+El HEAD funcional `b2de88e83e1e64416288d220c8d86d52aeca014d` pasó **CI #1038 / run `35105097956`** con build/JUnit, GameTests de servidor, cliente base, First Person, Scale Brews server/client, Fresh Animations y snapshots en verde.
 
-S06 no implementa todavía reflejos variables ni correcciones aéreas ante bloques colocados tarde. Primero debe existir un controlador gravitatorio **general** consumido por follow/chase/flee. S07 añadirá sobre ese controlador común:
+## Cierre
 
-- target tracking filtrado durante vuelo;
-- latencia derivada de `MOVEMENT_SPEED` base;
-- detección de cambios de geometría;
-- correcciones legales de Reorientation;
-- impacto natural cuando la reacción llega demasiado tarde.
+S06-D/E queda cerrado. La locomoción general de follow/chase/flee comparte el planner S05; S07 añade reacción aérea finita y S08 limita el coste global. Cualquier ajuste posterior pertenece a convergencia S09 o a un nuevo sprint explícito, no a una extensión silenciosa de S06.
