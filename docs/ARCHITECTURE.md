@@ -1,18 +1,22 @@
 # Architecture
 
-Clinging: Reoriented 0.1.0-beta.3 separates **physical gravity**, **camera ownership**, **body presentation**, **landing authority**, **aerodynamic steering**, **impact damage**, **interaction context** and the independent **Gravity Charge projectile lifecycle** instead of treating a gravity-direction write as one monolithic event. Beta.3 preserves the beta.2 gameplay/camera architecture while hardening hot paths and bounded recovery work.
+This document describes the **unreleased beta.4 navigation/gamefeel development architecture**. **0.1.0-beta.3** remains the latest published prerelease.
+
+Clinging: Reoriented separates **physical gravity**, **camera ownership**, **persistent body attitude**, **aerodynamic response**, **trajectory prediction**, **landing authority**, **impact damage**, **interaction context**, **gravity-aware mob locomotion** and the independent **Gravity Charge projectile lifecycle** instead of treating a gravity-direction write as one monolithic event.
 
 ## Authority and design rule
 
-The server owns physical gravity, collision, effect/charge state, landing commitment, aerodynamic velocity changes, safety intervention, damage and Gravity Charge acquisition/capture state. A voluntary gravity decision changes acceleration while preserving the current **world-space velocity vector**.
+The server owns physical gravity, collision, effect/charge state, landing commitment, aerodynamic velocity changes, mob gravity planning/commit, safety intervention, damage and Gravity Charge acquisition/capture state. A voluntary gravity decision changes acceleration while preserving the current **world-space velocity vector**.
 
-Presentation may interpolate that decision but cannot invent position, collision or damage. Gravity Fall air-diving redirects existing momentum within a bounded server-authoritative rule and does not create speed/lift.
+Presentation may interpolate physical decisions but cannot invent position, collision, damage or gravity capability. The beta.4 physical/predictive rule is deliberately shared: player landing and mob gravity transitions use the same conceptual motion primitives rather than maintaining separate approximate physics.
 
 ## Input and intent
 
 `GravityInput` plus client input mixins produce edge-triggered gravity requests. `select_intent_v3` carries `selectionLook` for cardinal selection and `navigationHeading` for gravity-coordinate orientation transport. The server validates sequence/revision, effect ownership, input context, airborne budget, target, hierarchy and collision clearance.
 
-Water uses `WaterDoubleTapDetector` for Space-release-Space while leaving vanilla key state intact. `WorldVerticalWaterMixin` makes owned swimming ascent/descent world +Y/-Y. Climbables use DOWN vanilla, lateral ignore and mirrored UP behaviour.
+Water uses `WaterDoubleTapDetector` for Space-release-Space while leaving vanilla key state intact. During owned water movement, horizontal movement is reconstructed in the camera frame: W/S use camera forward/back including pitch and A/D use camera left/right. `WorldVerticalWaterMixin` keeps Space/Shift on world +Y/-Y. Logical gravity is not the water control frame.
+
+Climbables use DOWN vanilla, lateral ignore and mirrored UP behaviour.
 
 During sustained Gravity Fall, the client sends sparse world-space gaze/forward samples. The server accepts only fresh, finite, monotonic samples while Gravity Fall owns the context.
 
@@ -20,33 +24,111 @@ During sustained Gravity Fall, the client sends sparse world-space gaze/forward 
 
 `GravityTransition` plans gravity/yaw coordinate transport but voluntary turns do not rotate world velocity. Gravity Changer remains the gravity-coordinate authority; Clinging records whether physical and visual state is its responsibility and releases ownership when another source takes over.
 
-`VisualTransitions` provides HOLD, LAND and SNAP presentation modes. Local-player LAND uses a shared **500 ms / 10 tick** window; ordinary tracked non-player SNAP keeps shorter 180/240 ms turn timing. Cancellation caused by invalidated support may hold the exact current quaternion; lifecycle/context transfer releases ownership. A camera HOLD created inside an already-active fluid context preserves the retained world frame for that fluid epoch; a later independent fluid entry still crosses the transfer fence and releases an older dry-flight HOLD.
+`VisualTransitions` provides HOLD, LAND and SNAP presentation modes. Local-player LAND uses at most **500 ms / 10 ticks**; ordinary tracked non-player SNAP keeps shorter 180/240 ms turn timing. Cancellation caused by invalidated support may hold the exact current quaternion; lifecycle/context transfer releases ownership.
 
-## Full-sphere Gravity Fall and body root
+A camera HOLD created inside an already-active fluid context preserves the retained world frame for that fluid epoch; a later independent fluid entry still crosses the transfer fence and releases an older dry-flight HOLD.
+
+The underwater camera frame is separate from logical gravity. Unsupported/free swimming converges to world-up; real gravity-relative support converges to support-up. Brief support hysteresis prevents one-tick geometry noise from flipping ownership, and neither visual state rewrites the stored gravity attribute.
+
+## Full-sphere Gravity Fall and body attitude
 
 `GravityFallLookState` owns a continuous local camera orientation only while the local player has active Gravity Fall presentation. Mouse deltas are applied in the camera's own screen frame, so horizontal/vertical intent keeps the same handedness through both pitch poles. The entity's ordinary yaw/pitch fields remain a vanilla-compatible representation of the same **forward vector** rather than storing out-of-range full-sphere pitch.
 
 `GravityFallCameraMixin` composes that camera-base orientation after Gravity Changer's retained visual-gravity frame and rebuilds Minecraft's camera basis. Vanilla third-person boom distance and wall clipping therefore consume the same continuous look frame instead of a second custom orbit implementation. Switching between first and third person changes camera placement, not the meaning of look input. When Gravity Fall releases ownership, the canonical entity yaw/pitch already represents the current gaze, so exit does not snap the view.
 
-`GravityFallState` is a server-authoritative coarse phase machine. Sustained presentation begins after 12 airborne ticks. `GravityFallVisuals`, `BodyOrientation` and `BodyRenderMath` reconstruct the body client-side from world velocity, with a six-tick entry blend and stable zero-speed retention.
+`GravityFallState` is a server-authoritative coarse phase machine. Sustained presentation begins after 12 airborne ticks. `GravityFallVisuals`, `BodyOrientation` and `BodyRenderMath` maintain a persistent body attitude with stable zero-speed retention rather than rebuilding the body frame directly from velocity every tick.
 
-During SUSTAIN, look may pull the macro body only outside a 35-degree deadzone, capped at 7.5 degrees/tick. LAND disables this steering and uses the shared 500 ms timing. Fresh Animations/EMF/ETF retain ownership of internal limb/head/equipment animation.
+`GravityFallAerodynamics.advanceBody` applies two bounded attitude influences:
 
-First Person uses a blended body-center/camera pivot for the avatar root; the real camera never receives the macro body transform.
+- gaze may pull the macro body only outside a **35-degree neck deadzone**, capped at **7.5 degrees/tick**;
+- velocity applies only weak **1.25 degrees/tick** weathercock stabilization and selects the closer head/feet axis, so stabilization cannot manufacture a 180-degree flip.
 
-## Aerodynamics, safety, impact and mace
+LAND uses the shared final landing timing instead of continuing free-flight attitude steering. Fresh Animations/EMF/ETF retain ownership of internal limb/head/equipment animation. First Person uses a blended body-center/camera pivot for the avatar root; the real camera never receives the macro body transform.
 
-`GravityFallAerodynamics` contains bounded body look-follow, posture drag and W air-diving: max 6 degrees/tick, positive velocity/look dot gate, preserved speed before drag and no generated thrust. `FlightSafety` caps eligible airborne world speed at 3.92 blocks/tick and guards unloaded/hard world boundaries.
+## Aerodynamics, shared trajectory physics, safety, impact and mace
+
+`GravityFallAerodynamics.applyAerodynamics` implements body-relative anisotropic drag. Velocity is decomposed into longitudinal and transverse components along the visible body's long axis; longitudinal momentum is retained and the transverse component receives **2.5% additional drag per tick**. This bends trajectory as a consequence of posture while losing energy. There is no W-specific airborne steering, angular velocity magnet, generated thrust or Elytra-style lift.
+
+`AirMotion` is the shared next-velocity seam used by real/predicted airborne motion. `TrajectoryPrediction` advances a real AABB through a bounded horizon and asks `LandingSurfaces.sweep` for the first contact. This predictor is reused by player landing, mob transition evaluation and committed-flight monitoring. Unknown geometry is not treated as air.
+
+`FlightSafety` caps eligible airborne world speed at 3.92 blocks/tick and guards unloaded/hard world boundaries.
 
 `ImpactState` and `ImpactDamage` derive damage from world-space velocity actually absorbed by collision and route equivalent fall distance through vanilla block/fall handling when possible.
 
 `DirectionalMaceFall` tracks literal displacement along the current gravity direction. A gravity change starts a fresh segment; old-axis distance and gravity strength do not contaminate smash height.
 
-## Landing surfaces and fluids
+## Landing surfaces, prediction and fluids
 
-`LandingSurfaceProvider` / `LandingSurfaces` expose bounded support and swept-contact semantics with stable identity for revalidation. Vanilla collision geometry is the base provider. `FluidContext.intersects` fences any non-empty fluid volume before a provider can create Clinging support/landing semantics. The same fluid-volume test also accepts hypothetical AABBs so planners and safe fallbacks can reject a future body without moving the entity first.
+`LandingSurfaceProvider` / `LandingSurfaces` expose bounded support and swept-contact semantics with stable identity for revalidation. Vanilla collision geometry is the base provider. `FluidContext.intersects` fences any non-empty fluid volume before a provider can create Clinging support/landing semantics. The same fluid-volume test accepts hypothetical AABBs so planners and safe fallbacks can reject a future body without moving the entity first.
 
-`LandingPrediction.MAX_TICKS` is the 10-tick presentation window. `LandingState` commits only while the same candidate remains valid, matches physical gravity, revalidates and stays reachable.
+Landing now separates **acquisition** from **presentation**:
+
+- `LandingPrediction.ACQUISITION_TICKS = 40` allows a physically valid support to be discovered up to two seconds ahead;
+- the final visual presentation remains bounded by the shared 10-tick window;
+- `LandingState` stores stable surface identity, gravity, ETA and bounded miss hysteresis;
+- a candidate retained only by hysteresis cannot start or maintain visible LAND without current physical confirmation;
+- the first swept contact remains authoritative, so a blocking contact cannot be ignored to select a support behind it;
+- Gravity Fall reuses the candidate computed by landing state rather than performing an independent second world sweep in the same tick;
+- touchdown earlier than forecast releases residual presentation immediately.
+
+## Gravity-aware mob navigation
+
+The beta.4 mob system deliberately separates **high-level intent** from **locomotion**. Vanilla goals still decide why a mob wants to move; the gravity layer only expands how a mob with legitimate Clinging/Reorientation capability may satisfy that intent when ordinary navigation fails.
+
+### Physical transition planner
+
+`MobGravityPlanner` evaluates one complete candidate transition without mutating the mob:
+
+**supported launch → gravity change → predicted airborne segment → first contact → habitable landing**.
+
+It reuses `TrajectoryPrediction`, `AirMotion` and `LandingSurfaces.sweep`, evaluates the real mob AABB in the candidate orientation, fails closed on unknown geometry, rejects blocking/trapped landings and computes vanilla-equivalent impact plus robustness. Physical impossibility is a veto; damage/risk is a strongly nonlinear cost rather than an automatic impossibility.
+
+`MobGravityLocalPlanner` puts that evaluator behind ordinary navigation. It asks one ephemeral mirror navigation for a tactical path. If ordinary walking really satisfies the goal, gravity work stops there. Otherwise it considers up to the final **four launch nodes** of the partial path and the **five alternate gravity directions**, giving an explicit maximum of **20 physical transition forecasts per local plan**. The returned approach path is truncated to the chosen launch frontier.
+
+`ManeuverKey(currentGravity, frontierNode, targetGravity)` identifies a concrete edge. Failed/non-progressive edges are excluded temporarily without banning the same gravity from nearby launch nodes.
+
+### General intent bridge
+
+`MobGravityNavigation` is the runtime bridge for ordinary mob goals. Its transient phase machine is:
+
+`IDLE → WAITING_PLAN → APPROACH → REVALIDATE → COMMITTED → LANDING_CONFIRM / RECOVERY`.
+
+Entity and position intents remain owned by the calling vanilla goal. Reachable vanilla paths are never replaced for spectacle. Wake adapters exist only for goal types such as `MeleeAttackGoal`/`AvoidEntityGoal` that can abort in `canUse()` before ever emitting `moveTo`; they expose the missing intent to the common planner rather than reimplementing species AI.
+
+Repeated requests during an owned gravity segment update/observe intent without overwriting the approach or returning airborne control to surface navigation. Revalidation occurs immediately before a gravity commit from the real supported position.
+
+### Pet follow
+
+`PetGravityFollow` consumes the same physical/local planner for `FollowOwnerGoal`. Pet following is **history-free**: runtime contains no owner breadcrumb queue, TTL, replay coordinate or historical gravity-turn instruction.
+
+A pet uses a filtered current owner target and current geometry. Ordinary same-surface following stays vanilla. When gravity is necessary, the pet walks to the selected launch frontier, revalidates, commits one legal transition, lets physics own the flight and requires stable support before replanning. An airborne owner remains trackable through filtered/tangential targeting; owner gravity changes do not remotely command the pet to turn.
+
+`PetGravityTeleport` is a guarded extreme-separation fallback, not hidden planner locomotion. A candidate must fit the body, be fluid/hazard free, have real support in its candidate gravity frame and expose tangent egress. External/borrowed gravity ownership cannot be stolen.
+
+### Dynamic flight observation and reaction
+
+`MobFlightMonitor` observes only a committed airborne segment. It uses current AABB, velocity, gravity, `AirMotion.nextVelocity` and `LandingSurfaces.sweep`; it never runs surface pathfinding or changes gravity.
+
+`MobFlightReaction` stores material target/danger observations plus a fixed action deadline. `MobReactionTime` derives latency from the mob's **base `MOVEMENT_SPEED`**, not `deltaMovement`, fall speed or transient momentum, using a smooth bounded curve of **2–10 ticks**. Later observations may update pending data without indefinitely pushing the deadline forward; returning to a safe/non-material state cancels the pending action.
+
+`MobFlightReactor` joins those pieces. Its dynamic monitor horizon is:
+
+`min(20, reactionTicks + 2)`
+
+while the exact committed `LandingSurfaces.Contact` is revalidated independently even when it lies beyond that short horizon. Reorientation may evaluate a new airborne correction only after the reaction delay and only through the same physical safety rules. Spent Clinging cannot acquire a second turn. If impact occurs before the legal reaction time, the collision is accepted as real gameplay.
+
+### Planning budget
+
+`MobGravityPlanningBudget` limits **new grounded gravity plans**, not vanilla navigation or already committed flight:
+
+- maximum **32** new gravity plans per server level/tick;
+- maximum **4** per **64×64 X/Z region/tick**;
+- a local plan remains internally bounded to `<=20` transition forecasts;
+- excess generic work moves to `WAITING_PLAN` with its intent preserved and retries on following ticks;
+- `PetGravityFollow` uses the same budget rather than a private unlimited path;
+- mobs without usable gravity capability do not consume a planning slot.
+
+`MobGravityNavigation` bounds failed-edge memory to eight exclusions per executor and keeps negative/replan throttles, preventing repeated misses from turning the budget into a busy loop.
 
 ## Gravity Charge lifecycle
 
@@ -76,9 +158,9 @@ Player-facing translation files are `en_us.json` and `es_es.json`. CI requires e
 
 `PlayerData` separates physical ownership, visual frame, airborne/landing state, Gravity Fall epoch/look/aero state, mace fall segment and safety frontier state. Teleports/transfers clear transient spatial state before context changes. Respawn/replacement preserves monotonic epochs without migrating obsolete entity-instance animation.
 
-Mounted gravity remains transactional over the root/passenger hierarchy. Pet following is **history-free**: `MobGravityPlanner` forecasts one physical support-to-support transition without mutation, `MobGravityLocalPlanner` combines one gravity-aware tactical path with at most five transition forecasts, and `PetGravityFollow` executes only the next edge through APPROACH → REVALIDATE → COMMITTED → LANDING_CONFIRM/RECOVERY. Failed `ManeuverKey` edges are excluded temporarily instead of being retried forever. `FollowGravityMixin` delegates only special gravity segments; ordinary same-surface follow stays vanilla.
+`MobGravity.State` holds mob gravity ownership plus transient navigation state. Gravity planning never steals external ownership. Support-to-support commits use the same legal Clinging/Reorientation capability rules as runtime: Clinging consumes its one airborne decision; Reorientation can support later legal corrections; stable support restores the normal next segment according to effect rules.
 
-Powered pets no longer use vanilla's DOWN-only teleport blindly. `PetGravityTeleport` first keeps ordinary navigation alive and only treats extreme separation as a fallback condition. A teleport candidate must fit the real body, be fluid/hazard free, have real support in the candidate gravity frame and expose at least one tangent egress. Current gravity is preferred; external/borrowed ownership cannot be stolen. There is no owner breadcrumb queue, TTL, replay coordinate or historical turn recording in runtime state.
+Mounted gravity remains transactional over the root/passenger hierarchy.
 
 ## Alchemical Leather semantic-wear boundary
 
@@ -99,6 +181,6 @@ Production code does not compile against Scale Brews or Alchemical Leather. Firs
 
 ## State summary
 
-The major gravity states are GROUNDED, AIRBORNE, SUSTAINED_GRAVITY_FALL, LANDING_COMMITTED and context transfer. These remain orthogonal to effect acquisition, Gravity Charge projectile state, mount loans, the pet follow executor and external gravity ownership.
+Player gravity states include GROUNDED, AIRBORNE, SUSTAINED_GRAVITY_FALL, LANDING_COMMITTED and context transfer. Mob gravity locomotion adds its own transient planning/execution phases without changing effect capability. These remain orthogonal to Gravity Charge projectile state, mount loans, optional semantic wear and external gravity ownership.
 
-**0.1.0-beta.1** introduced Gravity Charge and the beta line. **0.1.0-beta.2** replaced the pole-singular Gravity Fall look representation while keeping gameplay authority unchanged. **0.1.0-beta.3** preserves those semantics while reducing hot-path allocation/CPU work and bounding rare recovery searches.
+**0.1.0-beta.1** introduced Gravity Charge and the beta line. **0.1.0-beta.2** replaced the pole-singular Gravity Fall look representation. **0.1.0-beta.3** is the latest published performance/stability prerelease. The **unreleased beta.4 campaign** replaces W steering with posture-driven aerodynamics, separates 40-tick landing acquisition from 10-tick presentation, adds camera-relative water locomotion and introduces bounded, reaction-aware gravity locomotion for pets and general mob goals.
