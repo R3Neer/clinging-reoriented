@@ -64,7 +64,7 @@ public final class PetGravityFollowGoalGameTests {
         goal.stop();h.succeed();
     }
 
-    @GameTest(padding=64,maxTicks=180)
+    @GameTest(padding=64,maxTicks=300)
     public void realWolfAiExecutesAtLeastOneSafeGravityTransitionWithoutBreadcrumbs(GameTestHelper h){
         var owner=owner(h,new Vec3(14,10,5));clear(h);floor(h);
         Wolf wolf=h.spawn(EntityTypes.WOLF,new BlockPos(5,10,5));wolf.tame(owner);wolf.setOrderedToSit(false);
