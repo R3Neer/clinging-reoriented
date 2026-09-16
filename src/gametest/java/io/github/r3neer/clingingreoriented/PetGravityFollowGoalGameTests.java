@@ -30,7 +30,7 @@ public final class PetGravityFollowGoalGameTests {
 
         goal.start();goal.tick();
         h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(wolf)==Direction.DOWN,"approach tick changed gravity before frontier");
-        h.assertTrue(wolf.getNavigation().getTargetPos()!=null,"special follow did not author the tactical approach route");
+        h.assertTrue(wolf.getNavigation().getPath()!=null&&!wolf.getNavigation().isDone(),"special follow did not author the tactical approach path");
 
         Vec3 frontier=state.plan().frontier();
         wolf.setPos(frontier.x,frontier.y,frontier.z);wolf.setOnGround(true);wolf.setDeltaMovement(Vec3.ZERO);
