@@ -7,11 +7,10 @@ import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.ai.navigation.PathNavigation;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
-/** Passive effect lifetime and temporary rider grant; no navigation decisions. */
+/** Passive effect lifetime, temporary rider grants, and owned physical gravity commits. */
 public final class MobGravity {
     private static final double RECOVERY_RADIUS=4.0;
     public enum Ownership { NONE, OWNED_EFFECT, BORROWED_RIDER, EXTERNAL }
@@ -21,13 +20,6 @@ public final class MobGravity {
         public Ownership borrowedPreviousOwnership=Ownership.NONE;
         public Direction borrowedPreviousDirection=Direction.DOWN;
         public boolean airUsed;
-        public long breadcrumb;
-        public java.util.UUID breadcrumbOwner;
-        public long breadcrumbRoute=-1;
-        public long breadcrumbRouteRetryAt;
-        public boolean breadcrumbRouteOwned;
-        public PathNavigation breadcrumbNavigation;
-        public boolean breadcrumbRelocating;
         public long retryAt;
         public long visualSequence;
         public void clearBorrow(){borrowedPreviousOwnership=Ownership.NONE;borrowedPreviousDirection=Direction.DOWN;}
@@ -204,7 +196,7 @@ public final class MobGravity {
         return executePlannedTransition(mob,targetGravity,MobGravityPlanner.DEFAULT_TRANSITION_HORIZON_TICKS);
     }
     public static MobGravityPlanner.Transition executePlannedTransition(LivingEntity mob,Direction targetGravity,int horizonTicks){
-        if(!canReplayBreadcrumb(mob)||targetGravity==null||!AirChanges.grounded(mob))return null;
+        if(!canOwnEffectTransition(mob)||targetGravity==null||!AirChanges.grounded(mob))return null;
         Direction current=GravityDirectionUtil.getOwnGravityDirection(mob);
         if(current==targetGravity)return null;
         var evaluation=MobGravityPlanner.evaluateGroundedLaunch(mob,mob.position(),targetGravity,horizonTicks);
@@ -216,29 +208,10 @@ public final class MobGravity {
         return transition;
     }
 
-    public static boolean replay(LivingEntity pet,Direction direction){
-        if(!canReplayBreadcrumb(pet))return false;
-        var s=state(pet);
-        if(AirChanges.grounded(pet))s.airUsed=false;
-        Direction current=GravityDirectionUtil.getOwnGravityDirection(pet);
-        if(direction==current)return true;
-        if((s.ownership==Ownership.EXTERNAL||s.ownership==Ownership.NONE)&&current!=Direction.DOWN)return false;
-        if(s.airUsed && !pet.hasEffect(Reorientation.EFFECT))return false;
-        boolean airborne=!AirChanges.grounded(pet);
-        if(!ownedTurn(pet,direction,true,null)){
-            Vec3 centered=RotationUtil.getCenterAlignedPosition(pet.getBoundingBox(),pet.getDimensions(pet.getPose()),direction);
-            if(centered.distanceToSqr(pet.position())<=1.0E-12)return false;
-            s.breadcrumbRelocating=true;
-            try{if(!ownedRelocateTree(pet,direction,centered,null))return false;}
-            finally{s.breadcrumbRelocating=false;}
-        }
-        s.airUsed|=airborne;s.ownership=Ownership.OWNED_EFFECT;s.ownedDirection=direction;s.clearBorrow();s.retryAt=0;return true;
-    }
-    static boolean breadcrumbRelocating(LivingEntity pet){return state(pet).breadcrumbRelocating;}
-    static boolean canReplayBreadcrumb(LivingEntity pet){
-        if(!ClingingReoriented.hasEffect(pet) || !supported(pet) || pet.isPassenger() || pet.isVehicle() || !pet.isAlive())return false;
-        var s=state(pet);ownershipStillMatches(pet,s);
-        Direction current=GravityDirectionUtil.getOwnGravityDirection(pet);
+    static boolean canOwnEffectTransition(LivingEntity mob){
+        if(!ClingingReoriented.hasEffect(mob)||!supported(mob)||mob.isPassenger()||mob.isVehicle()||!mob.isAlive())return false;
+        var s=state(mob);ownershipStillMatches(mob,s);
+        Direction current=GravityDirectionUtil.getOwnGravityDirection(mob);
         return (s.ownership!=Ownership.EXTERNAL&&s.ownership!=Ownership.NONE)||current==Direction.DOWN;
     }
 }
