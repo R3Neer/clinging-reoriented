@@ -1,6 +1,7 @@
 package io.github.r3neer.clingingreoriented.mixin;
 
 import io.github.r3neer.clingingreoriented.PetGravityFollow;
+import io.github.r3neer.clingingreoriented.PetGravityTeleport;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.ai.goal.FollowOwnerGoal;
@@ -17,7 +18,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * Delegates only gravity-specific follow segments to the S06 online executor.
- * Ordinary same-surface following and vanilla teleport behavior remain owned by FollowOwnerGoal.
+ * Ordinary same-surface following remains vanilla; powered far-away pets use the gravity-safe fallback.
  */
 @Mixin(FollowOwnerGoal.class)
 public abstract class FollowGravityMixin {
@@ -59,6 +60,10 @@ public abstract class FollowGravityMixin {
     @Inject(method="tick",at=@At("HEAD"),cancellable=true)
     private void clinging$follow(CallbackInfo ci){
         clinging$refreshNavigation();
-        if(PetGravityFollow.tick(tamable,clinging$owner(),clinging$gravityFollow,speedModifier,stopDistance))ci.cancel();
+        LivingEntity candidate=clinging$owner();
+        if(PetGravityFollow.tick(tamable,candidate,clinging$gravityFollow,speedModifier,stopDistance)){
+            ci.cancel();return;
+        }
+        if(PetGravityTeleport.handleFarFollow(tamable,candidate,speedModifier))ci.cancel();
     }
 }
