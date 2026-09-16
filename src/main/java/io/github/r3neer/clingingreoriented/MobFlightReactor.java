@@ -32,6 +32,16 @@ public final class MobFlightReactor {
 
     public static void clear(LivingEntity entity){if(entity!=null)STATES.remove(entity);}
 
+    /** Preserve the exact S05 contact chosen at commit time, even when it lies beyond the short monitor horizon. */
+    public static void arm(LivingEntity entity,MobGravityPlanner.Transition committed){
+        if(!(entity instanceof Mob mob)||entity.level().isClientSide()||committed==null){clear(entity);return;}
+        FlightState state=new FlightState();
+        state.expectedContact=committed.landingContact();
+        state.expectedLanding=landingPosition(entity,committed.landingBody(),committed.targetGravity());
+        MobFlightReaction.begin(state.reaction,committed,currentFocus(mob));
+        STATES.put(entity,state);
+    }
+
     public static void tick(LivingEntity entity){
         if(!(entity instanceof Mob mob)||entity.level().isClientSide())return;
         var gravityState=MobGravity.state(entity);
@@ -95,11 +105,8 @@ public final class MobFlightReactor {
         // comparison and action; execution must fail closed rather than trusting stale candidate data.
         var committed=MobGravity.executeAirborneCorrection(
             mob,candidate.transition().targetGravity(),REACTION_FORECAST_TICKS);
-        if(committed==null)return false;
-        Vec3 landing=landingPosition(mob,committed.landingBody(),committed.targetGravity());
-        state.expectedContact=committed.landingContact();state.expectedLanding=landing;
-        MobFlightReaction.begin(state.reaction,committed,focus);
-        return true;
+        // executeAirborneCorrection arms a fresh FlightState with the newly committed contact.
+        return committed!=null;
     }
 
     private static Candidate bestCandidate(Mob mob,Vec3 focus,boolean danger,Vec3 baselineLanding){
