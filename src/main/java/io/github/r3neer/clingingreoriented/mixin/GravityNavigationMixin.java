@@ -26,8 +26,10 @@ public abstract class GravityNavigationMixin {
 
     @Inject(method="moveTo(Lnet/minecraft/world/entity/Entity;D)Z",at=@At("RETURN"),cancellable=true)
     private void clinging$entityIntentReturn(Entity target,double speed,CallbackInfoReturnable<Boolean> cir){
-        Path path=getPath();boolean reachable=cir.getReturnValue()&&path!=null&&path.canReach();
-        if(MobGravityNavigation.requestEntityAfterVanilla(mob,target,speed,reachable))cir.setReturnValue(true);
+        Path path=getPath();
+        var intent=new MobGravityNavigation.EntityIntent(target);
+        boolean satisfied=cir.getReturnValue()&&MobGravityNavigation.ordinaryPathSatisfies(mob,intent,path);
+        if(MobGravityNavigation.requestEntityAfterVanilla(mob,target,speed,satisfied))cir.setReturnValue(true);
     }
 
     @Inject(method="moveTo(DDDD)Z",at=@At("HEAD"),cancellable=true)
@@ -37,8 +39,10 @@ public abstract class GravityNavigationMixin {
 
     @Inject(method="moveTo(DDDD)Z",at=@At("RETURN"),cancellable=true)
     private void clinging$positionIntentReturn(double x,double y,double z,double speed,CallbackInfoReturnable<Boolean> cir){
-        Path path=getPath();boolean reachable=cir.getReturnValue()&&path!=null&&path.canReach();
-        if(MobGravityNavigation.requestPositionAfterVanilla(mob,new Vec3(x,y,z),speed,reachable))cir.setReturnValue(true);
+        Vec3 target=new Vec3(x,y,z);Path path=getPath();
+        var intent=new MobGravityNavigation.PositionIntent(target);
+        boolean satisfied=cir.getReturnValue()&&MobGravityNavigation.ordinaryPathSatisfies(mob,intent,path);
+        if(MobGravityNavigation.requestPositionAfterVanilla(mob,target,speed,satisfied))cir.setReturnValue(true);
     }
 
     @Inject(method="moveTo(DDDID)Z",at=@At("HEAD"),cancellable=true)
@@ -48,7 +52,9 @@ public abstract class GravityNavigationMixin {
 
     @Inject(method="moveTo(DDDID)Z",at=@At("RETURN"),cancellable=true)
     private void clinging$positionRangeIntentReturn(double x,double y,double z,int reachRange,double speed,CallbackInfoReturnable<Boolean> cir){
-        Path path=getPath();boolean reachable=cir.getReturnValue()&&path!=null&&path.canReach();
-        if(MobGravityNavigation.requestPositionAfterVanilla(mob,new Vec3(x,y,z),speed,reachable))cir.setReturnValue(true);
+        Vec3 target=new Vec3(x,y,z);Path path=getPath();
+        var intent=new MobGravityNavigation.PositionIntent(target);
+        boolean satisfied=cir.getReturnValue()&&MobGravityNavigation.ordinaryPathSatisfies(mob,intent,path);
+        if(MobGravityNavigation.requestPositionAfterVanilla(mob,target,speed,satisfied))cir.setReturnValue(true);
     }
 }
