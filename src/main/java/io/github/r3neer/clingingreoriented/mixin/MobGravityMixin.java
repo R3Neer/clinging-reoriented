@@ -13,11 +13,13 @@ public abstract class MobGravityMixin implements MobGravity.Holder {
     public MobGravity.State clinging$mobGravity(){return clinging$mobState;}
     @Inject(method="tick",at=@At("TAIL"))
     private void clinging$lifetime(CallbackInfo ci){
+        LivingEntity entity=(LivingEntity)(Object)this;
         // NONE/EXTERNAL are quiescent in MobGravity.tick. The only exceptional reason to enter
         // from those states is a legacy airUsed flag that still needs its grounded reset.
         if((clinging$mobState.ownership==MobGravity.Ownership.NONE||clinging$mobState.ownership==MobGravity.Ownership.EXTERNAL)
-            && !clinging$mobState.airUsed)return;
-        MobGravity.tick((LivingEntity)(Object)this);
+            && !clinging$mobState.airUsed){MobFlightReactor.clear(entity);return;}
+        MobGravity.tick(entity);
+        MobFlightReactor.tick(entity);
     }
     @Inject(method="addAdditionalSaveData",at=@At("TAIL"))
     private void clinging$saveMob(ValueOutput out,CallbackInfo ci){
