@@ -16,29 +16,30 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 public final class EntitySnapGameTests {
-    @GameTest(padding=32) public void petReplayPublishesOnlySuccessfulOwnedTurns(GameTestHelper h){
+    @GameTest(padding=32) public void petOwnedTurnPublishesOnlySuccessfulTransitions(GameTestHelper h){
         var p=player(h);var wolf=h.spawn(EntityTypes.WOLF,new BlockPos(4,10,4));wolf.tame(p);wolf.setNoAi(true);wolf.setNoGravity(true);wolf.setOnGround(false);
         wolf.addEffect(new MobEffectInstance(Reorientation.EFFECT,500));wolf.setYRot(37.0F);wolf.yRotO=37.0F;
         var expected=GravityTransition.plan(Direction.DOWN,Direction.EAST,GravityTransition.headingFromYaw(Direction.DOWN,37.0F));
-        h.assertTrue(MobGravity.replay(wolf,Direction.EAST),"owned pet replay succeeds");
-        h.assertTrue(MobGravity.state(wolf).visualSequence==1L,"successful owned replay advances entity visual sequence once");
+        h.assertTrue(MobGravity.ownedTurn(wolf,Direction.EAST,true,null),"owned pet turn succeeds");
+        var state=MobGravity.state(wolf);state.ownership=MobGravity.Ownership.OWNED_EFFECT;state.ownedDirection=Direction.EAST;
+        h.assertTrue(state.visualSequence==1L,"successful owned turn advances entity visual sequence once");
         h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(wolf)==Direction.EAST,"pet commits target gravity");
         h.assertTrue(Math.abs(Mth.wrapDegrees(wolf.getYRot()-(37.0F+expected.yawDelta())))<1.0E-3F,"server pet yaw gauge follows owned transition");
-        float sameYaw=wolf.getYRot();long sameSequence=MobGravity.state(wolf).visualSequence;
-        h.assertTrue(MobGravity.replay(wolf,Direction.EAST),"same-direction replay is a no-op success");
-        h.assertTrue(MobGravity.state(wolf).visualSequence==sameSequence && Math.abs(Mth.wrapDegrees(wolf.getYRot()-sameYaw))<1.0E-3F,"same-direction replay sends no visual transition and mutates no yaw");
+        float sameYaw=wolf.getYRot();long sameSequence=state.visualSequence;
+        h.assertTrue(MobGravity.ownedTurn(wolf,Direction.EAST,true,null),"same-direction owned turn is a no-op success");
+        h.assertTrue(state.visualSequence==sameSequence && Math.abs(Mth.wrapDegrees(wolf.getYRot()-sameYaw))<1.0E-3F,"same-direction turn sends no visual transition and mutates no yaw");
 
         AABB target=RotationUtil.makeBoxFromDimensions(wolf.getDimensions(wolf.getPose()),Direction.NORTH,wolf.position()).deflate(.01);
         BlockPos obstacle=BlockPos.containing(target.getCenter());h.getLevel().setBlockAndUpdate(obstacle,Blocks.STONE.defaultBlockState());
-        float beforeFailedYaw=wolf.getYRot();long beforeFailedSequence=MobGravity.state(wolf).visualSequence;
-        h.assertFalse(MobGravity.replay(wolf,Direction.NORTH),"collision preflight rejects blocked pet replay");
-        h.assertTrue(MobGravity.state(wolf).visualSequence==beforeFailedSequence,"failed preflight publishes no entity transition");
+        float beforeFailedYaw=wolf.getYRot();long beforeFailedSequence=state.visualSequence;
+        h.assertFalse(MobGravity.ownedTurn(wolf,Direction.NORTH,true,null),"collision preflight rejects blocked pet turn");
+        h.assertTrue(state.visualSequence==beforeFailedSequence,"failed preflight publishes no entity transition");
         h.assertTrue(Math.abs(Mth.wrapDegrees(wolf.getYRot()-beforeFailedYaw))<1.0E-3F,"failed preflight applies no yaw gauge");
 
-        h.getLevel().setBlockAndUpdate(obstacle,Blocks.AIR.defaultBlockState());long beforeExternal=MobGravity.state(wolf).visualSequence;
+        h.getLevel().setBlockAndUpdate(obstacle,Blocks.AIR.defaultBlockState());long beforeExternal=state.visualSequence;
         GravityDirectionUtil.setGravityDirection(wolf,Direction.UP);MobGravity.tick(wolf);
-        h.assertTrue(MobGravity.state(wolf).ownership==MobGravity.Ownership.EXTERNAL,"foreign Gravity Changer write relinquishes ownership");
-        h.assertTrue(MobGravity.state(wolf).visualSequence==beforeExternal,"foreign gravity write never gains Clinging visual ownership");h.succeed();
+        h.assertTrue(state.ownership==MobGravity.Ownership.EXTERNAL,"foreign Gravity Changer write relinquishes ownership");
+        h.assertTrue(state.visualSequence==beforeExternal,"foreign gravity write never gains Clinging visual ownership");h.succeed();
     }
 
     @GameTest(padding=40) public void mountedHalfTurnUsesOnePhysicalAxisAndMountGauge(GameTestHelper h){
