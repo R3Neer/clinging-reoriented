@@ -23,7 +23,7 @@ public final class PlayerData {
 
     public boolean gravityFallActive; public boolean gravityFallLanding; public Direction gravityFallLandingGravity=Direction.DOWN;
     public double gravityFallLandingEtaTicks; public long gravityFallSequence;
-    public Vec3 gravityFallLook; public float gravityFallForwardIntent; public long gravityFallLookSequence=-1L;
+    public Vec3 gravityFallLook; public long gravityFallLookSequence=-1L;
     public long gravityFallLookTick=Long.MIN_VALUE; public BodyOrientation.State gravityFallAeroBody;
 
     public Direction maceFallDirection=Direction.DOWN; public Vec3 maceFallLastPosition; public double maceFallDistance; public boolean maceFallActive;
@@ -33,7 +33,7 @@ public final class PlayerData {
     public void unbind(){support=null;supportId=-1;supportPosition=null;supportBox=null;lastTransport=Vec3.ZERO;groundedOnSurface=false;supportHistory.clear();supportSampleSequence=0;lastConsumedSupportSample=-1;pendingMove=null;}
     public void clearLandingCommit(){landingCommitted=false;landingContact=null;landingKind=null;landingEtaTicks=0.0D;landingDeadlineTick=0L;}
     public void clearLandingCandidate(){landingCandidate=null;landingCandidateStableTicks=0;landingCandidateMisses=0;landingCandidateRevision=-1;landingCandidateTick=Long.MIN_VALUE;landingCandidateConfirmed=false;}
-    public void clearGravityFall(){gravityFallActive=false;gravityFallLanding=false;gravityFallLandingGravity=Direction.DOWN;gravityFallLandingEtaTicks=0.0D;gravityFallLook=null;gravityFallForwardIntent=0.0F;gravityFallLookSequence=-1L;gravityFallLookTick=Long.MIN_VALUE;gravityFallAeroBody=null;}
+    public void clearGravityFall(){gravityFallActive=false;gravityFallLanding=false;gravityFallLandingGravity=Direction.DOWN;gravityFallLandingEtaTicks=0.0D;gravityFallLook=null;gravityFallLookSequence=-1L;gravityFallLookTick=Long.MIN_VALUE;gravityFallAeroBody=null;}
     public void clearMaceFall(){maceFallDirection=Direction.DOWN;maceFallLastPosition=null;maceFallDistance=0.0D;maceFallActive=false;}
     public void clearFlightSafetyHold(){flightSafetyHolding=false;flightHeldVelocity=Vec3.ZERO;}
     public void clearFlightSafety(){flightSafePosition=null;clearFlightSafetyHold();}
