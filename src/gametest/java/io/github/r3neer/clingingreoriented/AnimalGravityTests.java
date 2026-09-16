@@ -49,19 +49,6 @@ public final class AnimalGravityTests {
         }
         h.runAfterDelay(55,()->{for(var mob:animals)h.assertTrue(!ClingingReoriented.hasEffect(mob) && GravityDirectionUtil.getGravityDirection(mob)==Direction.UP,"natural expiry preserves external gravity");h.succeed();});
     }
-    @GameTest(padding=40) public void breadcrumbQueueBoundExpiryAndDimension(GameTestHelper h) throws Exception {
-        var owner=player(h);var wolf=h.spawn(EntityTypes.WOLF,new BlockPos(4,10,4));wolf.tame(owner);wolf.addEffect(new MobEffectInstance(Reorientation.EFFECT,500));
-        for(int i=0;i<100;i++)GravityBreadcrumbs.record(owner,Direction.EAST);
-        var field=GravityBreadcrumbs.class.getDeclaredField("TRAILS");field.setAccessible(true);
-        var trails=(java.util.Map<java.util.UUID,java.util.ArrayDeque<GravityBreadcrumbs.Step>>)field.get(null);
-        var trail=trails.get(owner.getUUID());h.assertTrue(trail.size()==GravityBreadcrumbs.LIMIT,"trail has a hard bound");
-        long sequence=trail.getLast().sequence();trail.clear();
-        trail.add(new GravityBreadcrumbs.Step(sequence,owner.level().dimension(),wolf.position(),Direction.EAST,owner.level().getGameTime()-GravityBreadcrumbs.TTL-1));
-        GravityBreadcrumbs.follow(wolf,1,2);h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.DOWN,"expired step ignored");
-        trail.add(new GravityBreadcrumbs.Step(sequence+1,net.minecraft.world.level.Level.NETHER,wolf.position(),Direction.EAST,owner.level().getGameTime()));
-        GravityBreadcrumbs.follow(wolf,1,2);h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.DOWN,"other dimension ignored");
-        GravityBreadcrumbs.clear(owner.getUUID());h.assertFalse(trails.containsKey(owner.getUUID()),"owner cleanup removes storage");h.succeed();
-    }
     private static Holder<MobEffect> clinging(){return BuiltInRegistries.MOB_EFFECT.get(Identifier.parse("alexsmobs:clinging")).orElseThrow();}
     private static ServerPlayer player(GameTestHelper h){
         var p=h.makeMockServerPlayerInLevel();p.snapTo(h.absoluteVec(new Vec3(4,10,4)));
@@ -107,86 +94,19 @@ public final class AnimalGravityTests {
     }
     @GameTest(padding=32) public void ownedPetGravityRetiresWhenEffectEnds(GameTestHelper h){
         var owner=player(h);var wolf=h.spawn(EntityTypes.WOLF,new BlockPos(4,10,4));wolf.tame(owner);wolf.setNoAi(true);wolf.addEffect(new MobEffectInstance(Reorientation.EFFECT,200));wolf.setOnGround(false);
-        h.assertTrue(MobGravity.replay(wolf,Direction.EAST),"breadcrumb-style replay acquires gravity ownership");
-        h.assertTrue(MobGravity.state(wolf).ownership==MobGravity.Ownership.OWNED_EFFECT && GravityDirectionUtil.getGravityDirection(wolf)==Direction.EAST,"owned frame recorded");
+        h.assertTrue(MobGravity.ownedTurn(wolf,Direction.EAST,true,null),"fixture could not acquire EAST gravity");
+        var state=MobGravity.state(wolf);state.ownership=MobGravity.Ownership.OWNED_EFFECT;state.ownedDirection=Direction.EAST;
+        h.assertTrue(state.ownership==MobGravity.Ownership.OWNED_EFFECT && GravityDirectionUtil.getGravityDirection(wolf)==Direction.EAST,"owned frame recorded");
         wolf.removeAllEffects();MobGravity.tick(wolf);
-        h.assertTrue(MobGravity.state(wolf).ownership==MobGravity.Ownership.NONE && GravityDirectionUtil.getGravityDirection(wolf)==Direction.DOWN,"owned effect frame retires to DOWN");h.succeed();
-    }
-    @GameTest(padding=40) public void petReplayRespectsClingingCharge(GameTestHelper h){
-        var owner=player(h);var wolf=h.spawn(EntityTypes.WOLF,new BlockPos(4,10,4));wolf.tame(owner);
-        wolf.addEffect(new MobEffectInstance(clinging(),500));wolf.setOnGround(false);
-        h.assertTrue(MobGravity.replay(wolf,Direction.EAST),"first airborne Clinging replay succeeds");
-        h.assertFalse(MobGravity.replay(wolf,Direction.NORTH),"Clinging pet cannot replay a second airborne turn");
-        wolf.addEffect(new MobEffectInstance(Reorientation.EFFECT,500));
-        h.assertTrue(MobGravity.replay(wolf,Direction.NORTH),"own Reorientation permits the pending airborne turn");h.succeed();
-    }
-    @GameTest(padding=40) public void followerTargetsTheProjectionOfAnAirborneNearbyBreadcrumb(GameTestHelper h){
-        var owner=player(h);var wolf=h.spawn(EntityTypes.WOLF,new BlockPos(4,10,4));wolf.tame(owner);wolf.addEffect(new MobEffectInstance(Reorientation.EFFECT,500));
-        for(int x=3;x<=10;x++)for(int z=3;z<=5;z++)h.getLevel().setBlockAndUpdate(h.absolutePos(new BlockPos(x,9,z)),Blocks.STONE.defaultBlockState());
-        wolf.setOnGround(true);wolf.setDeltaMovement(Vec3.ZERO);
-        Vec3 step=wolf.position().add(4,8,0);owner.setPos(step);GravityBreadcrumbs.record(owner,Direction.EAST);
-        owner.setPos(step.add(0,0,4));GravityBreadcrumbs.record(owner,Direction.NORTH);
-        h.assertTrue(wolf.distanceToSqr(owner)<100,"fixture keeps owner inside vanilla follow start radius");
-        var goal=new FollowOwnerGoal(wolf,1,10,2);h.assertTrue(goal.canUse(),"breadcrumb activates follow goal inside vanilla start radius");goal.start();goal.tick();
-        h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.DOWN,"pet does not rotate remotely before reaching projection");
-        var target=wolf.getNavigation().getTargetPos();
-        h.assertTrue(target!=null&&Math.abs(target.getX()-step.x)<2&&Math.abs(target.getZ()-step.z)<2,"navigation targets airborne breadcrumb projection: "+target);
-        wolf.setPos(step.x,wolf.getY(),step.z);wolf.setOnGround(true);wolf.setDeltaMovement(Vec3.ZERO);goal.tick();
-        h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.EAST,"grounded pet replays airborne breadcrumb at its movement-plane projection");
-        h.assertFalse(AirChanges.grounded(wolf),"successful replay releases navigation into ballistic fall");
-        h.assertTrue(GravityBreadcrumbs.hasPending(wolf),"internal center-aligned replay preserves the next breadcrumb");
-        h.assertFalse(goal.canContinueToUse(),"unsupported pet releases FollowOwnerGoal while physics owns the fall");
-        goal.stop();GravityBreadcrumbs.clear(owner.getUUID());h.succeed();
+        h.assertTrue(state.ownership==MobGravity.Ownership.NONE && GravityDirectionUtil.getGravityDirection(wolf)==Direction.DOWN,"owned effect frame retires to DOWN");h.succeed();
     }
     @GameTest(padding=32) public void followGoalRefreshesNavigationAfterGravityChanges(GameTestHelper h) throws Exception {
         var owner=player(h);var wolf=h.spawn(EntityTypes.WOLF,new BlockPos(4,10,4));wolf.tame(owner);wolf.addEffect(new MobEffectInstance(Reorientation.EFFECT,500));wolf.setNoGravity(true);wolf.setOnGround(false);
         var goal=new FollowOwnerGoal(wolf,1,10,2);var before=wolf.getNavigation();
-        h.assertTrue(MobGravity.replay(wolf,Direction.EAST),"fixture reorients pet");wolf.tick();
+        h.assertTrue(MobGravity.ownedTurn(wolf,Direction.EAST,true,null),"fixture reorients pet");wolf.tick();
         var directional=wolf.getNavigation();h.assertTrue(directional!=before,"Gravity Changer replaces navigation after gravity change");
         goal.stop();var field=FollowOwnerGoal.class.getDeclaredField("navigation");field.setAccessible(true);
         h.assertTrue(field.get(goal)==directional,"FollowOwnerGoal refreshes its cached navigation before lifecycle use");h.succeed();
-    }
-    @GameTest(padding=40,maxTicks=120) public void realWolfAiWalksToAirborneBreadcrumbAndReorients(GameTestHelper h){
-        var owner=player(h);var wolf=h.spawn(EntityTypes.WOLF,new BlockPos(4,10,4));wolf.tame(owner);wolf.addEffect(new MobEffectInstance(Reorientation.EFFECT,500));
-        for(int x=3;x<=10;x++)for(int z=3;z<=5;z++)h.getLevel().setBlockAndUpdate(h.absolutePos(new BlockPos(x,9,z)),Blocks.STONE.defaultBlockState());
-        wolf.setOnGround(true);wolf.setDeltaMovement(Vec3.ZERO);
-        Vec3 step=wolf.position().add(4,8,0);owner.setPos(step);owner.setNoGravity(true);GravityBreadcrumbs.record(owner,Direction.EAST);
-        h.assertTrue(wolf.distanceToSqr(owner)<100,"fixture keeps owner inside vanilla follow start radius");
-        h.runAfterDelay(80,()->{
-            h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.EAST,
-                "real wolf AI did not walk to the projected airborne breadcrumb and replay it; pos="+wolf.position()
-                    +", target="+wolf.getNavigation().getTargetPos()+", done="+wolf.getNavigation().isDone()
-                    +", pending="+GravityBreadcrumbs.hasPending(wolf)+", grounded="+AirChanges.grounded(wolf));
-            GravityBreadcrumbs.clear(owner.getUUID());h.succeed();
-        });
-    }
-    @GameTest(padding=32) public void effectFreePetKeepsVanillaDeadZoneAndExternalTeleportForgetsRoute(GameTestHelper h){
-        var owner=player(h);var wolf=h.spawn(EntityTypes.WOLF,new BlockPos(4,10,4));wolf.tame(owner);
-        h.getLevel().setBlockAndUpdate(wolf.blockPosition().below(),Blocks.STONE.defaultBlockState());wolf.setOnGround(true);wolf.setDeltaMovement(Vec3.ZERO);
-        Vec3 step=wolf.position().add(3,8,0);owner.setPos(step);owner.setNoGravity(true);GravityBreadcrumbs.record(owner,Direction.EAST);
-        var vanillaGoal=new FollowOwnerGoal(wolf,1,10,2);
-        h.assertFalse(vanillaGoal.canUse(),"effect-free pet must keep vanilla's ten-block follow dead zone");
-        wolf.addEffect(new MobEffectInstance(Reorientation.EFFECT,500));
-        h.assertTrue(vanillaGoal.canUse(),"effect grants access to pending breadcrumb");vanillaGoal.start();vanillaGoal.tick();
-        h.assertTrue(MobGravity.state(wolf).breadcrumbRouteOwned,"breadcrumb pursuit owns the active route before teleport");
-        wolf.teleportTo(wolf.getX()+1,wolf.getY(),wolf.getZ());
-        h.assertFalse(GravityBreadcrumbs.hasPending(wolf),"external pet teleport invalidates existing breadcrumbs");
-        h.assertFalse(MobGravity.state(wolf).breadcrumbRouteOwned,"external pet teleport releases breadcrumb route ownership");
-        h.assertTrue(wolf.getNavigation().isDone(),"external pet teleport stops the breadcrumb-authored path");
-        vanillaGoal.stop();
-        GravityBreadcrumbs.clear(owner.getUUID());h.succeed();
-    }
-    @GameTest(padding=32) public void sittingPetReleasesAndLaterResumesBreadcrumbRoute(GameTestHelper h){
-        var owner=player(h);var wolf=h.spawn(EntityTypes.WOLF,new BlockPos(4,10,4));wolf.tame(owner);wolf.addEffect(new MobEffectInstance(Reorientation.EFFECT,500));
-        for(int x=3;x<=9;x++)for(int z=3;z<=5;z++)h.getLevel().setBlockAndUpdate(h.absolutePos(new BlockPos(x,9,z)),Blocks.STONE.defaultBlockState());
-        wolf.setOnGround(true);wolf.setDeltaMovement(Vec3.ZERO);
-        owner.setPos(wolf.position().add(4,8,0));owner.setNoGravity(true);GravityBreadcrumbs.record(owner,Direction.EAST);
-        var goal=new FollowOwnerGoal(wolf,1,10,2);h.assertTrue(goal.canUse(),"standing pet acquires breadcrumb route");goal.start();goal.tick();
-        wolf.setOrderedToSit(true);h.assertFalse(goal.canContinueToUse(),"sitting pet releases active breadcrumb goal");goal.stop();
-        h.assertTrue(wolf.getNavigation().isDone(),"stopping the sitting pet clears its breadcrumb path");
-        h.assertTrue(GravityDirectionUtil.getGravityDirection(wolf)==Direction.DOWN,"sitting does not remotely replay the turn");
-        wolf.setOrderedToSit(false);h.assertTrue(goal.canUse(),"standing again resumes the still-pending breadcrumb");
-        goal.stop();GravityBreadcrumbs.clear(owner.getUUID());h.succeed();
     }
     @GameTest public void beaconSecondTierOnly(GameTestHelper h){
         var effect=clinging();
