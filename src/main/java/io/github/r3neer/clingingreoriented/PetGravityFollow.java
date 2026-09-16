@@ -20,6 +20,7 @@ public final class PetGravityFollow {
     private static final int TRANSITION_HORIZON_TICKS=80;
     private static final int LANDING_CONFIRM_TICKS=2;
     private static final long FAILED_MANEUVER_COOLDOWN_TICKS=80L;
+    private static final long IDLE_REPLAN_TICKS=10L;
     private static final long NO_PROGRESS_TICKS=40L;
     private static final double PROGRESS_EPS=.35D;
     private static final double OWNER_REPLAN_DISTANCE_SQR=4.0D;
@@ -37,6 +38,9 @@ public final class PetGravityFollow {
         private int landingTicks;
         private double bestFrontierDistance=Double.POSITIVE_INFINITY;
         private long progressAt;
+        private long nextIdlePlanAt;
+        private Vec3 idlePlanOwnerAnchor;
+        private Direction idlePlanGravity;
         private final Map<MobGravityLocalPlanner.ManeuverKey,Long> excludedUntil=new HashMap<>();
 
         public Phase phase(){return phase;}
@@ -82,7 +86,7 @@ public final class PetGravityFollow {
         if(state.ownerAnchor==null||owner.position().distanceToSqr(state.ownerAnchor)>OWNER_REPLAN_DISTANCE_SQR){
             state.excludedUntil.clear();
             releaseRoute(pet,state);clearPlan(state);
-            if(!prepareTransition(pet,owner,state,stopDistance,false))return false;
+            if(!prepareTransition(pet,owner,state,stopDistance,true))return false;
         }
 
         var plan=state.plan;
@@ -91,7 +95,7 @@ public final class PetGravityFollow {
         var key=plan.maneuverKey();
         if(key==null||current!=key.sourceGravity()){
             releaseRoute(pet,state);clearPlan(state);
-            return prepareTransition(pet,owner,state,stopDistance,false);
+            return prepareTransition(pet,owner,state,stopDistance,true);
         }
 
         if(state.phase==Phase.APPROACH){
@@ -102,13 +106,13 @@ public final class PetGravityFollow {
             }else{
                 if(!ensureRoute(pet,state,speed)){
                     rememberFailure(pet,state,key);clearPlan(state);
-                    return prepareTransition(pet,owner,state,stopDistance,false);
+                    return prepareTransition(pet,owner,state,stopDistance,true);
                 }
                 long now=pet.level().getGameTime();
                 if(distance<state.bestFrontierDistance-PROGRESS_EPS){state.bestFrontierDistance=distance;state.progressAt=now;}
                 else if(now-state.progressAt>=NO_PROGRESS_TICKS){
                     rememberFailure(pet,state,key);releaseRoute(pet,state);clearPlan(state);
-                    return prepareTransition(pet,owner,state,stopDistance,false);
+                    return prepareTransition(pet,owner,state,stopDistance,true);
                 }
                 return true;
             }
@@ -122,7 +126,7 @@ public final class PetGravityFollow {
             var committed=MobGravity.executePlannedTransition(pet,plan.terminalGravity(),TRANSITION_HORIZON_TICKS);
             if(committed==null){
                 rememberFailure(pet,state,key);clearPlan(state);
-                return prepareTransition(pet,owner,state,stopDistance,false);
+                return prepareTransition(pet,owner,state,stopDistance,true);
             }
             releaseRoute(pet,state);
             state.committedKey=key;
@@ -166,7 +170,7 @@ public final class PetGravityFollow {
             if(++state.landingTicks<LANDING_CONFIRM_TICKS)return true;
             // Real stable support is the new root of the online graph. A successful edge is not blacklisted.
             clearPlan(state);
-            if(planningContext(pet,owner)&&prepareTransition(pet,owner,state,stopDistance,false))return true;
+            if(planningContext(pet,owner)&&prepareTransition(pet,owner,state,stopDistance,true))return true;
             return false;
         }
 
@@ -174,26 +178,45 @@ public final class PetGravityFollow {
             if(!grounded){state.landingTicks=0;return true;}
             if(++state.landingTicks<LANDING_CONFIRM_TICKS)return true;
             clearPlan(state);
-            if(planningContext(pet,owner)&&prepareTransition(pet,owner,state,stopDistance,false))return true;
+            if(planningContext(pet,owner)&&prepareTransition(pet,owner,state,stopDistance,true))return true;
             return false;
         }
         return false;
     }
 
-    private static boolean prepareTransition(TamableAnimal pet,LivingEntity owner,State state,float stopDistance,boolean keepFailures){
+    private static boolean prepareTransition(TamableAnimal pet,LivingEntity owner,State state,float stopDistance,boolean force){
         if(!planningContext(pet,owner))return false;
         long now=pet.level().getGameTime();pruneFailures(state,now);
-        if(!keepFailures&&state.ownerAnchor!=null&&owner.position().distanceToSqr(state.ownerAnchor)>OWNER_REPLAN_DISTANCE_SQR)
-            state.excludedUntil.clear();
+        if(!force&&!idlePlanningDue(pet,owner,state,now))return false;
         Vec3 anchor=owner.position();double radius=Math.max(stopDistance,Math.max(.75D,pet.getBbWidth()));
         var goal=followGoal(anchor,radius);
         Set<MobGravityLocalPlanner.ManeuverKey> excluded=Set.copyOf(state.excludedUntil.keySet());
         var plan=MobGravityLocalPlanner.plan(pet,goal,TRANSITION_HORIZON_TICKS,excluded);
-        if(plan.kind()!=MobGravityLocalPlanner.Kind.TRANSITION||plan.maneuverKey()==null)return false;
+        if(plan.kind()!=MobGravityLocalPlanner.Kind.TRANSITION||plan.maneuverKey()==null){
+            rememberIdleMiss(pet,owner,state,now);return false;
+        }
+        clearIdleThrottle(state);
         state.plan=plan;state.ownerAnchor=anchor;state.phase=Phase.APPROACH;state.committedKey=null;
         state.routeNavigation=null;state.routeOwned=false;state.landingTicks=0;state.flightDeadline=0;
         state.bestFrontierDistance=pet.position().distanceTo(plan.frontier());state.progressAt=now;
         return true;
+    }
+
+    private static boolean idlePlanningDue(TamableAnimal pet,LivingEntity owner,State state,long now){
+        Direction gravity=GravityDirectionUtil.getOwnGravityDirection(pet);
+        return state.idlePlanOwnerAnchor==null||state.idlePlanGravity!=gravity
+            ||owner.position().distanceToSqr(state.idlePlanOwnerAnchor)>OWNER_REPLAN_DISTANCE_SQR
+            ||now>=state.nextIdlePlanAt;
+    }
+
+    private static void rememberIdleMiss(TamableAnimal pet,LivingEntity owner,State state,long now){
+        state.idlePlanOwnerAnchor=owner.position();
+        state.idlePlanGravity=GravityDirectionUtil.getOwnGravityDirection(pet);
+        state.nextIdlePlanAt=now+IDLE_REPLAN_TICKS;
+    }
+
+    private static void clearIdleThrottle(State state){
+        state.idlePlanOwnerAnchor=null;state.idlePlanGravity=null;state.nextIdlePlanAt=0;
     }
 
     private static MobGravityLocalPlanner.Goal followGoal(Vec3 anchor,double radius){
