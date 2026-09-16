@@ -8,10 +8,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EntityTypes;
+import net.minecraft.world.entity.animal.wolf.Wolf;
 import net.minecraft.world.entity.monster.zombie.Zombie;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
@@ -74,6 +78,53 @@ public final class MobFlightMonitorGameTests {
         h.succeed();
     }
 
+    @GameTest(padding=48,maxTicks=80)
+    public void reorientationCorrectsAfterReactionDelayButSpentClingingCannotSecondTurn(GameTestHelper h){
+        clear(h);
+        Wolf agile=flightWolf(h,new BlockPos(5,10,5),Reorientation.EFFECT);
+        Wolf clinging=flightWolf(h,new BlockPos(5,10,9),clinging());
+        long agileSequence=MobGravity.state(agile).visualSequence,clingingSequence=MobGravity.state(clinging).visualSequence;
+
+        var provider=new LandingSurfaceProvider(){
+            private boolean ours(Query query){return query.entity()==agile||query.entity()==clinging;}
+            @Override public Optional<LocalContact> currentSupport(Query query){return Optional.empty();}
+            @Override public Optional<LocalSweep> sweep(Query query,AABB start,AABB end){
+                if(!ours(query))return Optional.empty();
+                Vec3 a=start.getCenter(),b=end.getCenter();
+                if(query.gravity()==Direction.EAST&&b.x>a.x+1.0E-8D)
+                    return Optional.of(new LocalSweep(new LocalContact("east-blocker",1L,new Vec3(0,0,1)),.35D,false));
+                if(query.gravity()==Direction.NORTH&&b.z<a.z-1.0E-8D)
+                    return Optional.of(new LocalSweep(new LocalContact("north-safe",1L,new Vec3(0,0,1)),.5D,true));
+                return Optional.empty();
+            }
+            @Override public boolean revalidate(Query query,LocalContact contact){return ours(query);}
+        };
+        var registration=LandingSurfaces.register(
+            Identifier.fromNamespaceAndPath("clinging_reoriented_test","s07_air_reaction"),provider);
+
+        h.runAfterDelay(20,()->{
+            try{
+                h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(agile)==Direction.NORTH,
+                    "Reorientation mob did not correct persistent EAST danger after its reaction delay");
+                h.assertTrue(MobGravity.state(agile).visualSequence>agileSequence,
+                    "Reorientation correction emitted no owned visual transition");
+                h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(clinging)==Direction.EAST,
+                    "spent Clinging invented a second airborne gravity turn");
+                h.assertTrue(MobGravity.state(clinging).visualSequence==clingingSequence,
+                    "spent Clinging emitted a phantom second-turn visual");
+            }finally{registration.close();}
+            h.succeed();
+        });
+    }
+
+    private static Wolf flightWolf(GameTestHelper h,BlockPos relative,Holder<MobEffect> effect){
+        Wolf wolf=h.spawn(EntityTypes.WOLF,relative);wolf.setNoAi(true);wolf.setNoGravity(true);wolf.setOnGround(false);wolf.setDeltaMovement(Vec3.ZERO);
+        wolf.addEffect(new MobEffectInstance(effect,600));GravityDirectionUtil.setGravityDirection(wolf,Direction.EAST);
+        var state=MobGravity.state(wolf);state.ownership=MobGravity.Ownership.OWNED_EFFECT;state.ownedDirection=Direction.EAST;state.airUsed=true;state.retryAt=0;
+        MobFlightReactor.clear(wolf);return wolf;
+    }
+
+    private static Holder<MobEffect> clinging(){return BuiltInRegistries.MOB_EFFECT.get(Identifier.parse("alexsmobs:clinging")).orElseThrow();}
     private static void floor(GameTestHelper h){for(int x=0;x<=12;x++)for(int z=0;z<=10;z++)h.setBlock(new BlockPos(x,9,z),Blocks.STONE);}
     private static void clear(GameTestHelper h){
         for(var pos:BlockPos.betweenClosed(h.absolutePos(new BlockPos(-4,3,-4)),h.absolutePos(new BlockPos(18,20,14))))
