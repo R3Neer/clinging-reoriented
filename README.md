@@ -2,7 +2,7 @@
 
 The floor is wherever you decide it is.
 
-**Clinging: Reoriented** turns the Clinging effect from Alex's Mobs into an airborne gravity ability for Minecraft 26.2 on Fabric. Leave your local floor, release **Space**, look toward another world-cardinal direction and press Space again. Clinging grants one voluntary airborne gravity decision; **Reorientation** removes that one-turn limit. **0.1.0-beta.1** introduced the **Gravity Charge**, **beta.2** hardened full-sphere camera control, and **0.1.0-beta.3** is the current performance/stability prerelease.
+**Clinging: Reoriented** turns the Clinging effect from Alex's Mobs into an airborne gravity ability for Minecraft 26.2 on Fabric. Leave your local floor, release **Space**, look toward another world-cardinal direction and press Space again. Clinging grants one voluntary airborne gravity decision; **Reorientation** removes that one-turn limit. **0.1.0-beta.3** is the latest published prerelease; this branch contains the **unreleased beta.4 gravity-navigation/gamefeel campaign**.
 
 [![Minecraft 26.2](https://img.shields.io/badge/Minecraft-26.2-62B47A)](https://www.minecraft.net/)
 [![Fabric](https://img.shields.io/badge/Loader-Fabric-DDBD3B)](https://fabricmc.net/)
@@ -17,15 +17,15 @@ A voluntary turn changes **physical gravity immediately** but preserves the exis
 
 The local player's camera is independent from logical gravity. Free-flight turns retain the world frame that was actually being rendered, so chained Reorientation choices do not drag the view through every gravity basis. During sustained Gravity Fall the camera also gains **full-sphere look**: it can pass through both poles and complete 360-degree loops while horizontal and vertical mouse intent remains consistent on screen. First- and third-person views share that same look frame. On exit, the same viewing direction returns to ordinary vanilla yaw/pitch without a camera snap.
 
-When the real trajectory is about to meet a valid gravity-relative floor, Clinging reserves a shared **10-tick / 500 ms landing manoeuvre**. New gravity requests during `LANDING_COMMITTED` are discarded, never queued; invalidated support preserves the current visible frame instead of snapping backward.
+Landing prediction now separates **acquisition from presentation**. A valid future support can be tracked up to **40 ticks / 2 seconds** ahead, while the visible landing manoeuvre remains at most **10 ticks / 500 ms** and is timed to finish at the predicted touchdown. New gravity requests during `LANDING_COMMITTED` are discarded, never queued; invalidated support preserves the current visible frame instead of snapping backward.
 
-## Gravity Fall body, air and steering
+## Gravity Fall body and aerodynamics
 
-After **12 airborne ticks** under Clinging/Reorientation physics, sustained fall enters Gravity Fall presentation. Over a **6-tick blend**, the macroscopic body root follows actual world velocity. Near zero speed it retains the last reliable frame, preventing numerical flips during a gravity reversal.
+After **12 airborne ticks** under Clinging/Reorientation physics, sustained fall enters Gravity Fall presentation. The body keeps a persistent world-space attitude instead of being transported directly by velocity every tick.
 
-Velocity remains the primary body axis, but the camera can pull the body once gaze leaves a **35-degree neck deadzone**, capped at **7.5 degrees per tick**. Misalignment with the airflow adds bounded posture drag: streamlined flight is untouched and a perfectly broadside body adds at most **1.3% extra drag per tick**.
+Player gaze expresses body-attitude intent. The camera can move freely inside a **35-degree neck deadzone**; outside it the macro body follows by at most **7.5 degrees per tick**. Velocity contributes only a weak **1.25 degrees/tick** weathercock stabilization and always chooses the nearer head/feet orientation, so it cannot manufacture a 180-degree body flip.
 
-Holding **W** during sustained Gravity Fall bends the **existing** velocity toward gaze by at most **6 degrees per tick**, with authority proportional to the positive dot product between gaze and motion. It preserves speed before aerodynamic drag and creates no thrust or Elytra-style lift.
+Aerodynamics follows the visible body rather than a keyboard exception. Momentum is decomposed along and across the body's long axis: longitudinal momentum is retained while transverse momentum receives **2.5% additional drag per tick**. The trajectory therefore bends gradually toward the body's attitude while losing energy. **W no longer performs special airborne steering**, and the model adds no thrust or Elytra-style lift.
 
 At speed >= **0.75 blocks/tick**, Gravity Fall reuses vanilla's Elytra airflow sound. It fades in over 10 ticks and stops immediately when Gravity Fall releases ownership or real Elytra flight begins.
 
@@ -41,7 +41,9 @@ Mace smash height under directional gravity is measured as literal geometric dis
 
 Any intersection with a non-empty fluid volume is a context boundary for support, landing prediction/commitment and Gravity Fall body presentation. Water, lava and modded fluids use the same policy. A camera HOLD created by a gravity turn while already inside the fluid remains stable for that fluid epoch; entering fluid later with an older dry-flight HOLD still releases that obsolete frame.
 
-Water keeps the deliberate **Space, release, Space within 250 ms** gravity-request gesture. While Clinging/Reorientation owns water movement, Space is world **+Y** and Shift is world **-Y**, independent of the current gravity basis.
+Water keeps the deliberate **Space, release, Space within 250 ms** gravity-request gesture. While Clinging/Reorientation owns water movement, **W/S follow the camera forward/backward including pitch, A/D follow camera left/right, Space is world +Y and Shift is world -Y**. Stored logical gravity does not redefine free-swimming controls.
+
+The underwater visual frame also follows context rather than the stored gravity attribute: **free swimming converges to world-up**, while real gravity-relative support converges to that support's up direction. These are camera/control semantics only; entering water does not rewrite logical gravity.
 
 World-vertical climbables use an explicit policy: DOWN keeps vanilla ladders/vines/scaffolding; EAST/WEST/NORTH/SOUTH ignore climbable attachment/damping; UP mirrors vanilla Y climbing.
 
@@ -67,9 +69,15 @@ The public `LandingSurfaceProvider` / `LandingSurfaces` contract lets other mods
 
 The API intentionally contains no Scale Brews types. A concrete Scale-specific adapter belongs outside the base public contract.
 
-## Mounts and pets
+## Mounts, pets and gravity-aware mobs
 
-Mounted Reorientation turns a compatible airborne living root and its passenger hierarchy atomically. A pet with its own compatible effect pursues bounded owner gravity breadcrumbs on its current gravity-relative movement plane, replays the turn there, falls under physics and resumes route pursuit after support is found in the new frame.
+Mounted Reorientation turns a compatible airborne living root and its passenger hierarchy atomically.
+
+Pet following is **history-free**: pets no longer replay owner gravity breadcrumbs. A pet with its own compatible effect uses the owner's current/filtered position plus current world geometry, prefers ordinary navigation when it works, walks to a validated launch frontier when gravity is actually useful, revalidates immediately before committing and replans only after stable support or a material change. An airborne owner remains a tracked objective without remotely forcing the pet to copy a turn.
+
+The same locomotion layer is available to ordinary mobs with legitimate Clinging/Reorientation capability. Vanilla goals remain owners of intent: melee pursuit, escape and ordinary position goals try vanilla navigation first, then may use bounded support-to-support gravity transitions when the normal route cannot satisfy the intent. The planner has no per-species route table.
+
+During a committed gravity flight the mob monitors the real trajectory without surface pathfinding. Material target/world changes become actionable only after a **2–10 tick reaction delay derived from base movement speed**. Reorientation may make another airborne correction only when that correction is physically legal; spent Clinging never receives a second turn. A block placed too late can therefore still result in a perfectly ordinary collision.
 
 Non-player entities keep Clinging's owned **180/240 ms tracked snap** presentation; the 500 ms landing manoeuvre and full-sphere camera are local-player Gravity Fall rules.
 
@@ -90,7 +98,7 @@ Install the regular JAR on **both client and server** with:
 - Gravity Changer Unofficial Port 1.5.2-beta.5-mc26.2
 - Cloth Config API
 
-This is a **beta prerelease**. Back up important worlds before updating and use matching versions on every multiplayer participant.
+**0.1.0-beta.3 is the latest published prerelease.** The beta.4 navigation/gamefeel work described above is currently unreleased development. Back up important worlds before testing development builds and use matching versions on every multiplayer participant.
 
 ## Optional companions and compatibility
 
@@ -103,9 +111,9 @@ The exact Alchemical Leather ownership and validation contract is recorded in [t
 
 ## Project status
 
-**0.1.0-beta.3** is the current beta prerelease. It keeps the beta.2 gameplay/camera semantics while reducing hot-path allocation/CPU work and bounding rare recovery searches. The beta gate covers localization parity, build/JUnit, required server GameTests, default client, First Person, optional Scale Brews server/client, pinned Fresh Animations/Player Extension and semantic screenshot validation.
+**0.1.0-beta.3** remains the latest published beta. The active unreleased beta.4 campaign unifies Gravity Fall aerodynamics, earlier landing acquisition, camera-relative water controls and general gravity-aware mob locomotion on the same physical/support model. Grounded gravity planning is bounded to at most **20 transition forecasts per local plan**, **32 new plans per level/tick** and **4 per 64×64 region/tick**; committed flight uses only a short reaction-bound monitor until support/recovery.
 
-The prerelease is published only from the exact `main` commit that passes that complete matrix. Beta means the core design is coherent enough for broader validation; it does **not** mean feature freeze or guaranteed absence of bugs.
+The current development gate covers localization parity, build/JUnit, required server GameTests, default client, First Person, optional Scale Brews server/client, pinned Fresh Animations/Player Extension and semantic screenshot validation. No version, tag or prerelease is created until an explicitly prepared release HEAD passes that complete matrix on `main`.
 
 ## Build and documentation
 
