@@ -47,6 +47,30 @@ public final class PetGravityFollowGameTests {
     }
 
     @GameTest(padding=64)
+    public void transientVanillaApproachJumpKeepsPetPlanUntilGroundedCommit(GameTestHelper h){
+        var owner=owner(h,new Vec3(14,10,5));Wolf wolf=wolf(h,owner);wall(h,9);
+        var state=new PetGravityFollow.State();
+        h.assertTrue(PetGravityFollow.shouldWake(wolf,owner,state,2.0F),"fixture produced no gravity transition plan");
+        var plan=state.plan();
+        h.assertTrue(plan!=null&&state.phase()==PetGravityFollow.Phase.APPROACH,"fixture did not begin in APPROACH");
+        h.assertTrue(PetGravityFollow.tick(wolf,owner,state,1.0D,2.0F),"approach did not acquire its route");
+
+        wolf.setOnGround(false);wolf.setDeltaMovement(new Vec3(0,.2D,0));
+        h.assertTrue(PetGravityFollow.tick(wolf,owner,state,1.0D,2.0F),"short vanilla navigation jump released special follow ownership");
+        h.assertTrue(state.phase()==PetGravityFollow.Phase.APPROACH&&state.plan()==plan,
+            "short vanilla navigation jump discarded the active approach plan");
+        h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(wolf)==Direction.DOWN,
+            "approach jump committed a gravity turn while unsupported");
+
+        Vec3 frontier=plan.frontier();
+        wolf.setPos(frontier.x,frontier.y,frontier.z);wolf.setOnGround(true);wolf.setDeltaMovement(Vec3.ZERO);
+        h.assertTrue(PetGravityFollow.tick(wolf,owner,state,1.0D,2.0F),"grounded approach did not resume after transient jump");
+        h.assertTrue(state.phase()==PetGravityFollow.Phase.COMMITTED,"grounded frontier did not commit after transient jump: "+state.phase());
+        h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(wolf)==Direction.EAST,"resumed approach did not execute EAST transition");
+        h.succeed();
+    }
+
+    @GameTest(padding=64)
     public void airborneOwnerBlockedProjectionCanWakeSafeGravityTransition(GameTestHelper h){
         var owner=owner(h,new Vec3(14,13,5));Wolf wolf=wolf(h,owner);wall(h,9);
         owner.setOnGround(false);owner.setDeltaMovement(new Vec3(.2D,0,0));

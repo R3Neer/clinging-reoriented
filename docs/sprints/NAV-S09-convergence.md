@@ -16,6 +16,7 @@ S09 demuestra que NAV-S01…S08 converge en un único producto coherente: códig
 - daño sigue siendo coste y geometría imposible sigue siendo veto;
 - reacción sigue siendo finita, dependiente de `MOVEMENT_SPEED` base y nunca instantánea;
 - presupuestos S08 acotan planificación sin matar goals vivos;
+- un salto breve de la navegación vanilla durante `APPROACH` conserva route/intent durante como máximo 20 ticks sin replanificar ni permitir commit aéreo; una pérdida de soporte más larga falla la arista en vez de secuestrar el mob indefinidamente;
 - no quedan rutas especiales capaces de girar remotamente antes de llegar a una frontera de lanzamiento;
 - el estado servidor legado `gravityFallForwardIntent` fue retirado: `gravity_fall_look_v1` conserva el float sólo por compatibilidad de layout, el cliente envía 0 y beta.4 lo ignora.
 
@@ -75,8 +76,9 @@ Resultado de las búsquedas de cierre:
 - S07 funcional: `370c2f4c8a40f87b9d89e1895cf0df4df8ba68bd`, **run `35103896552`** verde.
 - HEAD funcional de convergencia antes de esta pasada documental: `b2de88e83e1e64416288d220c8d86d52aeca014d`, **run `35105097956`** verde.
 - HEAD tras convergencia documental y limpieza de estado legado: `48311e9d994a0335c15242491328ac4fbfd82188`, **Build and test #1039 / run `35112406795`**, verde en localización, build/JUnit, server GameTests, cliente base, First Person, Scale Brews server/client, Fresh Animations y snapshots.
-- El primer HEAD documental de cierre (`df2f0051024b37d6a05beebc441b27987c963313`) produjo un rojo útil en **#1040 / run `35114000226`** sólo en Scale Brews server: el wolf real seguía con `navDone=false` al tick 120 y el fixture exigía commit exactamente en ese tick. El mismo código había pasado esa lane en #1039 y baseline server/client/First Person seguían verdes. Se endureció el test con `succeedWhen`: ahora exige la misma transición real, ownership y no-colisión, pero permite que ocurra en cualquier tick dentro del **mismo `maxTicks=180`**, sin ampliar timeout ni tocar producción.
+- El primer HEAD documental de cierre (`df2f0051024b37d6a05beebc441b27987c963313`) produjo un rojo útil en **#1040 / run `35114000226`** sólo en Scale Brews server: el wolf real seguía con `navDone=false` al tick 120 y el fixture exigía commit exactamente en ese tick. El mismo código había pasado esa lane en #1039 y baseline server/client/First Person seguían verdes.
+- El primer hardening del fixture (`c402d03be9188e22b4b06e2c6e217ef0e539125d`) reveló en **#1041 / run `35115667401`** que el problema no era sólo el instante 120: el lobo podía seguir sin commit al agotar 180 ticks. El diagnóstico del executor mostró que un salto vanilla de `PathNavigation` durante `APPROACH` hacía fallar `planningContext`, borraba el plan y devolvía el tick a `FollowOwnerGoal`, permitiendo un bucle approach→jump→clear→replan. El fix mantiene ownership/ruta hasta 20 ticks de pérdida transitoria de soporte en ambos executors, no ejecuta planning ni commit mientras están airborne y falla/cooldown la arista si la pérdida deja de ser transitoria. Dos GameTests directos cubren pet y navegación genérica; el real-wolf gate conserva `maxTicks=180` y ahora espera la transición real con `succeedWhen`.
 
 ## Cierre
 
-NAV-S09 queda cerrado únicamente cuando el HEAD que contiene ese hardening temporal pasa la matriz completa. Este cierre no cambia versión, etiqueta, `main` ni publica prerelease. `0.1.0-beta.3` sigue siendo la última versión publicada; la campaña beta.4 queda lista como rama convergida para una futura decisión explícita de integración/release.
+NAV-S09 queda cerrado únicamente cuando el HEAD que contiene el hardening de `APPROACH` pasa la matriz completa. Este cierre no cambia versión, etiqueta, `main` ni publica prerelease. `0.1.0-beta.3` sigue siendo la última versión publicada; la campaña beta.4 queda lista como rama convergida para una futura decisión explícita de integración/release.

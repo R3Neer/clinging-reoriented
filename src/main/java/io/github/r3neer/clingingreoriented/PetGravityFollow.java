@@ -22,6 +22,7 @@ public final class PetGravityFollow {
     private static final long FAILED_MANEUVER_COOLDOWN_TICKS=80L;
     private static final long IDLE_REPLAN_TICKS=10L;
     private static final long NO_PROGRESS_TICKS=40L;
+    private static final long APPROACH_AIRBORNE_GRACE_TICKS=20L;
     private static final double PROGRESS_EPS=.35D;
     private static final int FLIGHT_GRACE_TICKS=20;
     private static final int MAX_EXCLUSIONS=8;
@@ -39,6 +40,7 @@ public final class PetGravityFollow {
         private int landingTicks;
         private double bestFrontierDistance=Double.POSITIVE_INFINITY;
         private long progressAt;
+        private long approachAirborneSince=Long.MIN_VALUE;
         private long nextIdlePlanAt;
         private Vec3 idlePlanOwnerAnchor;
         private boolean idlePlanOwnerAirborne;
@@ -82,9 +84,24 @@ public final class PetGravityFollow {
         if(state.phase==Phase.COMMITTED||state.phase==Phase.LANDING_CONFIRM||state.phase==Phase.RECOVERY)
             return tickFlightOrRecovery(pet,owner,state,speed,stopDistance);
 
-        if(!planningContext(pet,owner)){
+        if(!approachContext(pet,owner)){
             releaseRoute(pet,state);clearPlan(state);return false;
         }
+        boolean grounded=AirChanges.grounded(pet);
+        if(state.phase==Phase.APPROACH&&!grounded){
+            var plan=state.plan;var key=plan==null?null:plan.maneuverKey();
+            Direction current=GravityDirectionUtil.getOwnGravityDirection(pet);
+            if(key==null||current!=key.sourceGravity()){
+                releaseRoute(pet,state);clearPlan(state);return false;
+            }
+            long now=pet.level().getGameTime();
+            if(state.approachAirborneSince==Long.MIN_VALUE)state.approachAirborneSince=now;
+            if(now-state.approachAirborneSince<=APPROACH_AIRBORNE_GRACE_TICKS)return true;
+            rememberFailure(pet,state,key);releaseRoute(pet,state);clearPlan(state);return false;
+        }
+        state.approachAirborneSince=Long.MIN_VALUE;
+        if(!grounded){releaseRoute(pet,state);clearPlan(state);return false;}
+
         var observed=PetFollowTargeting.observe(pet,owner,state.targeting);
         if(observed==null){releaseRoute(pet,state);clearPlan(state);return false;}
         if(state.phase==Phase.IDLE&&!prepareTransition(pet,owner,state,stopDistance,false,observed))return false;
@@ -207,7 +224,7 @@ public final class PetGravityFollow {
         }
         clearIdleThrottle(state);
         state.plan=plan;state.ownerAnchor=anchor;state.ownerAnchorAirborne=target.airborne();state.phase=Phase.APPROACH;state.committedKey=null;
-        state.routeNavigation=null;state.routeOwned=false;state.landingTicks=0;state.flightDeadline=0;
+        state.routeNavigation=null;state.routeOwned=false;state.landingTicks=0;state.flightDeadline=0;state.approachAirborneSince=Long.MIN_VALUE;
         state.bestFrontierDistance=pet.position().distanceTo(plan.frontier());state.progressAt=now;
         return true;
     }
@@ -245,10 +262,13 @@ public final class PetGravityFollow {
         };
     }
 
-    private static boolean planningContext(TamableAnimal pet,LivingEntity owner){
+    private static boolean approachContext(TamableAnimal pet,LivingEntity owner){
         return pet!=null&&owner!=null&&!pet.level().isClientSide()&&pet.isAlive()&&owner.isAlive()&&pet.level()==owner.level()
-            &&!pet.unableToMoveToOwner()&&ClingingReoriented.hasEffect(pet)&&MobGravity.supported(pet)
-            &&AirChanges.grounded(pet)&&!FluidContext.intersects(pet);
+            &&!pet.unableToMoveToOwner()&&ClingingReoriented.hasEffect(pet)&&MobGravity.supported(pet)&&!FluidContext.intersects(pet);
+    }
+
+    private static boolean planningContext(TamableAnimal pet,LivingEntity owner){
+        return approachContext(pet,owner)&&AirChanges.grounded(pet);
     }
 
     private static boolean canRemainOwned(TamableAnimal pet,LivingEntity owner,State state){
@@ -289,5 +309,6 @@ public final class PetGravityFollow {
     private static void clearPlan(State state){
         state.phase=Phase.IDLE;state.plan=null;state.ownerAnchor=null;state.ownerAnchorAirborne=false;state.routeNavigation=null;state.routeOwned=false;
         state.committedKey=null;state.flightDeadline=0;state.landingTicks=0;state.bestFrontierDistance=Double.POSITIVE_INFINITY;state.progressAt=0;
+        state.approachAirborneSince=Long.MIN_VALUE;
     }
 }

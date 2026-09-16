@@ -35,6 +35,29 @@ public final class MobGravityNavigationGameTests {
     }
 
     @GameTest(padding=64)
+    public void transientVanillaApproachJumpKeepsGenericPlanUntilGroundedCommit(GameTestHelper h){
+        Zombie zombie=zombie(h,true);wall(h,9);Vec3 target=h.absoluteVec(new Vec3(14,10,5));
+        h.assertTrue(zombie.getNavigation().moveTo(target.x,target.y,target.z,1.0D),"blocked intent was not accepted");
+        var state=MobGravityNavigation.state(zombie);var plan=state.plan();
+        h.assertTrue(plan!=null&&state.phase()==MobGravityNavigation.Phase.APPROACH,"fixture did not begin in APPROACH");
+        MobGravityNavigation.tick(zombie);
+
+        zombie.setOnGround(false);zombie.setDeltaMovement(new Vec3(0,.2D,0));
+        MobGravityNavigation.tick(zombie);
+        h.assertTrue(state.phase()==MobGravityNavigation.Phase.APPROACH&&state.plan()==plan,
+            "short vanilla navigation jump discarded generic approach state");
+        h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(zombie)==Direction.DOWN,
+            "generic approach jump committed a gravity turn while unsupported");
+
+        Vec3 frontier=plan.frontier();
+        zombie.setPos(frontier.x,frontier.y,frontier.z);zombie.setOnGround(true);zombie.setDeltaMovement(Vec3.ZERO);
+        MobGravityNavigation.tick(zombie);
+        h.assertTrue(state.phase()==MobGravityNavigation.Phase.COMMITTED,"generic approach did not commit after support returned: "+state.phase());
+        h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(zombie)==Direction.EAST,"generic resumed approach did not execute EAST transition");
+        h.succeed();
+    }
+
+    @GameTest(padding=64)
     public void fleePositionIntentCanUseWallWhenItImprovesSeparation(GameTestHelper h){
         Zombie zombie=zombie(h,true);wall(h,9);
         Vec3 threat=h.absoluteVec(new Vec3(3,10,5));

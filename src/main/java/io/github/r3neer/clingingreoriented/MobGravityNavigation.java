@@ -27,6 +27,7 @@ public final class MobGravityNavigation {
     private static final long FAILED_MANEUVER_COOLDOWN_TICKS=80L;
     private static final long IDLE_REPLAN_TICKS=10L;
     private static final long NO_PROGRESS_TICKS=40L;
+    private static final long APPROACH_AIRBORNE_GRACE_TICKS=20L;
     private static final double PROGRESS_EPS=.35D;
     private static final double INTENT_REPLAN_DISTANCE_SQR=4.0D;
     private static final int MAX_EXCLUSIONS=8;
@@ -67,6 +68,7 @@ public final class MobGravityNavigation {
         private int landingTicks;
         private double bestFrontierDistance=Double.POSITIVE_INFINITY;
         private long progressAt;
+        private long approachAirborneSince=Long.MIN_VALUE;
         private long nextIdlePlanAt;
         private Vec3 idleFocusAnchor;
         private Direction idleGravity;
@@ -151,7 +153,21 @@ public final class MobGravityNavigation {
         if(s.phase==Phase.COMMITTED||s.phase==Phase.LANDING_CONFIRM||s.phase==Phase.RECOVERY){
             tickFlight(mob,s);return;
         }
-        if(!planningContext(mob)){clear(mob,s,true);return;}
+        if(!approachContext(mob)){clear(mob,s,true);return;}
+        boolean grounded=AirChanges.grounded(mob);
+        if(s.phase==Phase.APPROACH&&!grounded){
+            var plan=s.plan;var key=plan==null?null:plan.maneuverKey();
+            Direction current=GravityDirectionUtil.getOwnGravityDirection(mob);
+            if(key==null||current!=key.sourceGravity()){
+                clear(mob,s,true);return;
+            }
+            long now=mob.level().getGameTime();
+            if(s.approachAirborneSince==Long.MIN_VALUE)s.approachAirborneSince=now;
+            if(now-s.approachAirborneSince<=APPROACH_AIRBORNE_GRACE_TICKS)return;
+            rememberFailure(mob,s,key);releaseRoute(mob,s);clearPlanOnly(s);return;
+        }
+        s.approachAirborneSince=Long.MIN_VALUE;
+        if(!grounded){clear(mob,s,true);return;}
         if(s.phase==Phase.WAITING_PLAN){
             attemptDeferredPlan(mob,s);return;
         }
@@ -273,6 +289,7 @@ public final class MobGravityNavigation {
         }
         s.phase=Phase.APPROACH;s.intent=intent;s.speed=sanitizeSpeed(speed);s.plan=plan;s.focusAnchor=focus;
         s.routeNavigation=null;s.routeOwned=false;s.committedKey=null;s.flightDeadline=0;s.landingTicks=0;s.forceReplan=false;
+        s.approachAirborneSince=Long.MIN_VALUE;
         s.bestFrontierDistance=mob.position().distanceTo(plan.frontier());s.progressAt=now;clearIdleThrottle(s);
         if(s.bestFrontierDistance<=Math.clamp(Math.max(.55D,mob.getBbWidth()*.75D),.55D,1.25D))s.phase=Phase.REVALIDATE;
         return true;
@@ -284,6 +301,7 @@ public final class MobGravityNavigation {
         mob.getNavigation().stop();
         s.phase=Phase.WAITING_PLAN;s.intent=intent;s.speed=sanitizeSpeed(speed);s.plan=null;s.focusAnchor=focus;
         s.routeNavigation=null;s.routeOwned=false;s.committedKey=null;s.flightDeadline=0;s.landingTicks=0;
+        s.approachAirborneSince=Long.MIN_VALUE;
         s.bestFrontierDistance=Double.POSITIVE_INFINITY;s.progressAt=0;s.forceReplan=false;clearIdleThrottle(s);
     }
 
@@ -308,9 +326,13 @@ public final class MobGravityNavigation {
         };
     }
 
-    private static boolean planningContext(Mob mob){
+    private static boolean approachContext(Mob mob){
         return mob.isAlive()&&!mob.isPassenger()&&!mob.isVehicle()&&!mob.isFallFlying()&&ClingingReoriented.hasEffect(mob)
-            &&MobGravity.supported(mob)&&AirChanges.grounded(mob)&&!FluidContext.intersects(mob);
+            &&MobGravity.supported(mob)&&!FluidContext.intersects(mob);
+    }
+
+    private static boolean planningContext(Mob mob){
+        return approachContext(mob)&&AirChanges.grounded(mob);
     }
 
     private static boolean ensureRoute(Mob mob,State s){
@@ -353,6 +375,7 @@ public final class MobGravityNavigation {
     private static void clearPlanOnly(State s){
         s.phase=Phase.IDLE;s.plan=null;s.focusAnchor=null;s.routeNavigation=null;s.routeOwned=false;s.committedKey=null;
         s.flightDeadline=0;s.landingTicks=0;s.bestFrontierDistance=Double.POSITIVE_INFINITY;s.progressAt=0;s.forceReplan=false;
+        s.approachAirborneSince=Long.MIN_VALUE;
     }
 
     private static void clear(Mob mob,State s,boolean clearIntent){
