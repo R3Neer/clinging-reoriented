@@ -133,8 +133,10 @@ public final class MobFlightReactor {
         if(MobGravityNavigation.active(mob)&&intent!=null&&intent.valid(mob)){
             Vec3 focus=intent.focus();if(finite(focus))return focus;
         }
-        if(mob instanceof TamableAnimal pet&&pet.getOwner() instanceof LivingEntity owner&&owner.isAlive()&&owner.level()==mob.level())
-            return owner.position();
+        if(mob instanceof TamableAnimal pet){
+            LivingEntity owner=pet.getOwner();
+            if(owner!=null&&owner.isAlive()&&owner.level()==mob.level())return owner.position();
+        }
         return null;
     }
 
