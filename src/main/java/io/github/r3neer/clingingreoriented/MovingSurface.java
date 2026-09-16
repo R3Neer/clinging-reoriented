@@ -53,8 +53,6 @@ public final class MovingSurface {
         s.unbind(); if(p instanceof ServerPlayer sp) Payloads.publish(sp);
     }
     public static void teleported(Entity entity) {
-        if(entity instanceof ServerPlayer)GravityBreadcrumbs.clear(entity.getUUID());
-        if(entity instanceof net.minecraft.world.entity.TamableAnimal pet&&!MobGravity.breadcrumbRelocating(pet))GravityBreadcrumbs.forget(pet);
         if(entity instanceof Player p){
             boolean wasBound=ClingingReoriented.data(p).support!=null;
             clear(p);
