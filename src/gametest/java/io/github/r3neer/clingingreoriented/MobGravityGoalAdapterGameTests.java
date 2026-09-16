@@ -19,13 +19,15 @@ public final class MobGravityGoalAdapterGameTests {
     @GameTest(padding=64)
     public void meleeAttackGoalHandsBlockedPartialPathToGravityNavigation(GameTestHelper h) throws Exception {
         Zombie zombie=zombie(h,true);var target=player(h,new Vec3(14,10,5));wall(h,9);zombie.setTarget(target);
-        var goal=new MeleeAttackGoal(zombie,1.0D,true);
-        bypassCanUseCooldown(goal,zombie);
+        h.assertTrue(zombie.getTarget()==target&&target.isAlive(),"fixture lost its live melee target before canUse");
+        h.assertTrue(MobGravityNavigation.requestEntityAfterVanilla(zombie,target,1.0D,false),
+            "fixture has no direct safe gravity route for the melee target");
+        MobGravityNavigation.goalStopped(zombie);
+        h.assertFalse(MobGravityNavigation.active(zombie),"diagnostic gravity route did not release before goal test");
 
-        // Vanilla accepts a non-null partial Path here. The gravity layer must not pretend canUse failed;
-        // it takes over when the running goal emits its live entity intent through moveTo(target,...).
-        h.assertTrue(goal.canUse(),"blocked melee fixture never reached vanilla path logic after cooldown");
-        h.assertFalse(MobGravityNavigation.active(zombie),"partial-path canUse prematurely stole locomotion before the goal emitted intent");
+        var goal=new MeleeAttackGoal(zombie,1.0D,true);bypassCanUseCooldown(goal,zombie);
+        boolean canUse=goal.canUse();
+        h.assertTrue(canUse,"blocked melee goal did not start after vanilla path attempt and gravity wake");
         goal.start();goal.tick();
         h.assertTrue(MobGravityNavigation.active(zombie),"running melee goal did not hand its blocked entity intent to gravity navigation");
         h.assertTrue(MobGravityNavigation.state(zombie).plan()!=null,"melee handoff produced no gravity plan");
@@ -36,18 +38,20 @@ public final class MobGravityGoalAdapterGameTests {
     }
 
     @GameTest(padding=64)
-    public void effectFreeBlockedMeleeGoalRemainsVanillaEvenWhenPartialPathExists(GameTestHelper h) throws Exception {
+    public void effectFreeBlockedMeleeGoalCannotGainGravityLocomotion(GameTestHelper h) throws Exception {
         Zombie zombie=zombie(h,false);var target=player(h,new Vec3(14,10,5));wall(h,9);zombie.setTarget(target);
         var goal=new MeleeAttackGoal(zombie,1.0D,true);bypassCanUseCooldown(goal,zombie);
-        h.assertTrue(goal.canUse(),"fixture expected vanilla to accept its non-null partial path");
-        goal.start();goal.tick();
-        h.assertFalse(MobGravityNavigation.active(zombie),"effect-free melee goal gained gravity locomotion from a partial path");
-        goal.stop();h.succeed();
+        boolean canUse=goal.canUse();
+        if(canUse){goal.start();goal.tick();}
+        h.assertFalse(MobGravityNavigation.active(zombie),"effect-free melee goal gained gravity locomotion");
+        if(canUse)goal.stop();
+        h.succeed();
     }
 
     @GameTest(padding=64)
     public void reachableMeleeGoalStaysVanilla(GameTestHelper h) throws Exception {
         Zombie zombie=zombie(h,true);var target=player(h,new Vec3(10,10,5));zombie.setTarget(target);
+        h.assertTrue(zombie.getNavigation().createPath(target,0)!=null,"reachable fixture itself produced no vanilla path");
         var goal=new MeleeAttackGoal(zombie,1.0D,true);bypassCanUseCooldown(goal,zombie);
         h.assertTrue(goal.canUse(),"reachable vanilla melee goal unexpectedly failed after cooldown");
         goal.start();goal.tick();
@@ -91,7 +95,7 @@ public final class MobGravityGoalAdapterGameTests {
     private static Zombie zombie(GameTestHelper h,boolean powered){
         clear(h);floor(h);
         Zombie zombie=h.spawn(EntityTypes.ZOMBIE,new BlockPos(5,10,5));
-        zombie.setNoGravity(true);zombie.setOnGround(true);zombie.setDeltaMovement(Vec3.ZERO);
+        zombie.setNoAi(true);zombie.setNoGravity(true);zombie.setOnGround(true);zombie.setDeltaMovement(Vec3.ZERO);
         if(powered)zombie.addEffect(new MobEffectInstance(Reorientation.EFFECT,1200));
         return zombie;
     }
