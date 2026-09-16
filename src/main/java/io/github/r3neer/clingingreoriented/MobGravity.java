@@ -194,6 +194,28 @@ public final class MobGravity {
         }
         return true;
     }
+
+    /**
+     * Revalidates and commits one S05 support-to-support transition from the mob's real current support.
+     * The forecast assumes a stabilized launch, so successful commit zeros residual navigation velocity.
+     * A Clinging turn that begins on support consumes the resulting airborne stage immediately.
+     */
+    public static MobGravityPlanner.Transition executePlannedTransition(LivingEntity mob,Direction targetGravity){
+        return executePlannedTransition(mob,targetGravity,MobGravityPlanner.DEFAULT_TRANSITION_HORIZON_TICKS);
+    }
+    public static MobGravityPlanner.Transition executePlannedTransition(LivingEntity mob,Direction targetGravity,int horizonTicks){
+        if(!canReplayBreadcrumb(mob)||targetGravity==null||!AirChanges.grounded(mob))return null;
+        Direction current=GravityDirectionUtil.getOwnGravityDirection(mob);
+        if(current==targetGravity)return null;
+        var evaluation=MobGravityPlanner.evaluateGroundedLaunch(mob,mob.position(),targetGravity,horizonTicks);
+        if(!evaluation.accepted())return null;
+        var transition=evaluation.transition();
+        if(!ownedRelocateTree(mob,targetGravity,transition.launchPosition(),null))return null;
+        mob.setDeltaMovement(Vec3.ZERO);
+        var s=state(mob);s.airUsed=true;s.ownership=Ownership.OWNED_EFFECT;s.ownedDirection=targetGravity;s.clearBorrow();s.retryAt=0;
+        return transition;
+    }
+
     public static boolean replay(LivingEntity pet,Direction direction){
         if(!canReplayBreadcrumb(pet))return false;
         var s=state(pet);
