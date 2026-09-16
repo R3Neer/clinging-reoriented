@@ -36,8 +36,10 @@ public final class WaterMovementClientGameTest implements FabricClientGameTest {
                 ClingingReoriented.write(p,Direction.EAST);
                 var state=ClingingReoriented.data(p);state.owned=true;state.selected=Direction.EAST;state.visualFrameOwned=true;state.airChangeUsed=false;
                 p.setNoGravity(true);p.setDeltaMovement(Vec3.ZERO);
+                // Mirror the production turn lifecycle so the client receives ownership, not only the gravity attribute.
+                Payloads.publish(p);
             });
-            context.waitFor(mc->mc.player!=null&&mc.player.isInWater()&&GravityDirectionUtil.getOwnGravityDirection(mc.player)==Direction.EAST);
+            context.waitFor(mc->mc.player!=null&&mc.player.isInWater()&&GravityDirectionUtil.getOwnGravityDirection(mc.player)==Direction.EAST&&ClingingReoriented.controlsPhysics(mc.player));
             context.waitTicks(30);
 
             context.runOnClient(mc->{
