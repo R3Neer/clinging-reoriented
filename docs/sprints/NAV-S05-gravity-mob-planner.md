@@ -82,6 +82,68 @@ El coste específico del objetivo se añadirá por encima en S06.
 - el coste de riesgo crece monótonamente y de forma no lineal;
 - el mismo impacto cuesta más cuanto menor es la vida disponible.
 
-## Después de S05-A
+## S05-B — frontera caminable y comparación local
 
-S05-B añadirá generación barata de posiciones de lanzamiento locales y comparación entre direcciones. S05-C añadirá una búsqueda perezosa/acotada de pocos estados de soporte. Sólo tras esos gates S06 conectará el planner con goals concretos y retirará breadcrumbs.
+S05-B no hace todavía una búsqueda global de estados. Su trabajo es convertir un objetivo espacial en **un único punto de decisión caminable** sobre la superficie actual y comparar desde ahí un conjunto acotado de maniobras.
+
+### Dependencia reutilizada de Gravity Changer 26.2
+
+La dependencia ya sustituye `GroundPathNavigation` vanilla por `DirectionalGroundPathNavigation` cuando la gravedad del mob no es DOWN, conservando capacidades como puertas, flotación y vallas. Además expone:
+
+- `DirectionalMobAiUtil.projectOntoMovementPlane(origin,target,gravity)`;
+- `DirectionalGroundNodeEvaluator.nodePosition(entityPosition,gravity)`;
+- `DirectionalGroundNodeEvaluator.entityPosition(nodePosition,gravity)`.
+
+Por tanto S05 no debe implementar otro pathfinder para paredes/techos. La navegación existente es la capa táctica; nuestro planner sólo decide **cuándo y hacia qué soporte cambiar de gravedad**.
+
+### Objetivo abstracto
+
+S05-B introduce un objetivo neutral con tres operaciones conceptuales:
+
+- `focus()` — punto mundial que guía el path táctico;
+- `satisfied(position, gravity)` — si un estado de soporte ya cumple el objetivo;
+- `heuristic(position, gravity)` — coste restante no negativo para comparar candidatos.
+
+Follow/chase/flee implementarán estas políticas en S06. S05-B no conoce dueño, enemigo ni miedo.
+
+### Algoritmo acotado
+
+1. Proyectar `focus` al plano de movimiento actual con `DirectionalMobAiUtil`.
+2. Convertir esa proyección a nodo con `DirectionalGroundNodeEvaluator.nodePosition`.
+3. Pedir **una sola** ruta a la navegación actual sin ejecutarla.
+4. Si el path llega y el estado terminal satisface el objetivo, devolver `WALK`.
+5. Si el path es parcial, usar su `getEndNode()` convertido a posición de entidad como frontera caminable.
+6. Si no existe path, la posición actual es la única frontera permitida en S05-B.
+7. Desde esa frontera evaluar como máximo las cinco gravedades distintas de la actual mediante el kernel S05-A.
+8. Coste candidato = coste de aproximación caminando + coste físico S05-A + heurística del objetivo desde el landing.
+9. Elegir el candidato finito de menor coste; si ninguno existe, devolver `NO_PLAN`.
+
+### Invariantes S05-B
+
+- **Una consulta de pathfinding** por planificación local.
+- **Como máximo cinco simulaciones** gravitatorias.
+- Crear un `Path` no inicia `moveTo` ni modifica la navegación activa.
+- Nunca se escanean cubos 3D ni todos los bloques cercanos.
+- Un path parcial sirve de frontera, no se interpreta como llegada al objetivo.
+- La posición de frontera se obtiene con la misma convención de nodos que Gravity Changer, no con `BlockPos.containing` ingenuo bajo gravedad lateral.
+- WALK domina a un giro cuando ya cumple el objetivo con navegación ordinaria.
+- La gravedad actual no se reevalúa como “transición”.
+- Un landing rechazado por S05-A no puede reaparecer por una heurística barata.
+- El resultado sigue siendo declarativo: `WALK`, `TRANSITION` o `NO_PLAN`; la ejecución pertenece a una capa posterior.
+
+### Tests TM S05-B
+
+- objetivo caminable en la superficie actual devuelve WALK y cero evaluaciones gravitatorias aceptadas;
+- obstáculo que produce path parcial usa exactamente el último nodo como frontera;
+- gravedad lateral usa la conversión `nodePosition/entityPosition` de Gravity Changer;
+- ninguna consulta cambia posición, gravedad, navegación ni estado de capacidad;
+- nunca se evalúan más de cinco gravedades;
+- una transición físicamente válida pero más cara que WALK no desplaza a WALK;
+- una transición barata hacia un landing que mejora el objetivo vence a permanecer bloqueado;
+- path nulo cae a frontera actual sin búsqueda global.
+
+## S05-C — expansión perezosa de estados
+
+Sólo después de cerrar S05-B, S05-C permitirá encadenar unos pocos estados soporte→soporte con presupuesto estricto. La expansión será perezosa, reutilizará S05-B para cada estado y no convertirá el mundo en una rejilla 3D global.
+
+S06 conectará después el planner con goals concretos y retirará breadcrumbs sólo cuando el reemplazo general esté demostrado.
