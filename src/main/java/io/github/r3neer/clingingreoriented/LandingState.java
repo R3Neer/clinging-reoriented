@@ -73,9 +73,14 @@ public final class LandingState {
         return true;
     }
 
+    /**
+     * Abort an already-issued LAND presentation while preserving the exact visible frame. A LAND
+     * packet owns client presentation even when it did not originate from a pre-existing HOLD, so
+     * cancellation is keyed by landingCommitted rather than freeFlightVisualHeld.
+     */
     public static void cancel(ServerPlayer player,boolean visualBecameNonCanonical){
         var state=ClingingReoriented.data(player);
-        if(state.landingCommitted&&state.freeFlightVisualHeld)Payloads.cancelLanding(player,true);
+        if(state.landingCommitted)Payloads.cancelLanding(player,true);
         state.clearLandingCommit();state.clearLandingCandidate();
         if(visualBecameNonCanonical)state.visualBaseKnown=false;
     }
@@ -138,9 +143,10 @@ public final class LandingState {
 
     private static void clearFluidTransientPreservingHold(PlayerData state){state.airborneTicks=0;state.clearLandingCommit();state.clearLandingCandidate();}
 
+    /** Real support is authoritative: retire any remaining LAND/HOLD ownership exactly at touchdown. */
     private static void touchdown(ServerPlayer player,Direction gravity){
         var state=ClingingReoriented.data(player);boolean wasCommitted=state.landingCommitted;
-        if(!wasCommitted&&state.freeFlightVisualHeld)Payloads.cancelLanding(player,false);
+        if(wasCommitted||state.freeFlightVisualHeld)Payloads.cancelLanding(player,false);
         state.freeFlightVisualHeld=false;state.freeFlightVisualHeldInFluid=false;state.airborneTicks=0;
         state.clearLandingCommit();state.clearLandingCandidate();state.visualBaseDirection=gravity;state.visualBaseKnown=true;
     }
