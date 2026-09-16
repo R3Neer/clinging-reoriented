@@ -23,38 +23,12 @@ public final class PetGravityFollowGameTests {
 
         h.assertTrue(PetGravityFollow.shouldWake(wolf,owner,state,2.0F),"blocked owner route did not produce a special transition plan");
         h.assertTrue(state.phase()==PetGravityFollow.Phase.APPROACH,"special wake did not enter APPROACH");
-        h.assertTrue(state.plan()!=null&&state.plan().kind()==MobGravityLocalPlanner.Kind.TRANSITION,"wake did not cache a transition plan");
-        h.assertTrue(state.plan().terminalGravity()==Direction.EAST,"fixture expected EAST wall transition, got "+state.plan().terminalGravity());
+        var plan=state.plan();
+        h.assertTrue(plan!=null&&plan.kind()==MobGravityLocalPlanner.Kind.TRANSITION,"wake did not cache a transition plan");
+        h.assertTrue(plan.terminalGravity()==Direction.EAST,"fixture expected EAST wall transition, got "+plan.terminalGravity());
         h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(wolf)==Direction.DOWN,"planning remotely changed pet gravity before reaching frontier");
 
-        Vec3 frontier=state.plan().frontier();
-        wolf.setPos(frontier.x,frontier.y,frontier.z);wolf.setOnGround(true);wolf.setDeltaMovement(Vec3.ZERO);
-        h.assertTrue(PetGravityFollow.tick(wolf,owner,state,1.0D,2.0F),"executor relinquished the tick at commit frontier");
-        h.assertTrue(state.phase()==PetGravityFollow.Phase.COMMITTED,"frontier revalidation did not enter COMMITTED: "+state.phase());
-        h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(wolf)==Direction.EAST,"committed executor did not apply EAST gravity");
-        h.assertTrue(MobGravity.state(wolf).airUsed,"committed transition did not consume the airborne stage");
-
-        var landing=state.plan().transition().landingBody();
-        Vec3 landed=RotationUtil.getCenterAlignedPosition(landing,wolf.getDimensions(wolf.getPose()),Direction.EAST);
-        wolf.setPos(landed.x,landed.y,landed.z);wolf.setBoundingBox(landing);wolf.setDeltaMovement(Vec3.ZERO);wolf.setOnGround(true);
-        h.assertTrue(PetGravityFollow.tick(wolf,owner,state,1.0D,2.0F),"first landing contact should remain owned for debounce");
-        h.assertTrue(state.phase()==PetGravityFollow.Phase.LANDING_CONFIRM,"first support tick did not enter LANDING_CONFIRM");
-
-        owner.snapTo(wolf.position());owner.setOnGround(true);owner.setDeltaMovement(Vec3.ZERO);
-        h.assertFalse(PetGravityFollow.tick(wolf,owner,state,1.0D,2.0F),"second stable support should release special ownership when owner is already close");
-        h.assertTrue(state.phase()==PetGravityFollow.Phase.IDLE,"stable landing did not become a new idle support root");
-        h.succeed();
-    }
-
-    @GameTest(padding=64)
-    public void transientVanillaApproachJumpKeepsPetPlanUntilGroundedCommit(GameTestHelper h){
-        var owner=owner(h,new Vec3(14,10,5));Wolf wolf=wolf(h,owner);wall(h,9);
-        var state=new PetGravityFollow.State();
-        h.assertTrue(PetGravityFollow.shouldWake(wolf,owner,state,2.0F),"fixture produced no gravity transition plan");
-        var plan=state.plan();
-        h.assertTrue(plan!=null&&state.phase()==PetGravityFollow.Phase.APPROACH,"fixture did not begin in APPROACH");
-        h.assertTrue(PetGravityFollow.tick(wolf,owner,state,1.0D,2.0F),"approach did not acquire its route");
-
+        h.assertTrue(PetGravityFollow.tick(wolf,owner,state,1.0D,2.0F),"approach did not acquire its tactical route");
         wolf.setOnGround(false);wolf.setDeltaMovement(new Vec3(0,.2D,0));
         h.assertTrue(PetGravityFollow.tick(wolf,owner,state,1.0D,2.0F),"short vanilla navigation jump released special follow ownership");
         h.assertTrue(state.phase()==PetGravityFollow.Phase.APPROACH&&state.plan()==plan,
@@ -64,9 +38,20 @@ public final class PetGravityFollowGameTests {
 
         Vec3 frontier=plan.frontier();
         wolf.setPos(frontier.x,frontier.y,frontier.z);wolf.setOnGround(true);wolf.setDeltaMovement(Vec3.ZERO);
-        h.assertTrue(PetGravityFollow.tick(wolf,owner,state,1.0D,2.0F),"grounded approach did not resume after transient jump");
-        h.assertTrue(state.phase()==PetGravityFollow.Phase.COMMITTED,"grounded frontier did not commit after transient jump: "+state.phase());
-        h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(wolf)==Direction.EAST,"resumed approach did not execute EAST transition");
+        h.assertTrue(PetGravityFollow.tick(wolf,owner,state,1.0D,2.0F),"executor relinquished the tick at commit frontier");
+        h.assertTrue(state.phase()==PetGravityFollow.Phase.COMMITTED,"frontier revalidation did not enter COMMITTED: "+state.phase());
+        h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(wolf)==Direction.EAST,"committed executor did not apply EAST gravity");
+        h.assertTrue(MobGravity.state(wolf).airUsed,"committed transition did not consume the airborne stage");
+
+        var landing=plan.transition().landingBody();
+        Vec3 landed=RotationUtil.getCenterAlignedPosition(landing,wolf.getDimensions(wolf.getPose()),Direction.EAST);
+        wolf.setPos(landed.x,landed.y,landed.z);wolf.setBoundingBox(landing);wolf.setDeltaMovement(Vec3.ZERO);wolf.setOnGround(true);
+        h.assertTrue(PetGravityFollow.tick(wolf,owner,state,1.0D,2.0F),"first landing contact should remain owned for debounce");
+        h.assertTrue(state.phase()==PetGravityFollow.Phase.LANDING_CONFIRM,"first support tick did not enter LANDING_CONFIRM");
+
+        owner.snapTo(wolf.position());owner.setOnGround(true);owner.setDeltaMovement(Vec3.ZERO);
+        h.assertFalse(PetGravityFollow.tick(wolf,owner,state,1.0D,2.0F),"second stable support should release special ownership when owner is already close");
+        h.assertTrue(state.phase()==PetGravityFollow.Phase.IDLE,"stable landing did not become a new idle support root");
         h.succeed();
     }
 

@@ -25,23 +25,15 @@ public final class MobGravityNavigationGameTests {
         h.assertTrue(MobGravityNavigation.active(zombie),"blocked powered zombie did not enter gravity navigation");
         h.assertTrue(state.phase()==MobGravityNavigation.Phase.APPROACH||state.phase()==MobGravityNavigation.Phase.REVALIDATE,
             "gravity bridge entered unexpected phase: "+state.phase());
-        h.assertTrue(state.plan()!=null&&state.plan().kind()==MobGravityLocalPlanner.Kind.TRANSITION,
+        var plan=state.plan();
+        h.assertTrue(plan!=null&&plan.kind()==MobGravityLocalPlanner.Kind.TRANSITION,
             "blocked zombie did not cache a transition plan");
-        h.assertTrue(state.plan().terminalGravity()==Direction.EAST,
-            "fixture expected EAST wall transition, got "+state.plan().terminalGravity());
+        h.assertTrue(plan.terminalGravity()==Direction.EAST,
+            "fixture expected EAST wall transition, got "+plan.terminalGravity());
         h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(zombie)==Direction.DOWN,
             "recording navigation intent remotely changed zombie gravity");
-        h.succeed();
-    }
 
-    @GameTest(padding=64)
-    public void transientVanillaApproachJumpKeepsGenericPlanUntilGroundedCommit(GameTestHelper h){
-        Zombie zombie=zombie(h,true);wall(h,9);Vec3 target=h.absoluteVec(new Vec3(14,10,5));
-        h.assertTrue(zombie.getNavigation().moveTo(target.x,target.y,target.z,1.0D),"blocked intent was not accepted");
-        var state=MobGravityNavigation.state(zombie);var plan=state.plan();
-        h.assertTrue(plan!=null&&state.phase()==MobGravityNavigation.Phase.APPROACH,"fixture did not begin in APPROACH");
         MobGravityNavigation.tick(zombie);
-
         zombie.setOnGround(false);zombie.setDeltaMovement(new Vec3(0,.2D,0));
         MobGravityNavigation.tick(zombie);
         h.assertTrue(state.phase()==MobGravityNavigation.Phase.APPROACH&&state.plan()==plan,
@@ -52,8 +44,10 @@ public final class MobGravityNavigationGameTests {
         Vec3 frontier=plan.frontier();
         zombie.setPos(frontier.x,frontier.y,frontier.z);zombie.setOnGround(true);zombie.setDeltaMovement(Vec3.ZERO);
         MobGravityNavigation.tick(zombie);
-        h.assertTrue(state.phase()==MobGravityNavigation.Phase.COMMITTED,"generic approach did not commit after support returned: "+state.phase());
-        h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(zombie)==Direction.EAST,"generic resumed approach did not execute EAST transition");
+        h.assertTrue(state.phase()==MobGravityNavigation.Phase.COMMITTED,
+            "generic approach did not commit after support returned: "+state.phase());
+        h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(zombie)==Direction.EAST,
+            "generic resumed approach did not execute EAST transition");
         h.succeed();
     }
 
