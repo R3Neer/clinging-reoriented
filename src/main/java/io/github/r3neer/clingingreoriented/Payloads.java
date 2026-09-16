@@ -55,11 +55,11 @@ public final class Payloads {
         @Override public Type<VisualHold> type(){return TYPE;}
     }
     /** Commit the retained local-player frame toward the imminent gravity-relative floor. */
-    public record LandingVisual(int direction,int kind,long sequence) implements CustomPacketPayload {
-        public static final Type<LandingVisual> TYPE=Payloads.type("visual_land_v1");
+    public record LandingVisual(int direction,int kind,float etaTicks,long sequence) implements CustomPacketPayload {
+        public static final Type<LandingVisual> TYPE=Payloads.type("visual_land_v2");
         public static final StreamCodec<RegistryFriendlyByteBuf,LandingVisual> CODEC=StreamCodec.of(
-            (b,v)->{b.writeVarInt(v.direction);b.writeVarInt(v.kind);b.writeVarLong(v.sequence);},
-            b->new LandingVisual(b.readVarInt(),b.readVarInt(),b.readVarLong()));
+            (b,v)->{b.writeVarInt(v.direction);b.writeVarInt(v.kind);b.writeFloat(v.etaTicks);b.writeVarLong(v.sequence);},
+            b->new LandingVisual(b.readVarInt(),b.readVarInt(),b.readFloat(),b.readVarLong()));
         @Override public Type<LandingVisual> type(){return TYPE;}
     }
     /** Cancel a landing trajectory. holdCurrent=true freezes the exact currently displayed frame. */
@@ -121,9 +121,10 @@ public final class Payloads {
         long sequence=nextVisualSequence(p);
         if(ServerPlayNetworking.canSend(p,VisualHold.TYPE))ServerPlayNetworking.send(p,new VisualHold(plan.target().get3DDataValue(),plan.yawDelta(),sequence));
     }
-    public static void land(ServerPlayer p,net.minecraft.core.Direction direction,GravityTransition.TurnKind kind){
+    public static void land(ServerPlayer p,net.minecraft.core.Direction direction,GravityTransition.TurnKind kind,double etaTicks){
         long sequence=nextVisualSequence(p);
-        if(ServerPlayNetworking.canSend(p,LandingVisual.TYPE))ServerPlayNetworking.send(p,new LandingVisual(direction.get3DDataValue(),kind.ordinal(),sequence));
+        float eta=(float)(Double.isFinite(etaTicks)?Math.max(0.0D,Math.min(LandingTiming.PRESENTATION_TICKS,etaTicks)):LandingTiming.PRESENTATION_TICKS);
+        if(ServerPlayNetworking.canSend(p,LandingVisual.TYPE))ServerPlayNetworking.send(p,new LandingVisual(direction.get3DDataValue(),kind.ordinal(),eta,sequence));
     }
     public static void cancelLanding(ServerPlayer p,boolean holdCurrent){
         var s=ClingingReoriented.data(p);

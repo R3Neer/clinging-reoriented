@@ -73,8 +73,8 @@ public final class ClingingClient implements ClientModInitializer {
             VisualTransitions.hold(context.client().player,Direction.from3DDataValue(transition.direction()),transition.yawDelta(),transition.sequence());
         });
         ClientPlayNetworking.registerGlobalReceiver(Payloads.LandingVisual.TYPE,(transition,context)->{
-            if(transition.direction()<0||transition.direction()>5||context.client().player==null)return;
-            VisualTransitions.land(context.client().player,Direction.from3DDataValue(transition.direction()),transition.kind(),transition.sequence());
+            if(transition.direction()<0||transition.direction()>5||context.client().player==null||!Float.isFinite(transition.etaTicks())||transition.etaTicks()<0.0F)return;
+            VisualTransitions.land(context.client().player,Direction.from3DDataValue(transition.direction()),transition.kind(),transition.etaTicks(),transition.sequence());
         });
         ClientPlayNetworking.registerGlobalReceiver(Payloads.VisualCancel.TYPE,(transition,context)->{
             if(context.client().player==null)return;

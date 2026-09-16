@@ -30,7 +30,7 @@ public final class VisualTransitions {
 
     private enum Mode { HOLD, LAND, SNAP }
     private record Active(Entity entity,Direction target,GravityTransition.TurnKind kind,long sequence,Quaternionf startVisual,
-                          long receivedNanos,long startedNanos,boolean targetSeen,Mode mode) {}
+                          long receivedNanos,long startedNanos,boolean targetSeen,Mode mode,long durationNanos) {}
 
     private VisualTransitions() {}
 
@@ -49,20 +49,21 @@ public final class VisualTransitions {
         Quaternionf held=GravityTransition.compensatedVisualStart(current,yawDelta);
         GravityTransition.applyYawGauge(entity,yawDelta);
         animation.forceSet(target,now);
-        put(animation,new Active(entity,target,null,sequence,held,now,0L,actual==target,Mode.HOLD));
+        put(animation,new Active(entity,target,null,sequence,held,now,0L,actual==target,Mode.HOLD,0L));
         latestSequence=sequence;
     }
 
     /** Commit a retained free-flight frame toward its imminent floor; no new yaw gauge is applied. */
-    public static void land(Entity entity,Direction target,int kindId,long sequence){
+    public static void land(Entity entity,Direction target,int kindId,float etaTicks,long sequence){
         if(sequence<=latestSequence)return;
         GravityTransition.TurnKind kind=GravityTransition.TurnKind.fromId(kindId);
-        if(entity==null||target==null||kind==null||sequence<0)return;
+        if(entity==null||target==null||kind==null||!Float.isFinite(etaTicks)||etaTicks<0.0F||sequence<0)return;
         GravityRotationAnimation animation=animation(entity);if(animation==null)return;
         long now=System.nanoTime();Direction actual=GravityDirectionUtil.getGravityDirection(entity);
         Quaternionf current=animation.getRotation(actual,now);
         boolean seen=actual==target;if(seen)animation.forceSet(target,now);
-        put(animation,new Active(entity,target,kind,sequence,current,now,seen?now:0L,seen,Mode.LAND));
+        long duration=LandingTiming.presentationNanos(etaTicks);
+        put(animation,new Active(entity,target,kind,sequence,current,now,seen?now:0L,seen,Mode.LAND,duration));
         latestSequence=sequence;
     }
 
@@ -73,7 +74,7 @@ public final class VisualTransitions {
         long now=System.nanoTime();Direction actual=GravityDirectionUtil.getGravityDirection(entity);
         Quaternionf current=animation.getRotation(actual,now);
         animation.forceSet(actual,now);
-        if(holdCurrent)put(animation,new Active(entity,actual,null,sequence,current,now,0L,true,Mode.HOLD));
+        if(holdCurrent)put(animation,new Active(entity,actual,null,sequence,current,now,0L,true,Mode.HOLD,0L));
         else clear(animation);
         latestSequence=sequence;
     }
@@ -94,7 +95,7 @@ public final class VisualTransitions {
         Quaternionf currentVisual=animation.getRotation(actual,now);
         Quaternionf start=GravityTransition.compensatedVisualStart(currentVisual,yawDelta);
         GravityTransition.applyYawGauge(entity,yawDelta);
-        put(animation,new Active(entity,target,kind,sequence,start,now,0L,false,Mode.SNAP));
+        put(animation,new Active(entity,target,kind,sequence,start,now,0L,false,Mode.SNAP,kind.durationNanos()));
         return true;
     }
 
@@ -110,7 +111,7 @@ public final class VisualTransitions {
         if(!active.targetSeen()){
             if(actual==active.target()){
                 animation.forceSet(active.target(),now);
-                active=new Active(active.entity(),active.target(),null,active.sequence(),active.startVisual(),active.receivedNanos(),0L,true,Mode.HOLD);
+                active=new Active(active.entity(),active.target(),null,active.sequence(),active.startVisual(),active.receivedNanos(),0L,true,Mode.HOLD,0L);
                 put(animation,active);
             }else if(now-active.receivedNanos()>TARGET_WAIT_NANOS){clear(animation);return null;}
         }
@@ -124,12 +125,12 @@ public final class VisualTransitions {
         }
         if(!active.targetSeen()){
             animation.forceSet(active.target(),now);
-            active=new Active(active.entity(),active.target(),active.kind(),active.sequence(),active.startVisual(),active.receivedNanos(),now,true,active.mode());
+            active=new Active(active.entity(),active.target(),active.kind(),active.sequence(),active.startVisual(),active.receivedNanos(),now,true,active.mode(),active.durationNanos());
             put(animation,active);
         }
         long elapsed=Math.max(0L,now-active.startedNanos());
-        long duration=active.mode()==Mode.LAND?LandingTiming.PRESENTATION_NANOS:active.kind().durationNanos();
-        float progress=(float)Math.min(1.0D,elapsed/(double)duration);
+        long duration=active.durationNanos();
+        float progress=duration<=0L?1.0F:(float)Math.min(1.0D,elapsed/(double)duration);
         Quaternionf target=RotationUtil.getEntityRotationQuaternion(active.target());
         Quaternionf result=new Quaternionf(active.startVisual()).slerp(target,GravityTransition.easeOutQuadratic(progress));
         if(progress>=1.0F){clear(animation);return target;}

@@ -18,10 +18,6 @@ public final class LandingState {
         boolean fluid=FluidContext.intersects(player);
 
         if(fluid){
-            // Entering a fluid still tears down any solid-air landing/camera presentation from the
-            // previous context. The one exception is a HOLD that was created by a gravity turn
-            // requested while the player was already inside this fluid context: cancelling that
-            // HOLD at END_SERVER_TICK would undo the very turn presentation we just accepted.
             if(!eligibleWithoutFluid(player) || !ClingingReoriented.controlsPhysics(player)
                 || state.landingCommitted || !state.freeFlightVisualHeld || !state.freeFlightVisualHeldInFluid){
                 transferClear(player);
@@ -31,7 +27,6 @@ public final class LandingState {
             return;
         }
 
-        // Once the player leaves fluid, a surviving HOLD is an ordinary dry free-flight HOLD again.
         state.freeFlightVisualHeldInFluid=false;
 
         if(!eligibleWithoutFluid(player)){
@@ -61,7 +56,6 @@ public final class LandingState {
         if(predicted.get().etaTicks()<=LandingTiming.PRESENTATION_TICKS+PRESENTATION_EPS)commit(player,predicted.get(),kind);
     }
 
-    /** The one current-tick forecast, shared with Gravity Fall after LandingState runs. */
     static Optional<LandingPrediction.Candidate> currentPrediction(ServerPlayer player){
         if(player==null)return Optional.empty();
         var state=ClingingReoriented.data(player);
@@ -70,7 +64,6 @@ public final class LandingState {
         return Optional.of(state.landingCandidate);
     }
 
-    /** Input-side check closes the one-tick gap between real touchdown and END_SERVER_TICK. */
     public static boolean committed(ServerPlayer player){
         var state=ClingingReoriented.data(player);
         if(!state.landingCommitted)return false;
@@ -80,7 +73,6 @@ public final class LandingState {
         return true;
     }
 
-    /** Surface invalidation while Clinging still owns physics: preserve the exact visible frame. */
     public static void cancel(ServerPlayer player,boolean visualBecameNonCanonical){
         var state=ClingingReoriented.data(player);
         if(state.landingCommitted&&state.freeFlightVisualHeld)Payloads.cancelLanding(player,true);
@@ -88,12 +80,8 @@ public final class LandingState {
         if(visualBecameNonCanonical)state.visualBaseKnown=false;
     }
 
-    /** Connection teardown: no packet is useful because the play connection is going away. */
-    public static void lifecycleClear(ServerPlayer player){
-        clearTransient(ClingingReoriented.data(player));
-    }
+    public static void lifecycleClear(ServerPlayer player){clearTransient(ClingingReoriented.data(player));}
 
-    /** Ownership/teleport/fluid teardown while the connection remains alive. */
     public static void transferClear(ServerPlayer player){
         var state=ClingingReoriented.data(player);
         if(state.landingCommitted||state.freeFlightVisualHeld)Payloads.cancelLanding(player,false);
@@ -148,9 +136,7 @@ public final class LandingState {
         state.freeFlightVisualHeld=false;state.freeFlightVisualHeldInFluid=false;
     }
 
-    private static void clearFluidTransientPreservingHold(PlayerData state){
-        state.airborneTicks=0;state.clearLandingCommit();state.clearLandingCandidate();
-    }
+    private static void clearFluidTransientPreservingHold(PlayerData state){state.airborneTicks=0;state.clearLandingCommit();state.clearLandingCandidate();}
 
     private static void touchdown(ServerPlayer player,Direction gravity){
         var state=ClingingReoriented.data(player);boolean wasCommitted=state.landingCommitted;
@@ -163,7 +149,7 @@ public final class LandingState {
         var state=ClingingReoriented.data(player);
         state.landingCommitted=true;state.landingContact=candidate.contact();state.landingGravity=candidate.gravity();state.landingKind=kind;
         state.landingEtaTicks=candidate.etaTicks();state.landingDeadlineTick=player.level().getGameTime()+(long)Math.ceil(candidate.etaTicks())+2L;state.landingSequence++;
-        Payloads.land(player,candidate.gravity(),kind);
+        Payloads.land(player,candidate.gravity(),kind,candidate.etaTicks());
     }
 
     private static GravityTransition.TurnKind kindFor(PlayerData state,Direction target){
