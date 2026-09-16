@@ -47,6 +47,42 @@ public final class MobGravityPlannerGameTests {
         h.succeed();
     }
 
+    @GameTest(padding=48)
+    public void groundedFutureLaunchUsesFutureSupportWithoutMutating(GameTestHelper h){
+        Wolf wolf=wolf(h,true);
+        Vec3 future=wolf.position().add(3.0D,0.0D,0.0D);
+        BlockPos feet=BlockPos.containing(future);
+        for(int x=-2;x<=2;x++)for(int z=-2;z<=2;z++)h.getLevel().setBlockAndUpdate(feet.offset(x,-1,z),Blocks.STONE.defaultBlockState());
+        int wallX=feet.getX()+6;
+        for(int y=feet.getY()-4;y<=feet.getY()+5;y++)for(int z=feet.getZ()-5;z<=feet.getZ()+5;z++)
+            h.getLevel().setBlockAndUpdate(new BlockPos(wallX,y,z),Blocks.STONE.defaultBlockState());
+
+        Vec3 beforePosition=wolf.position(),beforeVelocity=wolf.getDeltaMovement();
+        Direction beforeGravity=GravityDirectionUtil.getOwnGravityDirection(wolf);
+        var beforeOwnership=MobGravity.state(wolf).ownership;boolean beforeAirUsed=MobGravity.state(wolf).airUsed;
+        var evaluation=MobGravityPlanner.evaluateGroundedLaunch(wolf,future,Direction.EAST,40);
+
+        h.assertTrue(evaluation.accepted(),"future supported launch should reach the EAST wall, rejection="+evaluation.rejection());
+        h.assertTrue(evaluation.transition().launchPosition().distanceTo(future)<1.0D,
+            "hypothetical launch did not originate at the future support: "+evaluation.transition().launchPosition()+" vs "+future);
+        h.assertTrue(wolf.position().equals(beforePosition)&&wolf.getDeltaMovement().equals(beforeVelocity),"future launch query mutated motion");
+        h.assertTrue(GravityDirectionUtil.getOwnGravityDirection(wolf)==beforeGravity&&MobGravity.state(wolf).ownership==beforeOwnership,
+            "future launch query mutated gravity ownership");
+        h.assertTrue(MobGravity.state(wolf).airUsed==beforeAirUsed,"future grounded launch query consumed capacity");
+        h.succeed();
+    }
+
+    @GameTest(padding=32)
+    public void groundedFutureLaunchWithoutSupportFailsClosed(GameTestHelper h){
+        Wolf wolf=wolf(h,true);Vec3 unsupported=wolf.position().add(4.0D,0.0D,0.0D);
+        Vec3 before=wolf.position();
+        var evaluation=MobGravityPlanner.evaluateGroundedLaunch(wolf,unsupported,Direction.EAST,20);
+        h.assertTrue(!evaluation.accepted()&&evaluation.rejection()==MobGravityPlanner.Rejection.STALE_CONTACT,
+            "unsupported future frontier should fail closed, got "+evaluation.rejection());
+        h.assertTrue(wolf.position().equals(before),"rejected future support query moved the mob");
+        h.succeed();
+    }
+
     @GameTest(padding=32)
     public void firstNonSupportContactRejectsTheManeuver(GameTestHelper h){
         Wolf wolf=wolf(h,true);
