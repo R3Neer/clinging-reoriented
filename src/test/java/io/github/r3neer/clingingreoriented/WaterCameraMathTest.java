@@ -31,9 +31,11 @@ final class WaterCameraMathTest {
     }
 
     @Test void supportedWallCanBecomeScreenUpWithoutChangingForward(){
-        Quaternionf base=GravityFallLookMath.vanillaRotation(-90.0F,0.0F);
+        Quaternionf base=GravityFallLookMath.vanillaRotation(0.0F,0.0F);
         Vec3 wallUp=new Vec3(-1,0,0);Vec3 before=WaterCameraMath.forward(base);
-        Quaternionf corrected=WaterCameraMath.applyRoll(base,WaterCameraMath.targetRoll(base,wallUp));
+        double roll=WaterCameraMath.targetRoll(base,wallUp);
+        assertTrue(Double.isFinite(roll),"orthogonal wall-up fixture accidentally entered roll pole");
+        Quaternionf corrected=WaterCameraMath.applyRoll(base,roll);
         assertVec(before,WaterCameraMath.forward(corrected),"wall support changed forward");
         assertVec(wallUp,WaterCameraMath.up(corrected),"wall normal did not become screen-up");
     }
