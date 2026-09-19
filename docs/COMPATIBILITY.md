@@ -11,7 +11,7 @@
 
 Fabric API 0.159.0+26.2, Fabric Loader 0.19.5 and Java 25 are also required for Minecraft 26.2. Client and server need matching Clinging: Reoriented versions.
 
-**0.1.0-beta.4** is the current published prerelease. It includes the gravity-aware mob navigation, posture-driven aerodynamics, earlier landing acquisition and water-control/presentation work described below.
+**0.1.0-beta.5** is the current published prerelease. It includes the gravity-aware mob navigation, posture-driven aerodynamics, earlier landing acquisition and water-control/presentation work described below.
 
 ## Gravity Charge and vanilla projectile semantics
 
@@ -20,6 +20,8 @@ Gravity Charge adds **no new dependency**. A launched Gravity Charge keeps the e
 The item itself is project-owned: GUI icon, 3D geometry and `gravity_charge` texture are original GPL-3.0-or-later assets. Minecraft's ShulkerBullet renderer/model/texture remain vanilla runtime resources and are not copied or redistributed by this repository.
 
 Reorientation brewing uses Gravity Charge instead of Shulker Shell. Alex's Mobs Continued remains the source of the Clinging potion/effect used as the base input.
+
+Marked relaunched Gravity Charges keep the vanilla `SHULKER_BULLET` type but bypass vanilla's Peaceful-only projectile despawn. Ordinary shulker bullets retain the vanilla despawn rule; no global entity-type behaviour is changed.
 
 ## First Person
 
