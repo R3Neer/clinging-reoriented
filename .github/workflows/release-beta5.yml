@@ -71,7 +71,7 @@ jobs:
           sources_sha="$(sha256sum "${sources[0]}" | awk '{print $1}')"
           echo "regular=${regular[0]}" >> "$GITHUB_OUTPUT"
           echo "sources=${sources[0]}" >> "$GITHUB_OUTPUT"
-          awk '/^## \[0\.1\.0-beta\.4\]/{capture=1; next} capture && /^## \[/{exit} capture{print}' CHANGELOG.md > release-notes.md
+          awk '/^## \[0\.1\.0-beta\.5\]/{capture=1; next} capture && /^## \[/{exit} capture{print}' CHANGELOG.md > release-notes.md
           cat >> release-notes.md <<EOF
 
           ---
