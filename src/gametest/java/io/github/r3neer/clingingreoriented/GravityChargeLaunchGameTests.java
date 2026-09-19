@@ -6,6 +6,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.Position;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.Difficulty;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.projectile.ShulkerBullet;
@@ -32,6 +33,35 @@ public final class GravityChargeLaunchGameTests {
         var bullets=h.getLevel().getEntitiesOfClass(ShulkerBullet.class,player.getBoundingBox().inflate(4),b->duck(b).clinging$isLaunchedCharge());
         h.assertTrue(bullets.size()==1,"manual launch creates one marked bullet");var bullet=bullets.getFirst();
         h.assertTrue(bullet.getType()==EntityTypes.SHULKER_BULLET,"launched Gravity Charge keeps exact vanilla entity type");h.assertTrue(bullet.getOwner()==player,"player attribution retained");h.assertTrue(bullet.isNoGravity(),"targetless Gravity Charge does not fall");h.succeed();
+    }
+
+    @GameTest(padding=40,maxTicks=20) public void manualUseProjectileSurvivesAndMovesAfterLaunch(GameTestHelper h){
+        var player=h.makeMockServerPlayerInLevel();player.setGameMode(GameType.SURVIVAL);player.snapTo(h.absoluteVec(new Vec3(8,10,8)));player.setYRot(-90);player.setXRot(0);
+        player.setItemInHand(InteractionHand.MAIN_HAND,new ItemStack(GravityCharges.ITEM));
+        GravityCharges.ITEM.use(h.getLevel(),player,InteractionHand.MAIN_HAND);
+        var bullets=h.getLevel().getEntitiesOfClass(ShulkerBullet.class,player.getBoundingBox().inflate(4),b->duck(b).clinging$isLaunchedCharge());
+        h.assertTrue(bullets.size()==1,"manual launch starts one Gravity Charge");
+        var bullet=bullets.getFirst();Vec3 start=bullet.position();
+        h.startSequence().thenExecuteAfter(4,()->{
+            h.assertTrue(bullet.isAlive(),"manual Gravity Charge must remain alive after its first ticks");
+            h.assertTrue(bullet.position().distanceToSqr(start)>0.01D,"manual Gravity Charge must move after launch");
+        }).thenSucceed();
+    }
+
+    @GameTest public void launchedChargeBypassesOnlyPeacefulShulkerDespawn(GameTestHelper h){
+        var server=h.getLevel().getServer();Difficulty previous=h.getLevel().getDifficulty();
+        var launched=charge(h,new Vec3(4,8,4),new Vec3(1,0,0));
+        var natural=new ShulkerBullet(EntityTypes.SHULKER_BULLET,h.getLevel());Vec3 p=h.absoluteVec(new Vec3(8,8,4));
+        natural.snapTo(p.x,p.y,p.z,0,0);h.getLevel().addFreshEntity(natural);
+        try{
+            server.setDifficulty(Difficulty.PEACEFUL,true);
+            launched.checkDespawn();natural.checkDespawn();
+            h.assertTrue(launched.isAlive(),"launched Gravity Charge must survive vanilla Peaceful despawn");
+            h.assertTrue(!natural.isAlive(),"natural shulker bullet must retain vanilla Peaceful despawn");
+        }finally{
+            server.setDifficulty(previous,true);
+        }
+        h.succeed();
     }
 
     @GameTest public void dispenserFactoryKeepsFacingIntentAndExactEntityType(GameTestHelper h){
@@ -61,7 +91,7 @@ public final class GravityChargeLaunchGameTests {
         Vec3 origin=new Vec3(6,10,6);var first=h.spawn(EntityTypes.COW,new BlockPos(18,10,6));var second=h.spawn(EntityTypes.PIG,new BlockPos(18,10,8));first.setNoAi(true);second.setNoAi(true);
         var bullet=charge(h,origin,new Vec3(1,0,0));var state=duck(bullet);h.assertTrue(state.clinging$targetEntity()==first,"initial aligned target acquired");
         h.setBlock(new BlockPos(12,10,6),Blocks.STONE);state.clinging$forceAcquire();h.assertTrue(state.clinging$targetEntity()==first,"temporary LOS loss does not discard valid lock");
-        first.discard();h.setBlock(new BlockPos(12,10,6),Blocks.AIR);state.clinging$forceAcquire();h.assertTrue(state.clinging$targetEntity()==second,"removed target allows reacquisition");h.succeed();
+        first.discard();h.setBlock(new BlockPos(12,10,6),Blocks.AIR);state.clinging$forceAcquire();h.assertTrue(state.clinging$targetBlock()==null&&state.clinging$targetEntity()==second,"removed target allows entity reacquisition");h.succeed();
     }
 
     @GameTest(padding=48) public void removedTargetBlockAllowsEntityReacquisition(GameTestHelper h){
