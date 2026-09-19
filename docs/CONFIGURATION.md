@@ -1,6 +1,6 @@
 # Configuration
 
-Clinging: Reoriented exposes **no mod-owned configuration file**. **0.1.0-beta.4** is the current prerelease; the values below describe its fixed navigation/gamefeel semantics, not user preferences.
+Clinging: Reoriented exposes **no mod-owned configuration file**. **0.1.0-beta.5** is the current prerelease; the values below describe its fixed navigation/gamefeel semantics, not user preferences.
 
 ## Local-player camera and landing
 
@@ -24,7 +24,7 @@ Fixed current values:
 - maximum macro-body gaze follow: **7.5 degrees/tick**;
 - passive velocity/weathercock stabilization: **1.25 degrees/tick**;
 - additional transverse aerodynamic drag: **2.5%/tick**;
-- special W air-diving redirect: **none** in beta.4;
+- special W air-diving redirect: **none** in beta.5;
 - fast-air sound admission: **0.75 blocks/tick**, with **10-tick** fade-in;
 - Clinging-controlled airborne world-speed cap: **3.92 blocks/tick**.
 
@@ -63,6 +63,7 @@ Gravity Charge uses fixed rules rather than configuration:
 - acquisition cone: approximately **15 degrees**;
 - targetless/invalid-target retry cadence: approximately every **4 ticks**;
 - launched movement stays cardinal/orthogonal and uses vanilla `SHULKER_BULLET` entity type;
+- marked launched charges bypass vanilla's Peaceful-only shulker-bullet despawn, while natural shulker bullets do not;
 - a valid lock remains sticky until invalid;
 - a directly sighted Target Block has absolute acquisition priority.
 
@@ -74,7 +75,7 @@ The player-facing locale files are `en_us` and `es_es`. CI requires exact key pa
 
 Clinging-owned non-player visual transitions keep the fixed **180/240 ms** tracked SNAP presentation. Active tracked snaps advance even while the entity is off-screen.
 
-Pet gravity follow has no breadcrumb, route-depth or owner-replay configuration. The beta.4 runtime is history-free and uses current/filtered owner intent plus current world geometry. Pet planning consumes the same global/regional budget as general mob navigation.
+Pet gravity follow has no breadcrumb, route-depth or owner-replay configuration. The beta.5 runtime is history-free and uses current/filtered owner intent plus current world geometry. Pet planning consumes the same global/regional budget as general mob navigation.
 
 ## Water
 
