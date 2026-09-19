@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.0-beta.5] - 2026-09-19
+
+### Gravity Charge hotfix
+
+- Fix relaunched Gravity Charges disappearing immediately in Peaceful difficulty because the deliberately retained vanilla `SHULKER_BULLET` entity type also inherited vanilla shulker-bullet peaceful despawn.
+- Bypass that despawn rule only for marked launched Gravity Charges; natural shulker bullets keep vanilla Peaceful behaviour unchanged.
+- Add launch-lifetime coverage proving manual use leaves a live projectile that moves after its first ticks.
+- Add a paired Peaceful regression proving a launched Gravity Charge survives while an ordinary shulker bullet still despawns.
+
+### Validation and release
+
+- Keep the Gravity Charge's vanilla entity type, renderer, impact, Levitation and shulker-duplication semantics unchanged apart from the launched-charge Peaceful lifetime exception.
+- Re-run the complete build/server/client compatibility matrix before publishing.
+- Publish beta.5 only from the exact successful `main` CI artifact rather than rebuilding for release.
+
 ## [0.1.0-beta.4] - 2026-09-16
 
 ### Gravity Fall body, aerodynamics and landing
