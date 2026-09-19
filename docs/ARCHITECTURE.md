@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the **unreleased beta.4 navigation/gamefeel development architecture**. **0.1.0-beta.3** remains the latest published prerelease.
+This document describes the current **0.1.0-beta.5 prerelease architecture**. Beta.5 is a narrow Gravity Charge Peaceful-mode hotfix over beta.4; the navigation/gamefeel architecture below is otherwise unchanged.
 
 Clinging: Reoriented separates **physical gravity**, **camera ownership**, **persistent body attitude**, **aerodynamic response**, **trajectory prediction**, **landing authority**, **impact damage**, **interaction context**, **gravity-aware mob locomotion** and the independent **Gravity Charge projectile lifecycle** instead of treating a gravity-direction write as one monolithic event.
 
@@ -8,7 +8,7 @@ Clinging: Reoriented separates **physical gravity**, **camera ownership**, **per
 
 The server owns physical gravity, collision, effect/charge state, landing commitment, aerodynamic velocity changes, mob gravity planning/commit, safety intervention, damage and Gravity Charge acquisition/capture state. A voluntary gravity decision changes acceleration while preserving the current **world-space velocity vector**.
 
-Presentation may interpolate physical decisions but cannot invent position, collision, damage or gravity capability. The beta.4 physical/predictive rule is deliberately shared: player landing and mob gravity transitions use the same conceptual motion primitives rather than maintaining separate approximate physics.
+Presentation may interpolate physical decisions but cannot invent position, collision, damage or gravity capability. The beta.5 physical/predictive rule is deliberately shared: player landing and mob gravity transitions use the same conceptual motion primitives rather than maintaining separate approximate physics.
 
 ## Input and intent
 

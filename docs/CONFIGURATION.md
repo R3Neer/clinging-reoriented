@@ -1,6 +1,6 @@
 # Configuration
 
-Clinging: Reoriented exposes **no mod-owned configuration file**. **0.1.0-beta.4** is the current prerelease; the values below describe its fixed navigation/gamefeel semantics, not user preferences.
+Clinging: Reoriented exposes **no mod-owned configuration file**. **0.1.0-beta.5** is the current prerelease; the values below describe its fixed navigation/gamefeel semantics, not user preferences.
 
 ## Local-player camera and landing
 

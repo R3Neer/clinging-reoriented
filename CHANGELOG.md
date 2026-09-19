@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.0-beta.5] - 2026-09-19
+
+### Gravity Charge hotfix
+
+- Keep launched Gravity Charges alive in Peaceful instead of inheriting vanilla ShulkerBullet peaceful-despawn behavior.
+- Preserve vanilla Peaceful despawn for natural shulker bullets; only project-owned launched Gravity Charges bypass that removal.
+- Add regressions proving manual launches survive and move through their first ticks, and that Peaceful distinguishes launched Gravity Charges from natural shulker bullets.
+- Keep beta.4 gravity navigation, mob AI, water, landing and aerodynamics semantics unchanged.
+- Publish beta.5 only from the exact successful `main` CI artifact rather than rebuilding for release.
+
 ## [0.1.0-beta.4] - 2026-09-16
 
 ### Gravity Fall body, aerodynamics and landing

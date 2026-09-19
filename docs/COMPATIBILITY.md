@@ -11,7 +11,7 @@
 
 Fabric API 0.159.0+26.2, Fabric Loader 0.19.5 and Java 25 are also required for Minecraft 26.2. Client and server need matching Clinging: Reoriented versions.
 
-**0.1.0-beta.4** is the current published prerelease. It includes the gravity-aware mob navigation, posture-driven aerodynamics, earlier landing acquisition and water-control/presentation work described below.
+**0.1.0-beta.5** is the current published prerelease. It includes the gravity-aware mob navigation, posture-driven aerodynamics, earlier landing acquisition and water-control/presentation work described below.
 
 ## Gravity Charge and vanilla projectile semantics
 
@@ -25,7 +25,7 @@ Reorientation brewing uses Gravity Charge instead of Shulker Shell. Alex's Mobs 
 
 The supported optional target is **First Person 2.7.2** with **Not Enough Animations 1.12.4**. The local avatar macro root uses a blended body-center/camera pivot during Gravity Fall; that root never feeds back into the actual camera.
 
-Beta.4 keeps full-sphere camera ownership separate from persistent body attitude and posture-driven aerodynamics. First Person still owns the camera/model baseline; Clinging transforms only its permitted macro body pass.
+Beta.5 keeps full-sphere camera ownership separate from persistent body attitude and posture-driven aerodynamics. First Person still owns the camera/model baseline; Clinging transforms only its permitted macro body pass.
 
 ## Fresh Animations / Player Extension / EMF / ETF
 

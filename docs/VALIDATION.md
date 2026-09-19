@@ -1,8 +1,8 @@
 # Validation
 
-## Unreleased beta.4 — gravity navigation and gamefeel campaign
+## 0.1.0-beta.4 — gravity navigation and gamefeel campaign
 
-The active `tm/gravity-navigation-gamefeel-beta4` campaign changes player gamefeel and adds general gravity-aware locomotion for mobs without changing the published version. **0.1.0-beta.3 remains the latest public prerelease.** No beta.4 tag/release is implied by this section.
+The `tm/gravity-navigation-gamefeel-beta4` campaign changed player gamefeel and added general gravity-aware locomotion for mobs, then shipped as **0.1.0-beta.4**. Beta.5 keeps those semantics and adds only the Gravity Charge Peaceful-mode hotfix documented in the changelog.
 
 ### Campaign invariants
 
