@@ -1,8 +1,20 @@
 # Validation
 
-## Unreleased beta.4 — gravity navigation and gamefeel campaign
+## 0.1.0-beta.5 — Gravity Charge Peaceful hotfix
 
-The active `tm/gravity-navigation-gamefeel-beta4` campaign changes player gamefeel and adds general gravity-aware locomotion for mobs without changing the published version. **0.1.0-beta.3 remains the latest public prerelease.** No beta.4 tag/release is implied by this section.
+Beta.5 closes a launch-lifecycle gap that beta.1–beta.4 did not exercise: the real Gravity Charge item creates an exact vanilla `SHULKER_BULLET`, and vanilla Peaceful despawn therefore removed the consumed projectile immediately after launch.
+
+The fix is deliberately narrow:
+
+- a projectile marked as a launched Gravity Charge bypasses only the Peaceful shulker-bullet despawn path;
+- natural shulker bullets retain vanilla Peaceful despawn;
+- a manual-use regression follows the real spawned projectile for multiple ticks and requires both survival and forward movement;
+- a paired regression invokes Peaceful despawn on a launched Charge and a natural bullet and proves only the Charge survives;
+- hotfix branch `fix/gravity-charge-launch-despawn` passed **Build and test #1050 / run `35444247062`** across build/JUnit, server GameTests, default client, First Person, Scale Brews server/client, Fresh Animations and semantic snapshots.
+
+## 0.1.0-beta.4 — gravity navigation and gamefeel campaign
+
+The `tm/gravity-navigation-gamefeel-beta4` campaign was integrated and published as **0.1.0-beta.4**. The evidence below records that released campaign rather than an unreleased development state.
 
 ### Campaign invariants
 

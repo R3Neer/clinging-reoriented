@@ -11,11 +11,13 @@
 
 Fabric API 0.159.0+26.2, Fabric Loader 0.19.5 and Java 25 are also required for Minecraft 26.2. Client and server need matching Clinging: Reoriented versions.
 
-**0.1.0-beta.4** is the current published prerelease. It includes the gravity-aware mob navigation, posture-driven aerodynamics, earlier landing acquisition and water-control/presentation work described below.
+**0.1.0-beta.5** is the current published prerelease. It includes the gravity-aware mob navigation, posture-driven aerodynamics, earlier landing acquisition and water-control/presentation work described below.
 
 ## Gravity Charge and vanilla projectile semantics
 
 Gravity Charge adds **no new dependency**. A launched Gravity Charge keeps the exact vanilla `minecraft:shulker_bullet` entity type. The project layers Gravity Charge state and routing onto that entity rather than registering a parallel projectile type, so vanilla projectile impact, Levitation, renderer and shulker-duplication checks continue to observe the expected type.
+
+The one deliberate lifecycle exception is Peaceful despawn: a projectile explicitly marked as a launched Gravity Charge is not discarded merely because the world is Peaceful. Natural shulker bullets retain vanilla despawn behaviour. This prevents a consumed Gravity Charge from vanishing immediately after use without broadening the exception to ordinary hostile projectiles.
 
 The item itself is project-owned: GUI icon, 3D geometry and `gravity_charge` texture are original GPL-3.0-or-later assets. Minecraft's ShulkerBullet renderer/model/texture remain vanilla runtime resources and are not copied or redistributed by this repository.
 
@@ -25,13 +27,13 @@ Reorientation brewing uses Gravity Charge instead of Shulker Shell. Alex's Mobs 
 
 The supported optional target is **First Person 2.7.2** with **Not Enough Animations 1.12.4**. The local avatar macro root uses a blended body-center/camera pivot during Gravity Fall; that root never feeds back into the actual camera.
 
-Beta.4 keeps full-sphere camera ownership separate from persistent body attitude and posture-driven aerodynamics. First Person still owns the camera/model baseline; Clinging transforms only its permitted macro body pass.
+Beta.5 keeps full-sphere camera ownership separate from persistent body attitude and posture-driven aerodynamics. First Person still owns the camera/model baseline; Clinging transforms only its permitted macro body pass.
 
 ## Fresh Animations / Player Extension / EMF / ETF
 
 The reproducible optional lane uses Fresh Animations 1.10.5, Fresh Animations Player Extension 1.1, Entity Model Features 3.3.5 and Entity Texture Features 7.2. Fixtures are checksum-pinned in CI. These mods retain ownership of limbs, head tracking, equipment and internal animation; Clinging applies only the macroscopic Gravity Fall root.
 
-The beta.4 persistent body-attitude layer does not take over Fresh Animations' internal pose channels. Its root orientation and anisotropic aerodynamics remain outside those limb/head/equipment responsibilities.
+The beta.5 persistent body-attitude layer does not take over Fresh Animations' internal pose channels. Its root orientation and anisotropic aerodynamics remain outside those limb/head/equipment responsibilities.
 
 ## Scale Brews
 
@@ -66,11 +68,11 @@ The current implementation and TM evidence are documented in [TM_ALCHEMICAL_LEAT
 
 Fluid handling is deliberately generic: non-empty `FluidState` volume suspends Clinging support/landing/Gravity Fall without per-mod integration. Sprint-landing reservation reads effective `JUMP_STRENGTH` plus vanilla Jump Boost power and remains bounded to one-to-three ticks.
 
-Beta.4 water presentation/control remains a Clinging-owned policy rather than a per-water-mod adapter: camera-relative WASD, world-vertical Space/Shift, world-up free-swim presentation and support-up presentation when genuinely supported. Logical gravity remains separate.
+Beta.5 water presentation/control remains a Clinging-owned policy rather than a per-water-mod adapter: camera-relative WASD, world-vertical Space/Shift, world-up free-swim presentation and support-up presentation when genuinely supported. Logical gravity remains separate.
 
 ## Gravity-aware mobs and vanilla AI ownership
 
-Beta.4 adds no optional AI dependency and does not replace Minecraft's high-level goal ownership.
+Beta.5 adds no optional AI dependency and does not replace Minecraft's high-level goal ownership.
 
 - vanilla goals still decide **why** a mob follows, pursues, flees or moves toward a position;
 - ordinary `PathNavigation` gets first refusal;

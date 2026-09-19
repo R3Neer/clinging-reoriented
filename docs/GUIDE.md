@@ -1,8 +1,8 @@
 # Player guide
 
-This guide describes the **unreleased beta.4 navigation/gamefeel development state** of Clinging: Reoriented. **0.1.0-beta.3** remains the latest published prerelease.
+This guide describes **0.1.0-beta.5**, the current Clinging: Reoriented prerelease.
 
-The beta.4 campaign changes Gravity Fall aerodynamics, landing acquisition, water controls/camera and gravity-aware mob navigation while preserving the core rule: Clinging grants one voluntary airborne gravity decision and Reorientation removes that one-turn limit. Development builds remain prerelease software and are still subject to bug fixes and tuning.
+Beta.5 retains the beta.4 gravity-navigation/gamefeel campaign and adds a narrow Gravity Charge lifecycle hotfix: a launched Gravity Charge remains active in Peaceful difficulty, while natural shulker bullets keep vanilla despawn behaviour. The core rule remains unchanged: Clinging grants one voluntary airborne gravity decision and Reorientation removes that one-turn limit.
 
 ## Controls and gravity turns
 

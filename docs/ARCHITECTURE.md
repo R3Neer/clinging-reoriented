@@ -1,14 +1,16 @@
 # Architecture
 
-This document describes the **unreleased beta.4 navigation/gamefeel development architecture**. **0.1.0-beta.3** remains the latest published prerelease.
+This document describes the runtime architecture of **0.1.0-beta.5**, the current prerelease.
 
 Clinging: Reoriented separates **physical gravity**, **camera ownership**, **persistent body attitude**, **aerodynamic response**, **trajectory prediction**, **landing authority**, **impact damage**, **interaction context**, **gravity-aware mob locomotion** and the independent **Gravity Charge projectile lifecycle** instead of treating a gravity-direction write as one monolithic event.
+
+Gravity Charge deliberately retains the vanilla `SHULKER_BULLET` entity type. Its mixin-owned launched marker scopes the one lifecycle divergence from vanilla: launched Charges bypass Peaceful despawn, while natural shulker bullets do not.
 
 ## Authority and design rule
 
 The server owns physical gravity, collision, effect/charge state, landing commitment, aerodynamic velocity changes, mob gravity planning/commit, safety intervention, damage and Gravity Charge acquisition/capture state. A voluntary gravity decision changes acceleration while preserving the current **world-space velocity vector**.
 
-Presentation may interpolate physical decisions but cannot invent position, collision, damage or gravity capability. The beta.4 physical/predictive rule is deliberately shared: player landing and mob gravity transitions use the same conceptual motion primitives rather than maintaining separate approximate physics.
+Presentation may interpolate physical decisions but cannot invent position, collision, damage or gravity capability. The beta.5 physical/predictive rule is deliberately shared: player landing and mob gravity transitions use the same conceptual motion primitives rather than maintaining separate approximate physics.
 
 ## Input and intent
 
@@ -73,7 +75,7 @@ Landing now separates **acquisition** from **presentation**:
 
 ## Gravity-aware mob navigation
 
-The beta.4 mob system deliberately separates **high-level intent** from **locomotion**. Vanilla goals still decide why a mob wants to move; the gravity layer only expands how a mob with legitimate Clinging/Reorientation capability may satisfy that intent when ordinary navigation fails.
+The beta.5 mob system deliberately separates **high-level intent** from **locomotion**. Vanilla goals still decide why a mob wants to move; the gravity layer only expands how a mob with legitimate Clinging/Reorientation capability may satisfy that intent when ordinary navigation fails.
 
 ### Physical transition planner
 
@@ -183,4 +185,4 @@ Production code does not compile against Scale Brews or Alchemical Leather. Firs
 
 Player gravity states include GROUNDED, AIRBORNE, SUSTAINED_GRAVITY_FALL, LANDING_COMMITTED and context transfer. Mob gravity locomotion adds its own transient planning/execution phases without changing effect capability. These remain orthogonal to Gravity Charge projectile state, mount loans, optional semantic wear and external gravity ownership.
 
-**0.1.0-beta.1** introduced Gravity Charge and the beta line. **0.1.0-beta.2** replaced the pole-singular Gravity Fall look representation. **0.1.0-beta.3** is the latest published performance/stability prerelease. The **unreleased beta.4 campaign** replaces W steering with posture-driven aerodynamics, separates 40-tick landing acquisition from 10-tick presentation, adds camera-relative water locomotion and introduces bounded, reaction-aware gravity locomotion for pets and general mob goals.
+**0.1.0-beta.1** introduced Gravity Charge and the beta line. **0.1.0-beta.2** replaced the pole-singular Gravity Fall look representation. **0.1.0-beta.3** is the latest published performance/stability prerelease. The **unreleased beta.5 campaign** replaces W steering with posture-driven aerodynamics, separates 40-tick landing acquisition from 10-tick presentation, adds camera-relative water locomotion and introduces bounded, reaction-aware gravity locomotion for pets and general mob goals.

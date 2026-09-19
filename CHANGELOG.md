@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.0-beta.5] - 2026-09-19
+
+### Gravity Charge hotfix
+
+- Keep relaunched Gravity Charges alive in Peaceful difficulty instead of inheriting vanilla ShulkerBullet's Peaceful despawn rule and disappearing immediately after launch.
+- Preserve vanilla behaviour for natural shulker bullets: only projectiles explicitly marked as launched Gravity Charges bypass that despawn path.
+- Add a real manual-use regression that follows the spawned projectile across multiple ticks and requires it to remain alive and move away from its launch position.
+- Add a paired Peaceful regression proving a launched Gravity Charge survives while an otherwise ordinary shulker bullet is still discarded.
+
+### Validation and release
+
+- Validate the gameplay fix on the exact hotfix tree across build/JUnit, server GameTests, default client, First Person, Scale Brews server/client, Fresh Animations and semantic snapshots.
+- Publish beta.5 only from the exact successful `main` CI artifact; do not rebuild for release.
+
 ## [0.1.0-beta.4] - 2026-09-16
 
 ### Gravity Fall body, aerodynamics and landing
