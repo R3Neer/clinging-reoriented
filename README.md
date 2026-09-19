@@ -2,7 +2,7 @@
 
 The floor is wherever you decide it is.
 
-**Clinging: Reoriented** turns the Clinging effect from Alex's Mobs into an airborne gravity ability for Minecraft 26.2 on Fabric. Leave your local floor, release **Space**, look toward another world-cardinal direction and press Space again. Clinging grants one voluntary airborne gravity decision; **Reorientation** removes that one-turn limit. **0.1.0-beta.4** is the current prerelease and includes the gravity-navigation/gamefeel campaign described below.
+**Clinging: Reoriented** turns the Clinging effect from Alex's Mobs into an airborne gravity ability for Minecraft 26.2 on Fabric. Leave your local floor, release **Space**, look toward another world-cardinal direction and press Space again. Clinging grants one voluntary airborne gravity decision; **Reorientation** removes that one-turn limit. **0.1.0-beta.5** is the current prerelease and includes the gravity-navigation/gamefeel campaign described below.
 
 [![Minecraft 26.2](https://img.shields.io/badge/Minecraft-26.2-62B47A)](https://www.minecraft.net/)
 [![Fabric](https://img.shields.io/badge/Loader-Fabric-DDBD3B)](https://fabricmc.net/)
@@ -53,7 +53,7 @@ A shulker bullet can be captured with a **melee hit or arrow**, including an arr
 
 Right-clicking launches a Gravity Charge from the player's eyes; a dispenser launches the same projectile from its facing. Both consume one item and manual use has a **0.5 second cooldown**. The item ID is **`clinging_reoriented:gravity_charge`**.
 
-The runtime projectile remains the exact vanilla `minecraft:shulker_bullet` entity type, so vanilla impact, levitation, renderer and shulker-duplication semantics remain available. Gravity Charge does not register a lookalike custom projectile type.
+The runtime projectile remains the exact vanilla `minecraft:shulker_bullet` entity type, so vanilla impact, levitation, renderer and shulker-duplication semantics remain available. Gravity Charge does not register a lookalike custom projectile type. Marked relaunched charges explicitly bypass vanilla's Peaceful-only shulker-bullet despawn; ordinary shulker bullets keep that vanilla rule.
 
 Acquisition is server-authoritative and bounded to roughly **32 blocks / 15 degrees**. A Target Block directly under the launch ray has absolute priority. Otherwise entities and assisted Target Blocks are scored by angular error and then distance. A valid lock is sticky. If the target dies, disappears, changes dimension or a locked Target Block ceases to be valid, the projectile retries acquisition from its current position while preserving the original launch intent. With no target it continues cardinal free flight.
 
@@ -100,7 +100,7 @@ Install the regular JAR on **both client and server** with:
 - Gravity Changer Unofficial Port 1.5.2-beta.5-mc26.2
 - Cloth Config API
 
-**0.1.0-beta.4 is the current prerelease.** Back up important worlds before testing prereleases and use matching versions on every multiplayer participant.
+**0.1.0-beta.5 is the current prerelease.** Back up important worlds before testing prereleases and use matching versions on every multiplayer participant.
 
 ## Optional companions and compatibility
 
@@ -113,7 +113,7 @@ The exact Alchemical Leather ownership and validation contract is recorded in [t
 
 ## Project status
 
-**0.1.0-beta.4** is the current beta. It unifies Gravity Fall aerodynamics, earlier landing acquisition, camera-relative water controls and general gravity-aware mob locomotion on the same physical/support model. Grounded gravity planning is bounded to at most **20 transition forecasts per local plan**, **32 new plans per level/tick** and **4 per 64×64 region/tick**; committed flight uses only a short reaction-bound monitor until support/recovery.
+**0.1.0-beta.5** is the current beta. It carries the beta.4 gravity-navigation/gamefeel stack plus a focused Gravity Charge hotfix for Peaceful worlds. Grounded gravity planning is bounded to at most **20 transition forecasts per local plan**, **32 new plans per level/tick** and **4 per 64×64 region/tick**; committed flight uses only a short reaction-bound monitor until support/recovery.
 
 The release gate covers localization parity, build/JUnit, required server GameTests, default client, First Person, optional Scale Brews server/client, pinned Fresh Animations/Player Extension and semantic screenshot validation. Prerelease artifacts are created only from the exact successful `main` CI artifact, never from a second build.
 
