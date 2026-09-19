@@ -9,6 +9,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.util.Mth;
+import net.minecraft.world.Difficulty;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityReference;
@@ -62,6 +63,11 @@ public abstract class ShulkerBulletMixin extends Projectile implements GravityCh
     @Override public @Nullable BlockPos clinging$targetBlock(){return clinging$targetBlock;}
     @Override public @Nullable Entity clinging$targetEntity(){return clinging$resolveEntityTarget();}
     @Override public void clinging$forceAcquire(){if(level() instanceof ServerLevel&&clinging$launchedCharge&&!clinging$hasValidTarget())clinging$acquireOrFly();}
+
+    @Inject(method="checkDespawn",at=@At("HEAD"),cancellable=true)
+    private void clinging$keepLaunchedChargeInPeaceful(CallbackInfo ci){
+        if(clinging$launchedCharge&&level().getDifficulty()==Difficulty.PEACEFUL)ci.cancel();
+    }
 
     @Inject(method="tick",at=@At("HEAD"))
     private void clinging$tickChargeHead(CallbackInfo ci){
