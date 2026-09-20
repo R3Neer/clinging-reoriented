@@ -114,7 +114,7 @@ public final class LandingStateGameTests {
             h.assertTrue(s.landingCandidate.etaTicks()>LandingPolicy.CLEAR_COMMIT_TICKS&&s.landingCandidate.etaTicks()<=LandingTiming.PRESENTATION_TICKS,
                 "clear support should be visible to body anticipation before input lock; eta="+s.landingCandidate.etaTicks());
             h.assertFalse(s.landingCommitted,"clear support must not lock input while still outside the final five ticks");
-            p.snapTo(new Vec3(p.getX(),targetY+2.0D,p.getZ()));p.setDeltaMovement(new Vec3(0,-.25,0));LandingState.tick(p);
+            p.snapTo(new Vec3(p.getX(),targetY+1.0D,p.getZ()));p.setDeltaMovement(new Vec3(0,-.25,0));LandingState.tick(p);
             h.assertTrue(s.landingCommitted,"clear support should commit once ETA enters the final five ticks");
         }finally{reg.close();}
         h.succeed();
