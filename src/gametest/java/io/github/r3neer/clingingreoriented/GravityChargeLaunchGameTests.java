@@ -6,11 +6,13 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.Position;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.server.level.TicketType;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.projectile.ShulkerBullet;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.storage.TagValueInput;
@@ -37,14 +39,17 @@ public final class GravityChargeLaunchGameTests {
 
     @GameTest(padding=40,maxTicks=20) public void manualUseProjectileSurvivesAndMovesAfterLaunch(GameTestHelper h){
         var player=h.makeMockServerPlayerInLevel();player.setGameMode(GameType.SURVIVAL);player.snapTo(h.absoluteVec(new Vec3(8,10,8)));player.setYRot(-90);player.setXRot(0);
+        h.getLevel().getChunkSource().addTicketWithRadius(TicketType.PORTAL,ChunkPos.containing(player.blockPosition()),2);
         player.setItemInHand(InteractionHand.MAIN_HAND,new ItemStack(GravityCharges.ITEM));
         GravityCharges.ITEM.use(h.getLevel(),player,InteractionHand.MAIN_HAND);
         var bullets=h.getLevel().getEntitiesOfClass(ShulkerBullet.class,player.getBoundingBox().inflate(4),b->duck(b).clinging$isLaunchedCharge());
         h.assertTrue(bullets.size()==1,"manual launch starts one Gravity Charge");
         var bullet=bullets.getFirst();Vec3 start=bullet.position();
-        h.startSequence().thenExecuteAfter(4,()->{
-            h.assertTrue(bullet.isAlive(),"manual Gravity Charge must remain alive after its first ticks");
-            h.assertTrue(bullet.position().distanceToSqr(start)>0.01D,"manual Gravity Charge must move after launch");
+        h.startSequence().thenWaitUntil(()->{
+            h.assertTrue(bullet.isAlive(),"manual Gravity Charge must remain alive while waiting for entity ticks");
+            h.assertTrue(bullet.tickCount>=4,"manual Gravity Charge has not received four entity ticks yet; ticks="+bullet.tickCount);
+            h.assertTrue(bullet.position().distanceToSqr(start)>0.01D,
+                "manual Gravity Charge must move after four entity ticks; ticks="+bullet.tickCount+" pos="+bullet.position()+" vel="+bullet.getDeltaMovement());
         }).thenSucceed();
     }
 
