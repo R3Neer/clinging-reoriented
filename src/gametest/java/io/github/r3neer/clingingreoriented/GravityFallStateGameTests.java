@@ -24,7 +24,7 @@ public final class GravityFallStateGameTests {
         var s=ClingingReoriented.data(p);
         s.owned=true;s.selected=Direction.DOWN;s.visualFrameOwned=true;s.visualBaseKnown=true;s.visualBaseDirection=Direction.DOWN;
         s.airborneTicks=airborneTicks;
-        p.setOnGround(false);p.setDeltaMovement(Vec3.ZERO);
+        p.setOnGround(false);p.setDeltaMovement(new Vec3(0,-.25D,0));
         return p;
     }
 

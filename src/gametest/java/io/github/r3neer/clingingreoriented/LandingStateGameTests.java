@@ -88,10 +88,15 @@ public final class LandingStateGameTests {
             h.assertFalse(s.landingCommitted,"early acquisition must not commit camera/body presentation");
             var key=s.landingCandidate.contact().key();
             p.snapTo(h.absoluteVec(new Vec3(5.5,16,5.5)));p.setDeltaMovement(new Vec3(0,-.25,0));LandingState.tick(p);
-            h.assertTrue(s.landingCandidate!=null&&s.landingCandidate.contact().key().equals(key),"entering presentation window must preserve acquired surface identity");
+            h.assertTrue(s.landingCandidate!=null&&s.landingCandidate.contact().key().equals(key),"entering body-approach window must preserve acquired surface identity");
             h.assertTrue(s.landingCandidateStableTicks>=2,"same acquired surface should accumulate stability");
-            h.assertTrue(s.landingCandidateConfirmed,"presentation may commit only from the current prediction");
-            h.assertTrue(s.landingCommitted,"same surface should commit after its ETA enters the 10-tick visual window");
+            h.assertTrue(s.landingCandidateConfirmed,"presentation may use only the current physical prediction");
+            h.assertTrue(s.landingCandidate.approach()==LandingPolicy.Approach.CLEAR,"straight feet-first approach should classify as clear");
+            h.assertTrue(s.landingCandidate.etaTicks()>LandingPolicy.CLEAR_COMMIT_TICKS&&s.landingCandidate.etaTicks()<=LandingTiming.PRESENTATION_TICKS,
+                "clear support should be visible to body anticipation before input lock; eta="+s.landingCandidate.etaTicks());
+            h.assertFalse(s.landingCommitted,"clear support must not lock input while still outside the final five ticks");
+            p.snapTo(new Vec3(p.getX(),targetY+2.0D,p.getZ()));p.setDeltaMovement(new Vec3(0,-.25,0));LandingState.tick(p);
+            h.assertTrue(s.landingCommitted,"clear support should commit once ETA enters the final five ticks");
         }finally{reg.close();}
         h.succeed();
     }

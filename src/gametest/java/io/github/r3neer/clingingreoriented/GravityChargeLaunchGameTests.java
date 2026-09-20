@@ -11,6 +11,8 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.projectile.ShulkerBullet;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.storage.TagValueInput;
@@ -23,6 +25,9 @@ public final class GravityChargeLaunchGameTests {
         ((GravityChargeProjectile)(Object)bullet).clinging$initializeCharge(intent);h.getLevel().addFreshEntity(bullet);return bullet;
     }
     private static GravityChargeProjectile duck(ShulkerBullet bullet){return (GravityChargeProjectile)(Object)bullet;}
+    private static void keepSimulated(GameTestHelper h,Vec3 absolute){
+        h.getLevel().getChunkSource().addTicketWithRadius(TicketType.PORTAL,ChunkPos.containing(BlockPos.containing(absolute)),2);
+    }
 
     @GameTest(padding=40) public void manualUseConsumesOneAndSpawnsOwnedVanillaBullet(GameTestHelper h){
         var player=h.makeMockServerPlayerInLevel();player.setGameMode(GameType.SURVIVAL);player.snapTo(h.absoluteVec(new Vec3(8,10,8)));player.setYRot(-90);player.setXRot(0);
@@ -38,6 +43,7 @@ public final class GravityChargeLaunchGameTests {
     @GameTest(padding=40,maxTicks=20) public void manualUseProjectileSurvivesAndMovesAfterLaunch(GameTestHelper h){
         var player=h.makeMockServerPlayerInLevel();player.setGameMode(GameType.SURVIVAL);player.snapTo(h.absoluteVec(new Vec3(8,10,8)));player.setYRot(-90);player.setXRot(0);
         player.setItemInHand(InteractionHand.MAIN_HAND,new ItemStack(GravityCharges.ITEM));
+        keepSimulated(h,player.position());
         GravityCharges.ITEM.use(h.getLevel(),player,InteractionHand.MAIN_HAND);
         var bullets=h.getLevel().getEntitiesOfClass(ShulkerBullet.class,player.getBoundingBox().inflate(4),b->duck(b).clinging$isLaunchedCharge());
         h.assertTrue(bullets.size()==1,"manual launch starts one Gravity Charge");
