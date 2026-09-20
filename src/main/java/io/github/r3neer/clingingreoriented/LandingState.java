@@ -53,7 +53,7 @@ public final class LandingState {
 
         GravityTransition.TurnKind kind=kindFor(state,gravity);
         if(kind==null||predicted.isEmpty())return;
-        if(predicted.get().etaTicks()<=LandingTiming.PRESENTATION_TICKS+PRESENTATION_EPS)commit(player,predicted.get(),kind);
+        if(predicted.get().etaTicks()<=LandingTiming.COMMIT_TICKS+PRESENTATION_EPS && committable(state,predicted.get()))commit(player,predicted.get(),kind);
     }
 
     static Optional<LandingPrediction.Candidate> currentPrediction(ServerPlayer player){
@@ -74,15 +74,14 @@ public final class LandingState {
     }
 
     /**
-     * Abort an already-issued LAND presentation while preserving the exact visible frame. A LAND
-     * packet owns client presentation even when it did not originate from a pre-existing HOLD, so
-     * cancellation is keyed by landingCommitted rather than freeFlightVisualHeld.
+     * Abort an already-issued LAND presentation and recover toward the retained free-flight frame.
+     * The physical gravity stays unchanged; only presentation returns smoothly to the frame that
+     * existed before the now-invalid landing trajectory.
      */
-    public static void cancel(ServerPlayer player,boolean visualBecameNonCanonical){
+    public static void cancel(ServerPlayer player,boolean recoverFlightFrame){
         var state=ClingingReoriented.data(player);
-        if(state.landingCommitted)Payloads.cancelLanding(player,true);
+        if(state.landingCommitted)Payloads.cancelLanding(player,recoverFlightFrame);
         state.clearLandingCommit();state.clearLandingCandidate();
-        if(visualBecameNonCanonical)state.visualBaseKnown=false;
     }
 
     public static void lifecycleClear(ServerPlayer player){clearTransient(ClingingReoriented.data(player));}
@@ -149,6 +148,10 @@ public final class LandingState {
         if(wasCommitted||state.freeFlightVisualHeld)Payloads.cancelLanding(player,false);
         state.freeFlightVisualHeld=false;state.freeFlightVisualHeldInFluid=false;state.airborneTicks=0;
         state.clearLandingCommit();state.clearLandingCandidate();state.visualBaseDirection=gravity;state.visualBaseKnown=true;
+    }
+
+    private static boolean committable(PlayerData state,LandingPrediction.Candidate candidate){
+        return candidate.contactKind()==LandingContactPolicy.ContactKind.CLEAR || state.landingCandidateStableTicks>=2;
     }
 
     private static void commit(ServerPlayer player,LandingPrediction.Candidate candidate,GravityTransition.TurnKind kind){

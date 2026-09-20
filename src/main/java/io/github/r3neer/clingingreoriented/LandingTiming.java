@@ -2,9 +2,12 @@ package io.github.r3neer.clingingreoriented;
 
 /** Shared timing contract for camera/body landing presentation. */
 public final class LandingTiming {
-    public static final int PRESENTATION_TICKS=10; // 500 ms at 20 TPS
+    public static final int PRESENTATION_TICKS=10; // body anticipation: 500 ms at 20 TPS
+    public static final int COMMIT_TICKS=6; // camera/input landing authority begins only in the final 300 ms
+    public static final int RECOVERY_TICKS=4; // invalidated LAND returns to the retained flight frame over 200 ms
     public static final long TICK_NANOS=50_000_000L;
     public static final long PRESENTATION_NANOS=PRESENTATION_TICKS*TICK_NANOS;
+    public static final long RECOVERY_NANOS=RECOVERY_TICKS*TICK_NANOS;
 
     private LandingTiming() {}
 

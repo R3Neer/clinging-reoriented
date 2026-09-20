@@ -12,7 +12,7 @@ import net.minecraft.world.phys.Vec3;
 public final class LandingPrediction {
     public static final int ACQUISITION_TICKS=40;
     public static final int MAX_TICKS=ACQUISITION_TICKS;
-    public record Candidate(LandingSurfaces.Contact contact,Direction gravity,double etaTicks) {}
+    public record Candidate(LandingSurfaces.Contact contact,Direction gravity,double etaTicks,LandingContactPolicy.ContactKind contactKind,double normalImpactSpeed,double approachRatio) {}
     private LandingPrediction() {}
 
     public static Optional<Candidate> predict(LivingEntity entity,int horizon){
@@ -27,7 +27,9 @@ public final class LandingPrediction {
         if(!trace.valid()||trace.firstContact().isEmpty())return Optional.empty();
         var hit=trace.firstContact().get();
         if(!hit.support())return Optional.empty();
-        return Optional.of(new Candidate(hit.surface().contact(),gravity,hit.etaTicks()));
+        var assessment=LandingContactPolicy.assess(hit.incomingVelocity(),hit.surface().contact().normal());
+        if(assessment.kind()==LandingContactPolicy.ContactKind.GRAZE)return Optional.empty();
+        return Optional.of(new Candidate(hit.surface().contact(),gravity,hit.etaTicks(),assessment.kind(),assessment.normalSpeed(),assessment.normalFraction()));
     }
 
     /** Kept package-visible for existing calibration tests and callers while S01 centralizes motion. */

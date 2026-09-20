@@ -62,7 +62,7 @@ public final class Payloads {
             b->new LandingVisual(b.readVarInt(),b.readVarInt(),b.readFloat(),b.readVarLong()));
         @Override public Type<LandingVisual> type(){return TYPE;}
     }
-    /** Cancel a landing trajectory. holdCurrent=true freezes the exact currently displayed frame. */
+    /** Cancel a landing trajectory. holdCurrent=true recovers the retained pre-landing flight frame when available. */
     public record VisualCancel(boolean holdCurrent,long sequence) implements CustomPacketPayload {
         public static final Type<VisualCancel> TYPE=Payloads.type("visual_cancel_v1");
         public static final StreamCodec<RegistryFriendlyByteBuf,VisualCancel> CODEC=StreamCodec.of(

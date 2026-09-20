@@ -73,7 +73,7 @@ public final class LandingStateGameTests {
             h.assertTrue(s.landingCandidate.etaTicks()<=LandingPrediction.ACQUISITION_TICKS,"early acquisition must respect bounded horizon");
             h.assertFalse(s.landingCommitted,"early acquisition must not commit camera/body presentation");
             var key=s.landingCandidate.contact().key();
-            p.snapTo(h.absoluteVec(new Vec3(5.5,16,5.5)));p.setDeltaMovement(new Vec3(0,-.25,0));LandingState.tick(p);
+            p.snapTo(h.absoluteVec(new Vec3(5.5,14,5.5)));p.setDeltaMovement(new Vec3(0,-.25,0));LandingState.tick(p);
             h.assertTrue(s.landingCandidate!=null&&s.landingCandidate.contact().key().equals(key),"entering presentation window must preserve acquired surface identity");
             h.assertTrue(s.landingCandidateStableTicks>=2,"same acquired surface should accumulate stability");
             h.assertTrue(s.landingCandidateConfirmed,"presentation may commit only from the current prediction");
@@ -106,6 +106,37 @@ public final class LandingStateGameTests {
         var reg=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","obstruction"),fixture(p,valid,supportNow,false));
         try{LandingState.tick(p);var s=ClingingReoriented.data(p);h.assertFalse(s.landingCommitted,"first non-support collision stops trajectory instead of seeing through it");h.assertTrue(s.landingCandidate==null,"blocking first contact must prevent even early acquisition of geometry behind it");}
         finally{reg.close();}
+        h.succeed();
+    }
+
+    @GameTest(padding=16)
+    public void fastTangentialFeetGrazeDoesNotBecomeLanding(GameTestHelper h){
+        var p=managed(h,Direction.DOWN,Direction.EAST);p.setDeltaMovement(new Vec3(1.0D,-.02D,0.0D));
+        var valid=new AtomicBoolean(true);var supportNow=new AtomicBoolean(false);
+        var reg=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","tangential_graze"),fixture(p,valid,supportNow,true));
+        try{
+            LandingState.tick(p);var s=ClingingReoriented.data(p);
+            h.assertTrue(s.landingCandidate==null,"fast nearly-tangential feet contact must remain a graze");
+            h.assertFalse(s.landingCommitted,"feet graze must not capture camera/input landing authority");
+        }finally{reg.close();}
+        h.succeed();
+    }
+
+    @GameTest(padding=16)
+    public void ambiguousFeetContactNeedsTwoConfirmedTicks(GameTestHelper h){
+        var p=managed(h,Direction.DOWN,Direction.EAST);p.setDeltaMovement(new Vec3(.35D,-.05D,0.0D));
+        var valid=new AtomicBoolean(true);var supportNow=new AtomicBoolean(false);
+        var reg=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","ambiguous_contact"),fixture(p,valid,supportNow,true));
+        try{
+            LandingState.tick(p);var s=ClingingReoriented.data(p);
+            h.assertTrue(s.landingCandidate!=null&&s.landingCandidate.contactKind()==LandingContactPolicy.ContactKind.AMBIGUOUS,
+                "intermediate approach must remain an ambiguous landing candidate");
+            h.assertTrue(s.landingCandidateStableTicks==1,"first ambiguous observation must start stability at one tick");
+            h.assertFalse(s.landingCommitted,"one ambiguous feet contact must not capture landing authority");
+            LandingState.tick(p);
+            h.assertTrue(s.landingCandidateStableTicks>=2,"same ambiguous support must accumulate persistence");
+            h.assertTrue(s.landingCommitted,"persistent ambiguous feet contact should eventually become a landing");
+        }finally{reg.close();}
         h.succeed();
     }
 
