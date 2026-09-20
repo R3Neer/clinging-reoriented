@@ -181,6 +181,9 @@ public final class GameFeelAdversarialGameTests {
         h.assertTrue(s.gravityFallActive&&!s.gravityFallLanding,"zero crossing retired/landed Gravity Fall without support");
         p.setDeltaMovement(eastMomentum);
 
+        // The reserved landing phase must exercise a real feet-first approach, not the tangential
+        // graze that beta.6 deliberately rejects as landing authority.
+        p.setDeltaMovement(new Vec3(.12D,.30D,0.0D));
         var valid=new AtomicBoolean(false);
         var reg=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","s05_reserved"),fixture(p,valid));
         try{

@@ -56,7 +56,7 @@ public final class LandingStateGameTests {
             h.assertTrue(result==ClingingReoriented.Result.LANDING_COMMITTED,"new gravity input is rejected by normal landing lock state");
             valid.set(false);LandingState.tick(p);
             h.assertFalse(s.landingCommitted,"provider invalidation cancels commitment");
-            h.assertFalse(s.visualBaseKnown,"canceled visual trajectory is conservatively non-canonical");
+            h.assertTrue(s.visualBaseKnown&&s.visualBaseDirection==Direction.EAST,"canceled landing must retain the known pre-landing flight frame");
         }finally{reg.close();}
         h.succeed();
     }
