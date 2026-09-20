@@ -16,7 +16,16 @@ public final class AirChanges {
 
         // Public geometry seam first. Vanilla itself still requires the ordinary onGround flag,
         // while a future custom provider may establish real support without forging that flag.
-        if(LandingSurfaces.currentSupport(p,gravity).isPresent())return true;
+        var support=LandingSurfaces.currentSupport(p,gravity);
+        if(support.isPresent()){
+            if(p instanceof Player player){
+                var state=ClingingReoriented.data(player);
+                long now=player.level().getGameTime();
+                if(state.landingGrazeKey!=null && state.landingGrazeGravity==gravity && now<=state.landingGrazeUntilTick
+                    && state.landingGrazeKey.equals(support.get().key()))return false;
+            }
+            return true;
+        }
 
         // Existing optional integrations remain legacy fallbacks until their own mods adopt the API.
         // Preserve their previous onGround gate so S00 changes no current compatibility semantics.

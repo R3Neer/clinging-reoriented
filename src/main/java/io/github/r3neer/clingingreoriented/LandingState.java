@@ -105,6 +105,13 @@ public final class LandingState {
                 state.clearLandingCandidate();
                 return Optional.empty();
             }
+            if(current.approach()==LandingPolicy.Approach.GRAZE){
+                state.landingGrazeKey=current.contact().key();
+                state.landingGrazeGravity=gravity;
+                state.landingGrazeUntilTick=tick+1L;
+                state.clearLandingCandidate();
+                return Optional.empty();
+            }
             boolean sameEpoch=state.landingCandidate!=null && state.landingCandidateRevision==state.revision
                 && same(current.contact(),state.landingCandidate.contact());
             if(sameEpoch){
@@ -138,18 +145,18 @@ public final class LandingState {
     }
 
     private static void clearTransient(PlayerData state){
-        state.airborneTicks=0;state.clearLandingCommit();state.clearLandingCandidate();state.visualBaseKnown=false;
+        state.airborneTicks=0;state.clearLandingCommit();state.clearLandingCandidate();state.clearLandingGraze();state.visualBaseKnown=false;
         state.freeFlightVisualHeld=false;state.freeFlightVisualHeldInFluid=false;
     }
 
-    private static void clearFluidTransientPreservingHold(PlayerData state){state.airborneTicks=0;state.clearLandingCommit();state.clearLandingCandidate();}
+    private static void clearFluidTransientPreservingHold(PlayerData state){state.airborneTicks=0;state.clearLandingCommit();state.clearLandingCandidate();state.clearLandingGraze();}
 
     /** Real support is authoritative: retire any remaining LAND/HOLD ownership exactly at touchdown. */
     private static void touchdown(ServerPlayer player,Direction gravity){
         var state=ClingingReoriented.data(player);boolean wasCommitted=state.landingCommitted;
         if(wasCommitted||state.freeFlightVisualHeld)Payloads.cancelLanding(player,false);
         state.freeFlightVisualHeld=false;state.freeFlightVisualHeldInFluid=false;state.airborneTicks=0;
-        state.clearLandingCommit();state.clearLandingCandidate();state.visualBaseDirection=gravity;state.visualBaseKnown=true;
+        state.clearLandingCommit();state.clearLandingCandidate();state.clearLandingGraze();state.visualBaseDirection=gravity;state.visualBaseKnown=true;
     }
 
     private static void commit(ServerPlayer player,LandingPrediction.Candidate candidate,GravityTransition.TurnKind kind){

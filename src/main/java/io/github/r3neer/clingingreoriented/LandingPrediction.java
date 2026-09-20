@@ -31,7 +31,6 @@ public final class LandingPrediction {
         double speedSqr=hit.incomingVelocity().lengthSqr();
         double tangential=Math.sqrt(Math.max(0.0D,speedSqr-normalSpeed*normalSpeed));
         LandingPolicy.Approach approach=LandingPolicy.classify(hit.incomingVelocity(),hit.surface().contact().normal());
-        if(approach==LandingPolicy.Approach.GRAZE)return Optional.empty();
         return Optional.of(new Candidate(hit.surface().contact(),gravity,hit.etaTicks(),approach,normalSpeed,tangential));
     }
 

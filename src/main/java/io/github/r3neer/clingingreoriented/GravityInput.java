@@ -62,7 +62,7 @@ public final class GravityInput {
 
     public static boolean available(Player p) {
         if(p.isPassenger())return p.hasEffect(Reorientation.EFFECT) && !p.isSpectator() && !p.isSleeping();
-        return !p.onGround() && !AirChanges.grounded(p) && !sprintLandingJumpReserved(p)
+        return !AirChanges.grounded(p) && !sprintLandingJumpReserved(p)
             && !p.isPassenger() && !p.isSleeping()
             && !p.isSpectator() && !p.getAbilities().flying && !elytraWins(p);
     }

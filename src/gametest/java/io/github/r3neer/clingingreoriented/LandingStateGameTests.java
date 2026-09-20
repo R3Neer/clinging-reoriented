@@ -70,7 +70,26 @@ public final class LandingStateGameTests {
         try{
             LandingState.tick(p);var s=ClingingReoriented.data(p);
             h.assertTrue(s.landingCandidate==null,"near-tangential feet contact must remain a graze, not a landing candidate");
+            h.assertTrue(s.landingGrazeKey!=null&&s.landingGrazeGravity==Direction.DOWN,"graze prediction must retain one-tick contact identity");
             h.assertFalse(s.landingCommitted,"near-tangential feet contact must not lock gravity input");
+        }finally{reg.close();}
+        h.succeed();
+    }
+
+
+    @GameTest(padding=16)
+    public void predictedGrazeSuppressesFirstGroundFlagButPersistentFeetSupportWins(GameTestHelper h){
+        var p=managed(h,Direction.DOWN,Direction.EAST);var valid=new AtomicBoolean(true);var supportNow=new AtomicBoolean(true);
+        var reg=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","graze_ground_flag"),fixture(p,valid,supportNow,true));
+        try{
+            p.setOnGround(true);p.setDeltaMovement(new Vec3(1.0D,0,0));
+            var contact=LandingSurfaces.currentSupport(p,Direction.DOWN).orElseThrow();
+            var s=ClingingReoriented.data(p);long now=p.level().getGameTime();
+            s.landingGrazeKey=contact.key();s.landingGrazeGravity=Direction.DOWN;s.landingGrazeUntilTick=now;
+            h.assertFalse(AirChanges.grounded(p),"first onGround tick for the predicted graze must not become semantic support");
+            h.assertTrue(GravityInput.available(p),"graze-suppressed ground flag must not steal the Reorientation rescue input");
+            s.landingGrazeUntilTick=now-1L;
+            h.assertTrue(AirChanges.grounded(p),"feet contact that persists beyond graze memory must become real support");
         }finally{reg.close();}
         h.succeed();
     }

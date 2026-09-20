@@ -20,6 +20,7 @@ public final class PlayerData {
     public boolean visualBaseKnown; public long landingSequence; public boolean freeFlightVisualHeld; public boolean freeFlightVisualHeldInFluid;
     public LandingPrediction.Candidate landingCandidate; public int landingCandidateStableTicks; public int landingCandidateMisses;
     public int landingCandidateRevision=-1; public long landingCandidateTick=Long.MIN_VALUE; public boolean landingCandidateConfirmed;
+    public LandingSurfaces.SurfaceKey landingGrazeKey; public Direction landingGrazeGravity=Direction.DOWN; public long landingGrazeUntilTick=Long.MIN_VALUE;
 
     public boolean gravityFallActive; public boolean gravityFallLanding; public Direction gravityFallLandingGravity=Direction.DOWN;
     public double gravityFallLandingEtaTicks; public long gravityFallSequence;
@@ -33,6 +34,7 @@ public final class PlayerData {
     public void unbind(){support=null;supportId=-1;supportPosition=null;supportBox=null;lastTransport=Vec3.ZERO;groundedOnSurface=false;supportHistory.clear();supportSampleSequence=0;lastConsumedSupportSample=-1;pendingMove=null;}
     public void clearLandingCommit(){landingCommitted=false;landingContact=null;landingKind=null;landingEtaTicks=0.0D;landingDeadlineTick=0L;}
     public void clearLandingCandidate(){landingCandidate=null;landingCandidateStableTicks=0;landingCandidateMisses=0;landingCandidateRevision=-1;landingCandidateTick=Long.MIN_VALUE;landingCandidateConfirmed=false;}
+    public void clearLandingGraze(){landingGrazeKey=null;landingGrazeGravity=Direction.DOWN;landingGrazeUntilTick=Long.MIN_VALUE;}
     public void clearGravityFall(){gravityFallActive=false;gravityFallLanding=false;gravityFallLandingGravity=Direction.DOWN;gravityFallLandingEtaTicks=0.0D;gravityFallLook=null;gravityFallLookSequence=-1L;gravityFallLookTick=Long.MIN_VALUE;gravityFallAeroBody=null;}
     public void clearMaceFall(){maceFallDirection=Direction.DOWN;maceFallLastPosition=null;maceFallDistance=0.0D;maceFallActive=false;}
     public void clearFlightSafetyHold(){flightSafetyHolding=false;flightHeldVelocity=Vec3.ZERO;}
