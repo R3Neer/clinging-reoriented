@@ -62,11 +62,11 @@ public final class Payloads {
             b->new LandingVisual(b.readVarInt(),b.readVarInt(),b.readFloat(),b.readVarLong()));
         @Override public Type<LandingVisual> type(){return TYPE;}
     }
-    /** Cancel a landing trajectory. holdCurrent=true freezes the exact currently displayed frame. */
-    public record VisualCancel(boolean holdCurrent,long sequence) implements CustomPacketPayload {
-        public static final Type<VisualCancel> TYPE=Payloads.type("visual_cancel_v1");
+    /** Cancel a landing trajectory. recoverHeldFrame=true eases back to the retained pre-landing frame. */
+    public record VisualCancel(boolean recoverHeldFrame,long sequence) implements CustomPacketPayload {
+        public static final Type<VisualCancel> TYPE=Payloads.type("visual_cancel_v2");
         public static final StreamCodec<RegistryFriendlyByteBuf,VisualCancel> CODEC=StreamCodec.of(
-            (b,v)->{b.writeBoolean(v.holdCurrent);b.writeVarLong(v.sequence);},b->new VisualCancel(b.readBoolean(),b.readVarLong()));
+            (b,v)->{b.writeBoolean(v.recoverHeldFrame);b.writeVarLong(v.sequence);},b->new VisualCancel(b.readBoolean(),b.readVarLong()));
         @Override public Type<VisualCancel> type(){return TYPE;}
     }
     /** Clinging-owned snap presentation for a tracked non-player entity. */
@@ -126,11 +126,11 @@ public final class Payloads {
         float eta=(float)(Double.isFinite(etaTicks)?Math.max(0.0D,Math.min(LandingTiming.PRESENTATION_TICKS,etaTicks)):LandingTiming.PRESENTATION_TICKS);
         if(ServerPlayNetworking.canSend(p,LandingVisual.TYPE))ServerPlayNetworking.send(p,new LandingVisual(direction.get3DDataValue(),kind.ordinal(),eta,sequence));
     }
-    public static void cancelLanding(ServerPlayer p,boolean holdCurrent){
+    public static void cancelLanding(ServerPlayer p,boolean recoverHeldFrame){
         var s=ClingingReoriented.data(p);
-        if(!holdCurrent){s.freeFlightVisualHeld=false;s.freeFlightVisualHeldInFluid=false;}
+        if(!recoverHeldFrame){s.freeFlightVisualHeld=false;s.freeFlightVisualHeldInFluid=false;}
         long sequence=nextVisualSequence(p);
-        if(ServerPlayNetworking.canSend(p,VisualCancel.TYPE))ServerPlayNetworking.send(p,new VisualCancel(holdCurrent,sequence));
+        if(ServerPlayNetworking.canSend(p,VisualCancel.TYPE))ServerPlayNetworking.send(p,new VisualCancel(recoverHeldFrame,sequence));
     }
     public static void visual(ServerPlayer p,GravityTransition.Plan plan){
         var s=ClingingReoriented.data(p);s.freeFlightVisualHeld=false;s.freeFlightVisualHeldInFluid=false;long sequence=nextVisualSequence(p);

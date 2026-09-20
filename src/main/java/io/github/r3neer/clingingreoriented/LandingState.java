@@ -53,7 +53,7 @@ public final class LandingState {
 
         GravityTransition.TurnKind kind=kindFor(state,gravity);
         if(kind==null||predicted.isEmpty())return;
-        if(predicted.get().etaTicks()<=LandingTiming.PRESENTATION_TICKS+PRESENTATION_EPS)commit(player,predicted.get(),kind);
+        if(LandingPolicy.shouldCommit(predicted.get(),state.landingCandidateStableTicks))commit(player,predicted.get(),kind);
     }
 
     static Optional<LandingPrediction.Candidate> currentPrediction(ServerPlayer player){
@@ -82,7 +82,8 @@ public final class LandingState {
         var state=ClingingReoriented.data(player);
         if(state.landingCommitted)Payloads.cancelLanding(player,true);
         state.clearLandingCommit();state.clearLandingCandidate();
-        if(visualBecameNonCanonical)state.visualBaseKnown=false;
+        // A cancelled LAND now eases back to the pre-landing HOLD, so the previous visual base stays canonical.
+        if(visualBecameNonCanonical&&!state.freeFlightVisualHeld)state.visualBaseKnown=false;
     }
 
     public static void lifecycleClear(ServerPlayer player){clearTransient(ClingingReoriented.data(player));}

@@ -5,6 +5,8 @@ public final class LandingTiming {
     public static final int PRESENTATION_TICKS=10; // 500 ms at 20 TPS
     public static final long TICK_NANOS=50_000_000L;
     public static final long PRESENTATION_NANOS=PRESENTATION_TICKS*TICK_NANOS;
+    public static final int RECOVERY_TICKS=4; // 200 ms back toward the retained free-flight frame.
+    public static final long RECOVERY_NANOS=RECOVERY_TICKS*TICK_NANOS;
 
     private LandingTiming() {}
 

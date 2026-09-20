@@ -61,6 +61,20 @@ public final class LandingStateGameTests {
         h.succeed();
     }
 
+
+    @GameTest(padding=16)
+    public void tangentialFeetGrazeDoesNotBecomeLandingCandidate(GameTestHelper h){
+        var p=managed(h,Direction.DOWN,Direction.EAST);p.setDeltaMovement(new Vec3(1.0D,-.05D,0));
+        var valid=new AtomicBoolean(true);var supportNow=new AtomicBoolean(false);
+        var reg=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","feet_graze"),fixture(p,valid,supportNow,true));
+        try{
+            LandingState.tick(p);var s=ClingingReoriented.data(p);
+            h.assertTrue(s.landingCandidate==null,"near-tangential feet contact must remain a graze, not a landing candidate");
+            h.assertFalse(s.landingCommitted,"near-tangential feet contact must not lock gravity input");
+        }finally{reg.close();}
+        h.succeed();
+    }
+
     @GameTest(padding=40)
     public void acquiresLongRangeBeforePresentationAndKeepsSurfaceIdentity(GameTestHelper h){
         var p=managed(h,Direction.DOWN,Direction.EAST);p.snapTo(h.absoluteVec(new Vec3(5.5,30,5.5)));p.setDeltaMovement(new Vec3(0,-.25,0));
