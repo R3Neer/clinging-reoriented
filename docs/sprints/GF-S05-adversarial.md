@@ -49,7 +49,7 @@ Estos cambios quedaron acompañados por tests antes del cierre.
 |---|---|---|
 | `EAST→UP→NORTH→DOWN→WEST→UP` | momentum físico no se rota; cámara mundial permanece retenida; body sólo responde a velocity | server holdouts + `s05-six-turn-retained-camera` |
 | high speed + giro tardío + impacto arbitrary-normal + salida de ownership | el impacto sigue cobrando una sola vez según componente realmente absorbida | `ImpactGameTests.actualLateTurnAndOwnershipExitCannotEraseArbitraryNormalImpact` |
-| landing válido → invalidación/cancel | no hay snap-back; se conserva el quaternion parcial actual; input committed no se encola | `GameFeelAdversarialGameTests` + `s05-cancelled-landing-holds-partial` |
+| landing válido → invalidación/cancel | beta.6 parte del quaternion parcial sin snap y recupera el HOLD previo en 200 ms; input committed no se encola | `GameFeelAdversarialGameTests` + `s05-cancelled-landing-recovers-hold` |
 | velocity cardinal → jitter sub-epsilon → inversión | zero-speed hold estable, sin NaN/flip/twist espurio | `s05-gravity-fall-zero-jitter` + kernel/body tests |
 | gravedad cambia antes que velocity | el body no sigue gravedad instantáneamente; espera a que cambie la trayectoria real | `s05-gravity-fall-velocity-not-gravity` |
 | Gravity Fall → Elytra | root/landing se liberan y Elytra conserva ownership | lifecycle/client tests + `s05-language-elytra` |
@@ -65,13 +65,13 @@ Estos cambios quedaron acompañados por tests antes del cierre.
 
 La CI conserva por separado las matrices `default`, `first_person` y `fresh_animations`. Un validador stdlib comprueba presencia única, firma PNG, resolución mínima, tamaño plausible y diferencias byte a byte en checkpoints que deben ser visualmente distintos. Run 464 produjo el manifiesto:
 
-- default: six-turn retained camera, zero-jitter, velocity-not-gravity, cancelled landing partial, Falling, Elytra;
+- default: six-turn retained camera, zero-jitter, velocity-not-gravity, cancelled landing recovery, Falling, Elytra;
 - First Person: Gravity Fall root, BODY_LANDING;
 - Fresh Animations: sustained DOWN, landing mid, landing final.
 
 Todos los checkpoints del manifiesto son **854×480**. La revisión visual de los artefactos exactos confirmó:
 
-- cancelación de landing en un frame intermedio real, sin endpoint anticipado;
+- cancelación de landing desde un frame intermedio real, sin snap, seguida de recuperación al HOLD previo;
 - Falling y Elytra claramente diferentes;
 - First Person conserva framing/cámara mientras el cuerpo entra en landing;
 - Fresh Animations conserva animación interna mientras el root corporal progresa de sustained a landing mid y al frame final.
@@ -87,7 +87,7 @@ Se corrigió sólo el fixture en `c7a3cf78e1865dc2b2266e7f216e67bb5568403f` para
 - [x] A1 inventariar cobertura existente y convertir sólo huecos reales en tests.
 - [x] A2 secuencia server/client de seis cambios cardinales verificando momentum, airborne continuity y ownership.
 - [x] A3 holdout de impacto tardío combinado con giro real, arbitrary-normal y salida de ownership.
-- [x] A4 invalidación/cancel de landing + input committed sin queue diferida ni snap-back.
+- [x] A4 invalidación/cancel de landing + input committed sin queue diferida ni snap-back. Beta.6 sustituye el hold parcial indefinido por recuperación acotada al HOLD previo.
 - [x] A5 lifecycle combinado Elytra/agua/respawn/teleport con RESET/ownership/epoch.
 - [x] A6 campaña cliente multigiro, jitter de cero, invalidación y comparación Falling/Gravity Fall/Elytra.
 - [x] A7 mounts/pets/remote tracking cruzando boundaries de ownership.
@@ -109,3 +109,8 @@ La campaña reservada combinaba caída sostenida, cambios físicos múltiples si
 ## Regla de cierre
 
 Cumplida: tests aplicables verdes, snapshots validados y revisados, holdouts superados, deuda externa explícita, revisión final sin cambios de producción y ejecución CI completa posterior sobre el HEAD de evidencia.
+
+
+## Nota posterior beta.6
+
+GF-S05 queda como evidencia histórica de la arquitectura que introdujo cancelación sin snap. La política vigente desde beta.6 refina ese contrato: el frame parcial sigue siendo el punto inicial exacto de la cancelación, pero ya no queda congelado; `RECOVER_HOLD` vuelve al frame de vuelo retenido en 4 ticks / 200 ms. El snapshot canónico pasa a `s05-cancelled-landing-recovers-hold`.

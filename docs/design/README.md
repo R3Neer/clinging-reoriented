@@ -1,6 +1,6 @@
 # Design archive
 
-The documents in this directory are **historical pre-implementation design records**, not the normative description of the current beta.4 development runtime.
+The documents in this directory are **historical pre-implementation design records**, not the normative description of the current runtime.
 
 They are intentionally retained because they record the reasoning that led to the NAV campaign, including rejected assumptions and intermediate designs. Statements such as “SIN IMPLEMENTACIÓN”, “APARCADO”, breadcrumb-era comparisons, W air-diving discussion or earlier owner-airborne policy describe the state **when that design note was written** and must not be read as current behaviour.
 

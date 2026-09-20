@@ -1,6 +1,6 @@
 # Player guide
 
-This guide describes the current **0.1.0-beta.5 prerelease** of Clinging: Reoriented. Beta.5 is a narrow Gravity Charge Peaceful-mode hotfix over beta.4; the navigation/gamefeel semantics below are otherwise unchanged.
+This guide describes the current **0.1.0-beta.6 prerelease** of Clinging: Reoriented. Beta.6 refines local-player landing capture so a tangential brush with the feet is not treated like planting the feet on a new floor.
 
 The beta.4 campaign changes Gravity Fall aerodynamics, landing acquisition, water controls/camera and gravity-aware mob navigation while preserving the core rule: Clinging grants one voluntary airborne gravity decision and Reorientation removes that one-turn limit. Development builds remain prerelease software and are still subject to bug fixes and tuning.
 
@@ -53,16 +53,22 @@ At speed >= **0.75 blocks/tick**, Gravity Fall reuses vanilla's `ELYTRA_FLYING` 
 
 Clinging predicts a bounded trajectory from the real body, **current world-space velocity** and gravity using the shared `AirMotion` recurrence plus landing-surface providers. Gravity Fall aerodynamics continuously changes that real velocity before later predictions, so the forecast is refreshed from the measured state each tick instead of guessing future look or posture input. A candidate floor must be physically valid support under the active gravity, and the **first real contact** on the predicted path matters.
 
-Acquisition and presentation are now separate:
+Acquisition, approach and commitment are separate:
 
 - a future landing may be acquired and tracked up to **40 ticks / 2 seconds** ahead;
 - acquisition keeps stable surface identity and brief hysteresis rather than rediscovering the floor from scratch each tick;
-- the visible camera/body landing manoeuvre still lasts at most **10 ticks / 500 ms**;
-- when the candidate crosses that final window, the remaining ETA sets the transition duration so the rotation converges **at touchdown**, not after impact.
+- the **feet face must participate in first contact**; shoulder/head/side contact remains blocking, not support;
+- if normal impact speed is <= **12% of total speed**, the contact is a **graze** and creates no landing candidate;
+- >= **30%** is a **clear** feet-first approach; the band between 12% and 30% is **ambiguous**;
+- total speed below **0.12 blocks/tick** is also ambiguous, so a gentle nudge needs persistence rather than an arbitrary ratio;
+- clear support can drive BODY_LANDING anticipation inside **10 ticks**, but camera/input commitment waits until ETA <= **5 ticks**;
+- ambiguous support requires **two confirmed observations**, drives body anticipation only inside **4 ticks** and commits only at ETA <= **3 ticks**.
 
-The 10-tick local-player landing presentation remains separate from the shorter 180/240 ms tracked SNAP used by non-player entities.
+A predicted graze keeps the identity of that exact surface/gravity for one extra server tick. If Minecraft briefly raises `onGround` as the feet skim it, that first matching ground flag is ignored by Clinging support/recharge and Reorientation remains rescuable. If the feet are still supported after the grace tick, the contact has become persistent and ordinary support wins.
 
-During `LANDING_COMMITTED`, new gravity requests are discarded rather than queued. A candidate retained only by hysteresis cannot start or maintain the visible landing transition without current physical confirmation. If predicted support disappears while Clinging still owns flight, the exact current presentation becomes the held frame; if another subsystem takes ownership, Clinging releases obsolete landing state.
+During `LANDING_COMMITTED`, new gravity requests are discarded rather than queued. Before that final commitment they remain legal. A candidate retained only by hysteresis cannot begin commitment without current physical confirmation. If a committed surface disappears, the visual frame eases back to the retained pre-landing HOLD over **4 ticks / 200 ms**; context transfer still releases obsolete ownership immediately.
+
+This policy is local-player interpretation layered after the shared geometric sweep. Mob transition planning still sees the same physical first-contact geometry and does not inherit the player comfort thresholds.
 
 ## Fluids and water
 

@@ -1,5 +1,35 @@
 # Validation
 
+## 0.1.0-beta.6 — landing contact intent
+
+Beta.6 refines local-player landing capture without changing the shared collision/trajectory model used by mob navigation.
+
+### Player landing invariants
+
+- `LandingSurfaces.sweep` still supplies the first full-AABB contact and feet/support normal; shoulder/side contact remains blocking.
+- `LandingPolicy` classifies only the local-player interpretation after that physical hit: normal-speed ratio <= **0.12** is GRAZE, >= **0.30** is CLEAR, the middle band is AMBIGUOUS, and total speed below **0.12 blocks/tick** is AMBIGUOUS.
+- GRAZE creates no landing candidate or commitment. Its exact surface key/gravity is retained for one tick so a matching transient vanilla `onGround` flag cannot recharge Clinging or canonicalize the retained camera.
+- Persistent matching support after the graze grace tick becomes ordinary support.
+- CLEAR may drive BODY_LANDING at ETA <=10 ticks, but camera/input commitment waits until ETA <=5.
+- AMBIGUOUS requires two current confirmations, may drive BODY_LANDING at ETA <=4 and commits only at ETA <=3.
+- Before `LANDING_COMMITTED`, a new legal Reorientation request remains available; once committed it is discarded rather than queued.
+- A committed LAND invalidation starts from the exact current partial quaternion and returns to the pre-landing HOLD through `RECOVER_HOLD` over **4 ticks / 200 ms**.
+- A blind/forged `onGround` flag without real support geometry does not become semantic support.
+
+### Automated coverage
+
+`LandingPolicyTest` covers ratio classification, low-speed ambiguity, body-approach windows and commit windows. Server GameTests cover tangential feet grazes, exact-surface one-tick ground suppression, persistent support, 40-tick acquisition, delayed clear commitment, first-contact blocking and false-ground semantics. The default client adversarial lane replaces the old indefinite partial-hold snapshot with `s05-cancelled-landing-recovers-hold`.
+
+### Useful red history
+
+- **#1065 / 35509766626** exposed six tests that encoded the old <=10-tick commitment policy or physically invalid zero/tangential landing fixtures; it also exposed an unrelated Gravity Charge fixture missing a stable simulation ticket. Fixtures were corrected, not production rules weakened.
+- **#1066 / 35509962888** left only the final-five-tick calibration fixture; the fixture was moved closer rather than changing the production threshold.
+- **#1068 / 35510197126** left only a historical assertion that expected a forged `onGround` flag to return `BLOCKED`. Beta.6 correctly reaches the already-spent Clinging budget and returns `AIR_CHANGE_USED` while preserving `airChangeUsed`.
+
+### Branch gate
+
+Functional HEAD `163722f0db55362b1fb4f1e5d5099a9ac76cc855`: **Build and test #1069 / run `35510393577` SUCCESS** across localization parity, build/JUnit, required server GameTests, default client, First Person, Scale Brews server/client, Fresh Animations and semantic snapshot validation.
+
 ## 0.1.0-beta.4 — gravity navigation and gamefeel campaign
 
 The `tm/gravity-navigation-gamefeel-beta4` campaign changed player gamefeel and added general gravity-aware locomotion for mobs, then shipped as **0.1.0-beta.4**. Beta.5 keeps those semantics and adds only the Gravity Charge Peaceful-mode hotfix documented in the changelog.
@@ -250,6 +280,9 @@ Automated assertions and snapshots are evidence, not a substitute for human game
 
 ## Historical releases
 
+- **0.1.0-beta.6**: landing contact intent, delayed commitment and recover-to-HOLD cancellation.
+- **0.1.0-beta.5**: Gravity Charge Peaceful-mode hotfix.
+- **0.1.0-beta.4**: gravity navigation/gamefeel, water controls and gravity-aware mobs.
 - **0.1.0-beta.3**: performance and stability hardening with bounded recovery work and reduced hot-path allocation/CPU overhead.
 - **0.1.0-beta.2**: full-sphere camera/input hardening and underwater retained-camera fix.
 - **0.1.0-beta.1**: Gravity Charge; first beta.

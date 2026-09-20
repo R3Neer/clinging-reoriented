@@ -1,17 +1,25 @@
 # Configuration
 
-Clinging: Reoriented exposes **no mod-owned configuration file**. **0.1.0-beta.5** is the current prerelease; the values below describe its fixed navigation/gamefeel semantics, not user preferences.
+Clinging: Reoriented exposes **no mod-owned configuration file**. **0.1.0-beta.6** is the current prerelease; the values below describe its fixed navigation/gamefeel semantics, not user preferences.
 
 ## Local-player camera and landing
 
 A voluntary gravity change during free flight does **not** rotate the local camera. During sustained Gravity Fall, look input remains screen-relative through full-sphere pole crossings in both first and third person.
 
-Landing uses two fixed horizons:
+Landing uses fixed acquisition plus contact-intent thresholds:
 
 - acquisition horizon: **40 ticks / 2 seconds**;
-- visible local LAND/BODY_LANDING presentation: at most **10 ticks / 500 ms**.
+- clear BODY_LANDING approach horizon: **10 ticks / 500 ms**;
+- clear camera/input commitment: ETA <= **5 ticks / 250 ms**;
+- ambiguous BODY_LANDING approach: two confirmed observations and ETA <= **4 ticks / 200 ms**;
+- ambiguous camera/input commitment: two confirmed observations and ETA <= **3 ticks / 150 ms**;
+- graze threshold: normal impact speed <= **12%** of total speed;
+- clear threshold: normal impact speed >= **30%** of total speed;
+- speed below **0.12 blocks/tick**: ambiguous regardless of angle;
+- matching physical ground after a predicted graze is suppressed for **1 tick**; persistent support is accepted afterward;
+- cancelled committed LAND returns to the retained pre-landing HOLD over **4 ticks / 200 ms**.
 
-The predictor is refreshed every tick from the real current body/velocity/gravity state. A candidate retained only by hysteresis cannot start or maintain visible landing presentation without a current physical confirmation. Invalidated support retains the exact current visual frame while Clinging still owns presentation; context transfer releases obsolete ownership.
+The predictor is refreshed every tick from the real current body/velocity/gravity state. Hysteresis alone cannot commit a landing, and player-facing graze classification does not alter the shared collision geometry used by mob planners. Context transfer releases obsolete ownership immediately.
 
 Ordinary tracked non-player SNAP remains separate: quarter turns use **180 ms** and opposite half turns **240 ms**.
 

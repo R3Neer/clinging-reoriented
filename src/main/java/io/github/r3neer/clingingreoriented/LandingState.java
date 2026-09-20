@@ -74,9 +74,10 @@ public final class LandingState {
     }
 
     /**
-     * Abort an already-issued LAND presentation while preserving the exact visible frame. A LAND
-     * packet owns client presentation even when it did not originate from a pre-existing HOLD, so
-     * cancellation is keyed by landingCommitted rather than freeFlightVisualHeld.
+     * Abort an already-issued LAND presentation. The client begins recovery from the exact current
+     * partial frame and, when a retained free-flight HOLD exists, eases back to that pre-landing
+     * frame instead of freezing mid-turn. A LAND packet owns presentation even without a prior HOLD,
+     * so cancellation is keyed by landingCommitted rather than freeFlightVisualHeld.
      */
     public static void cancel(ServerPlayer player,boolean visualBecameNonCanonical){
         var state=ClingingReoriented.data(player);

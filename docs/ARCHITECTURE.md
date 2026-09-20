@@ -8,7 +8,7 @@ Clinging: Reoriented separates **physical gravity**, **camera ownership**, **per
 
 The server owns physical gravity, collision, effect/charge state, landing commitment, aerodynamic velocity changes, mob gravity planning/commit, safety intervention, damage and Gravity Charge acquisition/capture state. A voluntary gravity decision changes acceleration while preserving the current **world-space velocity vector**.
 
-Presentation may interpolate physical decisions but cannot invent position, collision, damage or gravity capability. The beta.5 physical/predictive rule is deliberately shared: player landing and mob gravity transitions use the same conceptual motion primitives rather than maintaining separate approximate physics.
+Presentation may interpolate physical decisions but cannot invent position, collision, damage or gravity capability. The beta.6 physical/predictive rule is deliberately shared: player landing and mob gravity transitions use the same conceptual motion primitives rather than maintaining separate approximate physics.
 
 ## Input and intent
 
@@ -24,7 +24,7 @@ During sustained Gravity Fall, the client sends sparse world-space gaze/forward 
 
 `GravityTransition` plans gravity/yaw coordinate transport but voluntary turns do not rotate world velocity. Gravity Changer remains the gravity-coordinate authority; Clinging records whether physical and visual state is its responsibility and releases ownership when another source takes over.
 
-`VisualTransitions` provides HOLD, LAND and SNAP presentation modes. Local-player LAND uses at most **500 ms / 10 ticks**; ordinary tracked non-player SNAP keeps shorter 180/240 ms turn timing. Cancellation caused by invalidated support may hold the exact current quaternion; lifecycle/context transfer releases ownership.
+`VisualTransitions` provides HOLD, LAND, SNAP and RECOVER_HOLD presentation modes. BODY_LANDING may anticipate a clear floor up to **10 ticks** out, but local-player camera/input LAND commits only inside **5 ticks** for a clear approach or inside **3 ticks** after two confirmations for an ambiguous approach. Invalidated committed LAND enters RECOVER_HOLD and eases back to the retained pre-landing quaternion over **4 ticks / 200 ms**; lifecycle/context transfer still releases ownership immediately. Ordinary tracked non-player SNAP keeps its separate 180/240 ms turn timing.
 
 A camera HOLD created inside an already-active fluid context preserves the retained world frame for that fluid epoch; a later independent fluid entry still crosses the transfer fence and releases an older dry-flight HOLD.
 
@@ -61,15 +61,19 @@ LAND uses the shared final landing timing instead of continuing free-flight atti
 
 `LandingSurfaceProvider` / `LandingSurfaces` expose bounded support and swept-contact semantics with stable identity for revalidation. Vanilla collision geometry is the base provider. `FluidContext.intersects` fences any non-empty fluid volume before a provider can create Clinging support/landing semantics. The same fluid-volume test accepts hypothetical AABBs so planners and safe fallbacks can reject a future body without moving the entity first.
 
-Landing now separates **acquisition** from **presentation**:
+Landing separates **geometric acquisition**, **player contact intent**, **body approach** and **camera/input commitment**:
 
-- `LandingPrediction.ACQUISITION_TICKS = 40` allows a physically valid support to be discovered up to two seconds ahead;
-- the final visual presentation remains bounded by the shared 10-tick window;
-- `LandingState` stores stable surface identity, gravity, ETA and bounded miss hysteresis;
-- a candidate retained only by hysteresis cannot start or maintain visible LAND without current physical confirmation;
-- the first swept contact remains authoritative, so a blocking contact cannot be ignored to select a support behind it;
+- `LandingPrediction.ACQUISITION_TICKS = 40` still discovers the first physically valid feet support up to two seconds ahead using the shared `TrajectoryPrediction`/surface seam;
+- `LandingPolicy` is applied only to the local-player landing interpretation after that shared hit exists: normal-speed ratio <= **0.12** is GRAZE, >= **0.30** is CLEAR, and the middle band is AMBIGUOUS; total speed below **0.12 blocks/tick** is forced to AMBIGUOUS;
+- GRAZE never becomes a landing candidate. Its exact `SurfaceKey`/gravity is remembered for one tick so a matching transient vanilla `onGround` flag cannot immediately become semantic support, recharge Clinging or canonicalize the visual frame;
+- if the same feet support persists beyond that one-tick graze memory, ordinary `AirChanges.grounded` wins and it becomes a real landing;
+- CLEAR may enter BODY_LANDING inside 10 ticks but `LANDING_COMMITTED` waits until ETA <= 5;
+- AMBIGUOUS requires two current confirmations, may enter BODY_LANDING inside 4 ticks and commits only at ETA <= 3;
+- before `LANDING_COMMITTED`, Reorientation input remains legal; after commit it is discarded rather than queued;
+- `LandingState` still stores stable surface identity, gravity, ETA and bounded miss hysteresis, and a hysteresis-only candidate cannot commit;
+- the first swept contact remains authoritative, so a blocking shoulder/side contact cannot be ignored to select a support behind it;
 - Gravity Fall reuses the candidate computed by landing state rather than performing an independent second world sweep in the same tick;
-- touchdown earlier than forecast releases residual presentation immediately.
+- the player-facing contact-intent layer does **not** alter the shared sweep consumed by mob transition planning.
 
 ## Gravity-aware mob navigation
 
@@ -181,6 +185,6 @@ Production code does not compile against Scale Brews or Alchemical Leather. Firs
 
 ## State summary
 
-Player gravity states include GROUNDED, AIRBORNE, SUSTAINED_GRAVITY_FALL, LANDING_COMMITTED and context transfer. Mob gravity locomotion adds its own transient planning/execution phases without changing effect capability. These remain orthogonal to Gravity Charge projectile state, mount loans, optional semantic wear and external gravity ownership.
+Player gravity states include GROUNDED, AIRBORNE, SUSTAINED_GRAVITY_FALL, predictive landing approach, LANDING_COMMITTED, RECOVER_HOLD presentation and context transfer. Mob gravity locomotion adds its own transient planning/execution phases without changing effect capability. These remain orthogonal to Gravity Charge projectile state, mount loans, optional semantic wear and external gravity ownership.
 
-**0.1.0-beta.1** introduced Gravity Charge and the beta line. **0.1.0-beta.2** replaced the pole-singular Gravity Fall look representation. **0.1.0-beta.3** is the latest published performance/stability prerelease. The **unreleased beta.4 campaign** replaces W steering with posture-driven aerodynamics, separates 40-tick landing acquisition from 10-tick presentation, adds camera-relative water locomotion and introduces bounded, reaction-aware gravity locomotion for pets and general mob goals.
+**0.1.0-beta.1** introduced Gravity Charge and the beta line; beta.2 hardened full-sphere camera input; beta.3 hardened performance; beta.4 shipped posture-driven aerodynamics, 40-tick landing acquisition, water controls and gravity-aware mob locomotion; beta.5 fixed Gravity Charge in Peaceful. **0.1.0-beta.6** adds the local-player contact-intent layer and recover-to-HOLD landing cancellation while preserving the shared physical predictor.

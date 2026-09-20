@@ -11,7 +11,7 @@
 
 Fabric API 0.159.0+26.2, Fabric Loader 0.19.5 and Java 25 are also required for Minecraft 26.2. Client and server need matching Clinging: Reoriented versions.
 
-**0.1.0-beta.5** is the current published prerelease. It includes the gravity-aware mob navigation, posture-driven aerodynamics, earlier landing acquisition and water-control/presentation work described below.
+**0.1.0-beta.6** is the current prerelease. It keeps the shared beta.4/5 physics and adds a local-player landing contact-intent layer so a tangential feet graze is not treated as planted support.
 
 ## Gravity Charge and vanilla projectile semantics
 
@@ -25,7 +25,7 @@ Reorientation brewing uses Gravity Charge instead of Shulker Shell. Alex's Mobs 
 
 The supported optional target is **First Person 2.7.2** with **Not Enough Animations 1.12.4**. The local avatar macro root uses a blended body-center/camera pivot during Gravity Fall; that root never feeds back into the actual camera.
 
-Beta.5 keeps full-sphere camera ownership separate from persistent body attitude and posture-driven aerodynamics. First Person still owns the camera/model baseline; Clinging transforms only its permitted macro body pass.
+Beta.6 keeps full-sphere camera ownership separate from persistent body attitude and posture-driven aerodynamics. First Person still owns the camera/model baseline; Clinging transforms only its permitted macro body pass.
 
 ## Fresh Animations / Player Extension / EMF / ETF
 
@@ -66,7 +66,7 @@ The current implementation and TM evidence are documented in [TM_ALCHEMICAL_LEAT
 
 Fluid handling is deliberately generic: non-empty `FluidState` volume suspends Clinging support/landing/Gravity Fall without per-mod integration. Sprint-landing reservation reads effective `JUMP_STRENGTH` plus vanilla Jump Boost power and remains bounded to one-to-three ticks.
 
-Beta.4 water presentation/control remains a Clinging-owned policy rather than a per-water-mod adapter: camera-relative WASD, world-vertical Space/Shift, world-up free-swim presentation and support-up presentation when genuinely supported. Logical gravity remains separate.
+Water presentation/control remains a Clinging-owned policy rather than a per-water-mod adapter: camera-relative WASD, world-vertical Space/Shift, world-up free-swim presentation and support-up presentation when genuinely supported. Logical gravity remains separate.
 
 ## Gravity-aware mobs and vanilla AI ownership
 
@@ -90,7 +90,7 @@ Planning remains bounded independently of optional mods: at most 20 physical tra
 ## Ownership boundaries
 
 - **Minecraft vanilla**: ShulkerBullet entity type, projectile collision/Levitation, projectile renderer/resources, Target Block hit/redstone semantics and shulker-duplication mechanics; high-level mob goal intent and ordinary pathfinding semantics.
-- **Clinging: Reoriented**: Gravity Charge item/capture/acquisition/cardinal routing plus voluntary gravity policy, camera HOLD/full-sphere Gravity Fall, landing commitment, persistent body attitude, posture-driven aerodynamics, safety, impact, mace, owned mount transitions and bounded gravity-aware mob locomotion. When Alchemical Leather is present, Clinging also owns publication of successful-turn and controlled-Reorientation semantic facts.
+- **Clinging: Reoriented**: Gravity Charge item/capture/acquisition/cardinal routing plus voluntary gravity policy, camera HOLD/full-sphere Gravity Fall, local-player landing contact intent/commitment/recovery, persistent body attitude, posture-driven aerodynamics, safety, impact, mace, owned mount transitions and bounded gravity-aware mob locomotion. The player-facing graze heuristic is layered after shared landing geometry and does not alter mob planning physics. When Alchemical Leather is present, Clinging also owns publication of successful-turn and controlled-Reorientation semantic facts.
 - **Gravity Changer**: physical gravity attributes, coordinate transforms and general movement/collision behaviour; directional `PathNavigation` semantics and presentation for foreign gravity changes.
 - **Vanilla / registered landing providers**: collision/support facts subject to shared fluid fencing.
 - **First Person**: camera/model baseline; Clinging may transform its body pass but not the real camera.

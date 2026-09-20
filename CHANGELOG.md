@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.1.0-beta.6] - 2026-09-20
+
+### Landing contact intent
+
+- Distinguish a meaningful feet-first landing approach from a tangential feet graze without changing the shared swept-AABB collision model.
+- Classify local-player support approach from incoming velocity: normal impact at or below 12% of total speed is a graze, at or above 30% is clear, and the middle band is ambiguous; total speed below 0.12 blocks/tick is also ambiguous.
+- Keep early support acquisition at 40 ticks, but delay input/camera commitment: clear approaches may drive body anticipation inside 10 ticks and commit inside 5; ambiguous approaches require two confirmations, anticipate inside 4 and commit inside 3.
+- Carry exact surface/gravity graze identity through the first matching vanilla `onGround` tick so a brief foot skim does not recharge Clinging, canonicalize the retained frame or steal a Reorientation rescue input. Persistent support after that grace tick still becomes a normal landing.
+- Replace indefinite partial-frame landing cancellation with `RECOVER_HOLD`, easing from the exact partial LAND frame back to the retained pre-landing HOLD over 4 ticks / 200 ms.
+- Keep shoulder/side first contact blocking, keep first-contact/full-AABB authority, and leave gravity-aware mob planning on the shared physical predictor rather than applying player comfort thresholds to AI.
+
+### Validation and release
+
+- Add unit coverage for graze/ambiguous/clear classification and commitment windows, plus GameTests for tangential feet grazes, transient `onGround`, persistent support, delayed commitment and real-support-over-forged-ground semantics.
+- Update the adversarial client holdout and semantic snapshot from indefinite partial LAND hold to bounded recovery-to-HOLD.
+- Keep Gravity Charge, water, aerodynamics, mob planning and optional compatibility behaviour otherwise unchanged.
+- Publish beta.6 only from the exact successful `main` CI artifact rather than rebuilding for release.
+
 ## [0.1.0-beta.5] - 2026-09-19
 
 ### Gravity Charge hotfix

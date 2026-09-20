@@ -8,25 +8,29 @@ La predicción de landing estaba acoplada a la ventana visual final: `LandingPre
 
 ## Contratos
 
-1. **Adquisición ≠ presentación.** La física puede adquirir un candidato con bastante antelación; el cuerpo/cámara sólo entra en transición durante los últimos `PRESENTATION_TICKS`.
+1. **Adquisición ≠ approach ≠ commitment.** La física puede adquirir un candidato con bastante antelación. Desde beta.6 el body puede anticipar antes que la cámara y el input sólo queda bloqueado durante el commitment final.
 2. **Una sola física.** Toda predicción pasa por `TrajectoryPrediction` + `AirMotion` + `LandingSurfaces.sweep`; no existe un raycast paralelo ni una ecuación aproximada.
 3. **Primer contacto manda.** Un obstáculo no-soporte anterior invalida la trayectoria. Nunca se mira a través de geometría para encontrar un suelo posterior.
 4. **Volumen real.** La predicción barre el AABB completo del jugador.
 5. **Candidato persistente.** Se conserva identidad de superficie, gravedad, ETA, estabilidad y misses breves para evitar flapping de adquisición.
 6. **Nada de compromiso obsoleto.** Un candidato retenido por histéresis no puede iniciar BODY_LANDING/camera landing si la predicción del tick actual no lo confirma.
 7. **Revalidación.** Una superficie adquirida debe seguir existiendo bajo el mismo frame gravitatorio. Cambio de gravedad o revisión inválida rompe la adquisición.
-8. **Touchdown sincronizado.** Cuando la ETA cruza la ventana final, la duración visual usa la ETA restante y termina en el contacto previsto, no después.
-9. **Continuidad ante invalidación.** Si el candidato deja de ser válido durante la presentación, se cancela a la postura visible actual y se vuelve a free-fall sin snap.
+8. **Touchdown sincronizado sin captura prematura.** CLEAR puede anticipar body hasta 10 ticks pero no compromete cámara/input hasta <=5; AMBIGUOUS necesita dos confirmaciones y usa 4/3 ticks para body/commit.
+9. **Continuidad ante invalidación.** Si un LAND comprometido deja de ser válido, el cliente vuelve al HOLD de vuelo previo mediante RECOVER_HOLD en 4 ticks / 200 ms; no congela indefinidamente el quaternion parcial ni hace snap.
 10. **Touchdown real manda sobre la predicción.** Si el soporte se adquiere antes de la ETA prevista, se libera inmediatamente cualquier LAND/HOLD residual.
 11. **Trabajo acotado.** El horizonte largo se mantiene dentro del límite del predictor y Gravity Fall reutiliza el candidato calculado por `LandingState`; no hace un segundo barrido independiente del mundo en el mismo tick.
 
 ## Calibración cerrada
 
-- `PRESENTATION_TICKS = 10`.
 - `ACQUISITION_TICKS = 40` (2 s a 20 TPS).
+- `LandingTiming.PRESENTATION_TICKS = 10` sigue siendo el máximo de anticipación corporal CLEAR.
+- Política beta.6: GRAZE <=12% de velocidad normal/total; CLEAR >=30%; banda intermedia y velocidad total <0,12 bloques/tick = AMBIGUOUS.
+- CLEAR: BODY_LANDING <=10 ticks; LANDING_COMMITTED <=5 ticks.
+- AMBIGUOUS: dos confirmaciones; BODY_LANDING <=4 ticks; LANDING_COMMITTED <=3 ticks.
+- Un GRAZE conserva durante un tick la identidad exacta de superficie/gravedad para que el primer `onGround` coincidente no se convierta por sí solo en soporte; si persiste, el soporte real gana.
 - La adquisición registra estabilidad desde el primer tick confirmado y tolera como máximo un miss transitorio fuera de la ventana visual.
-- Dentro de la ventana visual sólo una predicción **actual** puede iniciar o mantener el compromiso.
-- La duración de LAND se calcula a partir de la ETA restante y se limita a la ventana de 10 ticks.
+- Dentro del commitment sólo una predicción **actual** puede mantener LAND.
+- Cancelar LAND recupera el HOLD previo en 4 ticks / 200 ms.
 
 ## Implementación
 
@@ -37,15 +41,22 @@ La predicción de landing estaba acoplada a la ventana visual final: `LandingPre
 ## Evidencia TM
 
 - Soporte a >10 y <=40 ticks: adquirido sin compromiso visual.
-- Misma superficie al entrar en <=10 ticks: conserva identidad y compromete.
+- Misma superficie al entrar en <=10 ticks: conserva identidad; CLEAR anticipa body pero sólo compromete al entrar en <=5 ticks.
 - Primer contacto bloqueante: impide adquisición posterior.
 - Un miss lejano: histéresis; segundo miss: limpieza.
 - Candidato sólo retenido: nunca inicia BODY_LANDING.
 - Gravity Fall no ejecuta un segundo `sweep` en el mismo tick; existe un contador adversarial específico.
 - ETA visual: JUnit cubre 0, 3, 9.5, 10 y >10 ticks.
-- Cancelación parcial: el cliente conserva el frame visible exacto.
+- Cancelación parcial: desde beta.6 el cliente parte del frame parcial exacto y recupera suavemente el HOLD previo en 200 ms.
 - Run **#888 / 35075098789**: build/JUnit, 126 GameTests de servidor, cliente base, First Person, Scale Brews, Fresh Animations y validación de snapshots, todo verde.
 
 ## Cierre
 
 NAV-S03 queda cerrado. La dependencia pública siguiente es NAV-S04; no quedan cambios de producción pendientes en S03.
+
+
+## Refinamiento beta.6 — contacto de pies con intención física
+
+La geometría S03 no cambia: el primer contacto y la cara de pies siguen viniendo del mismo sweep volumétrico. Beta.6 añade una política local del jugador después del hit para distinguir **apoyo** de **roce** sin contaminar el predictor compartido de mobs.
+
+Los holdouts nuevos cubren roce tangencial sin candidato/commit, memoria de un tick frente a `onGround`, persistencia que sí se convierte en soporte, ventanas CLEAR/AMBIGUOUS y recuperación visual a HOLD. La evidencia de CI final se registra en `GF-S06-landing-contact-policy.md`.
