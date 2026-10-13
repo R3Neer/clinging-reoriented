@@ -8,7 +8,11 @@ import net.minecraft.world.phys.Vec3;
 /** Pure continuous collision test for an axis-aligned body translated between two positions. */
 public final class SweptAabb {
     private static final double EPS=1.0E-9D;
-    public record Hit(double fraction,Direction normal) {}
+    public record Hit(double fraction,Direction normal,int normalMask) {
+        public Hit(double fraction,Direction normal){this(fraction,normal,bit(normal));}
+        public boolean includes(Direction direction){return direction!=null&&(normalMask&bit(direction))!=0;}
+        public boolean tied(){return Integer.bitCount(normalMask)>1;}
+    }
     private record Axis(double enter,double exit,Direction normal) {}
     private SweptAabb() {}
 
@@ -22,8 +26,9 @@ public final class SweptAabb {
         double enter=Math.max(x.enter(),Math.max(y.enter(),z.enter()));
         double exit=Math.min(x.exit(),Math.min(y.exit(),z.exit()));
         if(enter>exit+EPS||exit<-EPS||enter>1.0D+EPS||enter<-EPS)return Optional.empty();
-        Direction normal=normalAt(enter,x,y,z,null);
-        return normal==null?Optional.empty():Optional.of(new Hit(Math.max(0.0D,Math.min(1.0D,enter)),normal));
+        int mask=normalMaskAt(enter,x,y,z);
+        Direction normal=firstNormal(mask,x,y,z);
+        return normal==null?Optional.empty():Optional.of(new Hit(Math.max(0.0D,Math.min(1.0D,enter)),normal,mask));
     }
 
     /** Like {@link #hit}, but accepts a corner/edge tie only when the requested normal participates in the first contact. */
@@ -37,18 +42,22 @@ public final class SweptAabb {
         double enter=Math.max(x.enter(),Math.max(y.enter(),z.enter()));
         double exit=Math.min(x.exit(),Math.min(y.exit(),z.exit()));
         if(enter>exit+EPS||exit<-EPS||enter>1.0D+EPS||enter<-EPS)return Optional.empty();
-        Direction normal=normalAt(enter,x,y,z,desired);
-        return normal==desired?Optional.of(new Hit(Math.max(0.0D,Math.min(1.0D,enter)),desired)):Optional.empty();
+        int mask=normalMaskAt(enter,x,y,z);
+        return (mask&bit(desired))!=0?Optional.of(new Hit(Math.max(0.0D,Math.min(1.0D,enter)),desired,mask)):Optional.empty();
     }
 
-    private static Direction normalAt(double enter,Axis x,Axis y,Axis z,Direction desired){
-        if(desired!=null){
-            for(Axis axis:new Axis[]{x,y,z})if(axis.normal()==desired&&Math.abs(axis.enter()-enter)<=EPS)return desired;
-            return null;
-        }
-        for(Axis axis:new Axis[]{x,y,z})if(axis.normal()!=null&&Math.abs(axis.enter()-enter)<=EPS)return axis.normal();
+    private static int normalMaskAt(double enter,Axis x,Axis y,Axis z){
+        int mask=0;
+        for(Axis axis:new Axis[]{x,y,z})if(axis.normal()!=null&&Math.abs(axis.enter()-enter)<=EPS)mask|=bit(axis.normal());
+        return mask;
+    }
+
+    private static Direction firstNormal(int mask,Axis x,Axis y,Axis z){
+        for(Axis axis:new Axis[]{x,y,z})if(axis.normal()!=null&&(mask&bit(axis.normal()))!=0)return axis.normal();
         return null;
     }
+
+    private static int bit(Direction direction){return direction==null?0:1<<direction.get3DDataValue();}
 
     private static Axis axis(double min,double max,double omin,double omax,double delta,Direction negativeNormal,Direction positiveNormal){
         if(Math.abs(delta)<=EPS){

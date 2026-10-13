@@ -119,7 +119,7 @@ jobs:
                   's05-six-turn-retained-camera',
                   's05-gravity-fall-zero-jitter',
                   's05-gravity-fall-velocity-not-gravity',
-                  's05-cancelled-landing-holds-partial',
+                  's05-cancelled-landing-recovers-hold',
                   's05-language-falling',
                   's05-language-elytra',
                   'gravity-fall-full-sphere-360',

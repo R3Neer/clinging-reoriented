@@ -25,7 +25,7 @@ public final class GravityFallState {
         // LandingState already performed the bounded 40-tick sweep earlier in this END_SERVER_TICK.
         // Consume only its current-tick result: Gravity Fall must never run a second world forecast.
         var candidate=LandingState.currentPrediction(player);
-        boolean imminent=candidate.isPresent() && candidate.get().etaTicks()<=BODY_LANDING_HORIZON+1.0E-6D;
+        boolean imminent=candidate.isPresent() && LandingPolicy.bodyApproachReady(candidate.get(),state.landingCandidateStableTicks);
 
         if(!state.gravityFallActive){
             if(state.landingCommitted || imminent)return;

@@ -179,7 +179,8 @@ public final class GameFeelAdversarialGameTests {
 
         p.setDeltaMovement(Vec3.ZERO);GravityFallState.tick(p);
         h.assertTrue(s.gravityFallActive&&!s.gravityFallLanding,"zero crossing retired/landed Gravity Fall without support");
-        p.setDeltaMovement(eastMomentum);
+        // The reserved landing now tests a real feet-first approach to the UP-gravity ceiling.
+        p.setDeltaMovement(new Vec3(0,.25D,0));
 
         var valid=new AtomicBoolean(false);
         var reg=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","s05_reserved"),fixture(p,valid));

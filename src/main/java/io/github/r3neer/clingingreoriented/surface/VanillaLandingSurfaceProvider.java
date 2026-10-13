@@ -26,20 +26,31 @@ public final class VanillaLandingSurfaceProvider implements LandingSurfaceProvid
     }
 
     @Override public Optional<LocalSweep> sweep(Query query,AABB startBody,AABB endBody){
+        return sweepEvidence(query,startBody,endBody).map(value->new LocalSweep(value.contact(),value.fraction(),value.relation().support()));
+    }
+
+    @Override public Optional<LocalSweepEvidence> sweepEvidence(Query query,AABB startBody,AABB endBody){
         AABB swept=new AABB(Math.min(startBody.minX,endBody.minX),Math.min(startBody.minY,endBody.minY),Math.min(startBody.minZ,endBody.minZ),
             Math.max(startBody.maxX,endBody.maxX),Math.max(startBody.maxY,endBody.maxY),Math.max(startBody.maxZ,endBody.maxZ)).inflate(PROBE);
-        double bestFraction=Double.POSITIVE_INFINITY;AABB bestBox=null;Direction bestNormal=null;boolean bestSupport=false;
+        double bestFraction=Double.POSITIVE_INFINITY;AABB bestBox=null;Direction bestNormal=null;ContactRelation bestRelation=null;
         Direction desired=query.gravity().getOpposite();
         for(var shape:query.entity().level().getBlockCollisions(query.entity(),swept))for(var box:shape.toAabbs()){
             var any=SweptAabb.hit(startBody,endBody,box);if(any.isEmpty())continue;
             double fraction=any.get().fraction();
-            boolean supports=SweptAabb.hitForNormal(startBody,endBody,box,desired).filter(h->Math.abs(h.fraction()-fraction)<=TIE).isPresent();
-            if(fraction<bestFraction-TIE || Math.abs(fraction-bestFraction)<=TIE&&supports&&!bestSupport){
-                bestFraction=fraction;bestBox=box;bestNormal=supports?desired:any.get().normal();bestSupport=supports;
+            boolean supports=any.get().includes(desired);
+            ContactRelation relation=supports?(any.get().tied()?ContactRelation.MIXED:ContactRelation.SUPPORT):ContactRelation.NON_SUPPORT;
+            if(fraction<bestFraction-TIE){
+                bestFraction=fraction;bestBox=box;bestNormal=supports?desired:any.get().normal();bestRelation=relation;
+            }else if(Math.abs(fraction-bestFraction)<=TIE){
+                ContactRelation merged=ContactRelation.merge(bestRelation,relation);
+                if((bestRelation==null||!bestRelation.support())&&relation.support()){
+                    bestBox=box;bestNormal=desired;
+                }
+                bestRelation=merged;
             }
         }
         if(bestBox==null)return Optional.empty();
-        return Optional.of(new LocalSweep(contact(bestBox,bestNormal),bestFraction,bestSupport));
+        return Optional.of(new LocalSweepEvidence(contact(bestBox,bestNormal),bestFraction,bestRelation));
     }
 
     @Override public boolean revalidate(Query query, LocalContact contact) {

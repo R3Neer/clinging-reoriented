@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the current **0.1.0-beta.5 prerelease architecture**. Beta.5 is a narrow Gravity Charge Peaceful-mode hotfix over beta.4; the navigation/gamefeel architecture below is otherwise unchanged.
+This document describes the current **0.1.0-beta.6 prerelease architecture**, including contact-aware landing confirmation and cancelled-landing recovery.
 
 Clinging: Reoriented separates **physical gravity**, **camera ownership**, **persistent body attitude**, **aerodynamic response**, **trajectory prediction**, **landing authority**, **impact damage**, **interaction context**, **gravity-aware mob locomotion** and the independent **Gravity Charge projectile lifecycle** instead of treating a gravity-direction write as one monolithic event.
 
@@ -24,7 +24,7 @@ During sustained Gravity Fall, the client sends sparse world-space gaze/forward 
 
 `GravityTransition` plans gravity/yaw coordinate transport but voluntary turns do not rotate world velocity. Gravity Changer remains the gravity-coordinate authority; Clinging records whether physical and visual state is its responsibility and releases ownership when another source takes over.
 
-`VisualTransitions` provides HOLD, LAND and SNAP presentation modes. Local-player LAND uses at most **500 ms / 10 ticks**; ordinary tracked non-player SNAP keeps shorter 180/240 ms turn timing. Cancellation caused by invalidated support may hold the exact current quaternion; lifecycle/context transfer releases ownership.
+`VisualTransitions` provides HOLD, LAND, SNAP and RECOVER presentation modes. Body anticipation is bounded to **500 ms / 10 ticks**; local-player LAND begins within five ticks for clear support or three ticks for confirmed ambiguous support. Ordinary tracked non-player SNAP keeps shorter 180/240 ms turn timing. Cancellation caused by invalidated support recovers toward the pre-landing HOLD over **200 ms / 4 ticks**; lifecycle/context transfer releases ownership.
 
 A camera HOLD created inside an already-active fluid context preserves the retained world frame for that fluid epoch; a later independent fluid entry still crosses the transfer fence and releases an older dry-flight HOLD.
 
@@ -65,7 +65,8 @@ Landing now separates **acquisition** from **presentation**:
 
 - `LandingPrediction.ACQUISITION_TICKS = 40` allows a physically valid support to be discovered up to two seconds ahead;
 - the final visual presentation remains bounded by the shared 10-tick window;
-- `LandingState` stores stable surface identity, gravity, ETA and bounded miss hysteresis;
+- `LandingPolicy` classifies normal/tangential incoming motion and mixed first-contact evidence as clear, ambiguous or grazing;
+- `LandingState` stores stable surface identity, gravity, ETA and bounded miss hysteresis; ambiguous commitment requires two distinct consecutive confirmed server ticks, and missing prediction resets confirmation immediately;
 - a candidate retained only by hysteresis cannot start or maintain visible LAND without current physical confirmation;
 - the first swept contact remains authoritative, so a blocking contact cannot be ignored to select a support behind it;
 - Gravity Fall reuses the candidate computed by landing state rather than performing an independent second world sweep in the same tick;

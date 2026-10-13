@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.0-beta.6] - 2026-10-14
+
+### Contact-aware landings
+
+- Distinguish clear feet-first approaches, ambiguous or mixed contacts and tangential grazes without treating every brief feet contact as support.
+- Keep Reorientation available during acquisition and body anticipation. Commit camera and input only within five ticks of a clear landing, or three ticks of an ambiguous landing after two consecutive confirmed server ticks.
+- Count at most one confirmation per server tick. A missed prediction, skipped tick or changed surface restarts confirmation; retaining a distant candidate through a short miss does not retain its confirmation count.
+- Preserve simultaneous support and lateral contact evidence through the landing surface API, with a default adapter for existing providers.
+- Recover a cancelled landing smoothly toward the retained flight orientation over four ticks / 200 ms. Lifecycle and context transfers release presentation immediately.
+
+### Validation and release
+
+- Add regressions for duplicate same-tick observations, interrupted confirmation, real consecutive-tick commitment, grazes, mixed contacts, commit windows and visual recovery.
+- Run the server/client compatibility matrix, including First Person, Scale Brews and Fresh Animations.
+- Publish the regular and sources JARs from the exact successful main CI artifact.
+
 ## [0.1.0-beta.5] - 2026-09-19
 
 ### Gravity Charge hotfix

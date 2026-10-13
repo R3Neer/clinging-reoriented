@@ -49,11 +49,14 @@ public final class LandingSurfaces {
         }
     }
 
-    public record SweepHit(Contact contact, double fraction, boolean support) {
+    public record SweepHit(Contact contact,double fraction,LandingSurfaceProvider.ContactRelation relation) {
+        public SweepHit(Contact contact,double fraction,boolean support){this(contact,fraction,support?LandingSurfaceProvider.ContactRelation.SUPPORT:LandingSurfaceProvider.ContactRelation.NON_SUPPORT);}
         public SweepHit {
-            if (contact == null || !Double.isFinite(fraction) || fraction < 0.0D || fraction > 1.0D)
+            if (contact == null || !Double.isFinite(fraction) || fraction < 0.0D || fraction > 1.0D || relation==null)
                 throw new IllegalArgumentException("Invalid landing sweep hit");
         }
+        public boolean support(){return relation.support();}
+        public boolean mixed(){return relation.mixed();}
     }
 
     public interface Registration extends AutoCloseable { @Override void close(); }
@@ -92,17 +95,22 @@ public final class LandingSurfaces {
         return Optional.empty();
     }
 
-    /** Earliest geometric contact across providers. At an exact tie, valid support wins before stable provider-id order. */
+    /** Earliest geometric contact across providers. Exact support/non-support ties remain explicitly ambiguous. */
     public static Optional<SweepHit> sweep(LivingEntity entity, Direction gravity, AABB startBody, AABB endBody) {
         if (entity == null || gravity == null || !finite(startBody) || !finite(endBody)) return Optional.empty();
         var query = new LandingSurfaceProvider.Query(entity, gravity);
         SweepHit best = null;
         for (var entry : ORDERED_PROVIDERS) {
-            var local = safeSweep(entry.id(), entry.provider(), query, startBody, endBody);
+            var local = safeSweepEvidence(entry.id(), entry.provider(), query, startBody, endBody);
             if (local.isEmpty()) continue;
-            var hit = new SweepHit(wrap(entry.id(), gravity, local.get().contact()), local.get().fraction(),local.get().support());
-            if (best == null || hit.fraction() < best.fraction() - TIE
-                || Math.abs(hit.fraction()-best.fraction())<=TIE && hit.support() && !best.support()) best = hit;
+            var hit = new SweepHit(wrap(entry.id(), gravity, local.get().contact()),local.get().fraction(),local.get().relation());
+            if(best==null||hit.fraction()<best.fraction()-TIE){best=hit;continue;}
+            if(Math.abs(hit.fraction()-best.fraction())<=TIE){
+                var merged=LandingSurfaceProvider.ContactRelation.merge(best.relation(),hit.relation());
+                Contact contact=best.contact();
+                if(!best.support()&&hit.support())contact=hit.contact();
+                best=new SweepHit(contact,best.fraction(),merged);
+            }
         }
         return Optional.ofNullable(best);
     }
@@ -140,11 +148,11 @@ public final class LandingSurfaces {
         }
     }
 
-    private static Optional<LandingSurfaceProvider.LocalSweep> safeSweep(Identifier id, LandingSurfaceProvider provider,
-                                                                          LandingSurfaceProvider.Query query,
-                                                                          AABB startBody, AABB endBody) {
+    private static Optional<LandingSurfaceProvider.LocalSweepEvidence> safeSweepEvidence(Identifier id, LandingSurfaceProvider provider,
+                                                                                           LandingSurfaceProvider.Query query,
+                                                                                           AABB startBody, AABB endBody) {
         try {
-            var value = provider.sweep(query, startBody, endBody);
+            var value = provider.sweepEvidence(query, startBody, endBody);
             return value == null ? Optional.empty() : value;
         } catch (RuntimeException failure) {
             warnOnce(id, "sweep", failure);

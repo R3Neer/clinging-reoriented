@@ -78,7 +78,7 @@ public final class ClingingClient implements ClientModInitializer {
         });
         ClientPlayNetworking.registerGlobalReceiver(Payloads.VisualCancel.TYPE,(transition,context)->{
             if(context.client().player==null)return;
-            VisualTransitions.cancel(context.client().player,transition.holdCurrent(),transition.sequence());
+            VisualTransitions.cancel(context.client().player,transition.recoverHeldFrame(),transition.sequence());
         });
         ClientPlayNetworking.registerGlobalReceiver(Payloads.EntityVisualTransition.TYPE,(transition,context)->{
             if(transition.direction()<0||transition.direction()>5||!Float.isFinite(transition.yawDelta())||context.client().level==null)return;

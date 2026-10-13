@@ -11,6 +11,17 @@ import net.minecraft.world.phys.Vec3;
  * living entity. Providers never own gravity, placement, camera or landing policy.
  */
 public interface LandingSurfaceProvider {
+    enum ContactRelation {
+        NON_SUPPORT(false,false), SUPPORT(true,false), MIXED(true,true);
+        private final boolean support;private final boolean mixed;
+        ContactRelation(boolean support,boolean mixed){this.support=support;this.mixed=mixed;}
+        public boolean support(){return support;}
+        public boolean mixed(){return mixed;}
+        public static ContactRelation merge(ContactRelation a,ContactRelation b){
+            if(a==null)return b;if(b==null)return a;if(a==MIXED||b==MIXED)return MIXED;
+            return a==b?a:MIXED;
+        }
+    }
     record Query(LivingEntity entity, Direction gravity) {
         public Query {
             if (entity == null || gravity == null) throw new IllegalArgumentException("Landing query requires entity and gravity");
@@ -39,6 +50,14 @@ public interface LandingSurfaceProvider {
         }
     }
 
+    /** Rich first-contact evidence. MIXED means feet and a non-support face arrived simultaneously. */
+    record LocalSweepEvidence(LocalContact contact,double fraction,ContactRelation relation) {
+        public LocalSweepEvidence {
+            if(contact==null||!Double.isFinite(fraction)||fraction<0.0D||fraction>1.0D||relation==null)
+                throw new IllegalArgumentException("Invalid landing sweep evidence");
+        }
+    }
+
     /** Current gravity-relative feet support, if this provider owns one. */
     Optional<LocalContact> currentSupport(Query query);
 
@@ -47,6 +66,14 @@ public interface LandingSurfaceProvider {
      * time horizon are owned by Clinging; providers only report geometric contact.
      */
     default Optional<LocalSweep> sweep(Query query, AABB startBody, AABB endBody) { return Optional.empty(); }
+
+    /** Backward-compatible richer query; existing providers keep their former support/non-support meaning. */
+    default Optional<LocalSweepEvidence> sweepEvidence(Query query,AABB startBody,AABB endBody){
+        var legacy=sweep(query,startBody,endBody);
+        if(legacy==null||legacy.isEmpty())return Optional.empty();
+        var value=legacy.get();
+        return Optional.of(new LocalSweepEvidence(value.contact(),value.fraction(),value.support()?ContactRelation.SUPPORT:ContactRelation.NON_SUPPORT));
+    }
 
     /** Revalidate a previously returned contact under the current query/frame. */
     boolean revalidate(Query query, LocalContact contact);

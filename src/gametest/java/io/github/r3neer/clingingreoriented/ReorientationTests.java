@@ -35,7 +35,7 @@ public final class ReorientationTests {
         h.assertTrue(first==ClingingReoriented.Result.SUCCESS,"first air change: "+first);
         p.removeEffect(clinging);p.addEffect(new MobEffectInstance(clinging,200));p.setOnGround(true);
         var refreshed=ClingingReoriented.attempt(p,new Vec3(0,0,1));
-        h.assertTrue(refreshed==ClingingReoriented.Result.BLOCKED && ClingingReoriented.data(p).airChangeUsed,"refresh and forged ground do not replenish: result="+refreshed+", used="+ClingingReoriented.data(p).airChangeUsed+", ground="+p.onGround());
+        h.assertTrue(refreshed==ClingingReoriented.Result.AIR_CHANGE_USED && ClingingReoriented.data(p).airChangeUsed,"refresh and forged ground do not replenish or become semantic support: result="+refreshed+", used="+ClingingReoriented.data(p).airChangeUsed+", ground="+p.onGround());
         p.setOnGround(false);
         p.removeAllEffects();p.addEffect(new MobEffectInstance(Reorientation.EFFECT,200));
         for(int i=0;i<12;i++)h.assertTrue(ClingingReoriented.attempt(p,i%2==0?new Vec3(0,0,1):new Vec3(0,0,-1))==ClingingReoriented.Result.SUCCESS,"Reorientation alone unlimited");

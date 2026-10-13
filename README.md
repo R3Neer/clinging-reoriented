@@ -2,7 +2,7 @@
 
 The floor is wherever you decide it is.
 
-**Clinging: Reoriented** turns the Clinging effect from Alex's Mobs into an airborne gravity ability for Minecraft 26.2 on Fabric. Leave your local floor, release **Space**, look toward another world-cardinal direction and press Space again. Clinging grants one voluntary airborne gravity decision; **Reorientation** removes that one-turn limit. **0.1.0-beta.5** is the current prerelease and includes the gravity-navigation/gamefeel campaign described below.
+**Clinging: Reoriented** turns the Clinging effect from Alex's Mobs into an airborne gravity ability for Minecraft 26.2 on Fabric. Leave your local floor, release **Space**, look toward another world-cardinal direction and press Space again. Clinging grants one voluntary airborne gravity decision; **Reorientation** removes that one-turn limit. **0.1.0-beta.6** is the current prerelease and includes the gravity-navigation/gamefeel campaign described below.
 
 [![Minecraft 26.2](https://img.shields.io/badge/Minecraft-26.2-62B47A)](https://www.minecraft.net/)
 [![Fabric](https://img.shields.io/badge/Loader-Fabric-DDBD3B)](https://fabricmc.net/)
@@ -17,7 +17,7 @@ A voluntary turn changes **physical gravity immediately** but preserves the exis
 
 The local player's camera is independent from logical gravity. Free-flight turns retain the world frame that was actually being rendered, so chained Reorientation choices do not drag the view through every gravity basis. During sustained Gravity Fall the camera also gains **full-sphere look**: it can pass through both poles and complete 360-degree loops while horizontal and vertical mouse intent remains consistent on screen. First- and third-person views share that same look frame. On exit, the same viewing direction returns to ordinary vanilla yaw/pitch without a camera snap.
 
-Landing prediction now separates **acquisition from presentation**. A valid future support can be tracked up to **40 ticks / 2 seconds** ahead, while the visible landing manoeuvre remains at most **10 ticks / 500 ms** and is timed to finish at the predicted touchdown. New gravity requests during `LANDING_COMMITTED` are discarded, never queued; invalidated support preserves the current visible frame instead of snapping backward.
+Landing prediction distinguishes a clear feet-first approach, ambiguous support and tangential grazes. Future support can be tracked up to **40 ticks / 2 seconds** ahead, with body anticipation bounded to **10 ticks / 500 ms**. Camera and controls commit only in the final **5 ticks** for a clear landing, or **3 ticks** for an ambiguous landing after confirmation on **two consecutive server ticks**. Repeated checks in one tick do not count twice, and losing the prediction restarts confirmation. Grazes preserve the opportunity to use Reorientation. New gravity requests during `LANDING_COMMITTED` are discarded, never queued; a cancelled landing eases back toward the retained flight orientation over **4 ticks / 200 ms**.
 
 ## Gravity Fall body and aerodynamics
 
@@ -113,7 +113,7 @@ The exact Alchemical Leather ownership and validation contract is recorded in [t
 
 ## Project status
 
-**0.1.0-beta.5** is the current beta. It unifies Gravity Fall aerodynamics, earlier landing acquisition, camera-relative water controls and general gravity-aware mob locomotion on the same physical/support model. Grounded gravity planning is bounded to at most **20 transition forecasts per local plan**, **32 new plans per level/tick** and **4 per 64×64 region/tick**; committed flight uses only a short reaction-bound monitor until support/recovery.
+**0.1.0-beta.6** is the current beta. It unifies Gravity Fall aerodynamics, earlier landing acquisition, camera-relative water controls and general gravity-aware mob locomotion on the same physical/support model. Grounded gravity planning is bounded to at most **20 transition forecasts per local plan**, **32 new plans per level/tick** and **4 per 64×64 region/tick**; committed flight uses only a short reaction-bound monitor until support/recovery.
 
 The release gate covers localization parity, build/JUnit, required server GameTests, default client, First Person, optional Scale Brews server/client, pinned Fresh Animations/Player Extension and semantic screenshot validation. Prerelease artifacts are created only from the exact successful `main` CI artifact, never from a second build.
 

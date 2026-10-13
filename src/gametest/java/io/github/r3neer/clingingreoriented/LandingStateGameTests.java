@@ -61,6 +61,96 @@ public final class LandingStateGameTests {
         h.succeed();
     }
 
+
+    @GameTest(padding=16)
+    public void tangentialFeetGrazeDoesNotBecomeLandingCandidate(GameTestHelper h){
+        var p=managed(h,Direction.DOWN,Direction.EAST);p.setDeltaMovement(new Vec3(1.0D,-.05D,0));
+        var valid=new AtomicBoolean(true);var supportNow=new AtomicBoolean(false);
+        var reg=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","feet_graze"),fixture(p,valid,supportNow,true));
+        try{
+            LandingState.tick(p);var s=ClingingReoriented.data(p);
+            h.assertTrue(s.landingCandidate==null,"near-tangential feet contact must remain a graze, not a landing candidate");
+            h.assertTrue(s.landingGrazeKey!=null&&s.landingGrazeGravity==Direction.DOWN,"graze prediction must retain one-tick contact identity");
+            h.assertFalse(s.landingCommitted,"near-tangential feet contact must not lock gravity input");
+        }finally{reg.close();}
+        h.succeed();
+    }
+
+    @GameTest(padding=16)
+    public void simultaneousFeetAndLateralProvidersRequirePersistence(GameTestHelper h){
+        var p=managed(h,Direction.DOWN,Direction.EAST);p.setDeltaMovement(new Vec3(.5D,-.4D,0));
+        var valid=new AtomicBoolean(true);var supportNow=new AtomicBoolean(false);
+        var blocker=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","corner_a_blocker"),fixture(p,valid,supportNow,false));
+        var feet=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","corner_b_feet"),fixture(p,valid,supportNow,true));
+        try{
+            var start=p.getBoundingBox().deflate(1.0E-7D);var end=start.move(p.getDeltaMovement());
+            var hit=LandingSurfaces.sweep(p,Direction.DOWN,start,end).orElseThrow();
+            h.assertTrue(hit.support()&&hit.mixed(),"exact support/blocker tie must retain mixed first-contact evidence");
+            LandingState.tick(p);var s=ClingingReoriented.data(p);
+            h.assertTrue(s.landingCandidate!=null&&s.landingCandidate.approach()==LandingPolicy.Approach.AMBIGUOUS,
+                "feet+lateral tie must become an ambiguous landing candidate");
+            h.assertFalse(s.landingCommitted,"first mixed observation must not lock gravity input");
+            LandingState.tick(p);
+            h.assertFalse(s.landingCommitted,"a repeated observation in the same tick must not confirm persistence");
+            h.runAfterDelay(1,()->{
+                try{
+                    LandingState.tick(p);
+                    h.assertTrue(s.landingCommitted,"same mixed contact may commit on the next consecutive tick");
+                    h.succeed();
+                }finally{feet.close();blocker.close();}
+            });
+        }catch(RuntimeException|Error failure){feet.close();blocker.close();throw failure;}
+    }
+
+    @GameTest(padding=16)
+    public void repeatedObservationInSameTickDoesNotSatisfyPersistence(GameTestHelper h){
+        var p=managed(h,Direction.DOWN,Direction.EAST);p.setDeltaMovement(new Vec3(.5D,-.4D,0));
+        var valid=new AtomicBoolean(true);var supportNow=new AtomicBoolean(false);
+        var blocker=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","repeat_blocker"),fixture(p,valid,supportNow,false));
+        var feet=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","repeat_feet"),fixture(p,valid,supportNow,true));
+        try{
+            LandingState.tick(p);LandingState.tick(p);var s=ClingingReoriented.data(p);
+            h.assertFalse(s.landingCommitted,"two observations in the same server tick are not two consecutive ticks");
+        }finally{feet.close();blocker.close();}
+        h.succeed();
+    }
+
+    @GameTest(padding=16)
+    public void interruptedObservationDoesNotSatisfyConsecutivePersistence(GameTestHelper h){
+        var p=managed(h,Direction.DOWN,Direction.EAST);p.setDeltaMovement(new Vec3(.5D,-.4D,0));
+        var valid=new AtomicBoolean(true);var supportNow=new AtomicBoolean(false);
+        var blocker=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","gap_blocker"),fixture(p,valid,supportNow,false));
+        var feet=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","gap_feet"),fixture(p,valid,supportNow,true));
+        try{
+            LandingState.tick(p);var s=ClingingReoriented.data(p);
+            // Recreate a candidate retained through the permitted far-prediction miss.
+            s.landingCandidate=new LandingPrediction.Candidate(s.landingCandidate.contact(),Direction.DOWN,20,
+                LandingPolicy.Approach.AMBIGUOUS,.4,.5);
+            s.landingCandidateTick=p.level().getGameTime()-1;s.landingCandidateConfirmed=false;s.landingCandidateMisses=1;
+            LandingState.tick(p);
+            h.assertFalse(s.landingCommitted,"reacquisition after a missed forecast must restart consecutive confirmation");
+        }finally{feet.close();blocker.close();}
+        h.succeed();
+    }
+
+
+    @GameTest(padding=16)
+    public void predictedGrazeSuppressesFirstGroundFlagButPersistentFeetSupportWins(GameTestHelper h){
+        var p=managed(h,Direction.DOWN,Direction.EAST);var valid=new AtomicBoolean(true);var supportNow=new AtomicBoolean(true);
+        var reg=LandingSurfaces.register(Identifier.fromNamespaceAndPath("clinging_reoriented_test","graze_ground_flag"),fixture(p,valid,supportNow,true));
+        try{
+            p.setOnGround(true);p.setDeltaMovement(new Vec3(1.0D,0,0));
+            var contact=LandingSurfaces.currentSupport(p,Direction.DOWN).orElseThrow();
+            var s=ClingingReoriented.data(p);long now=p.level().getGameTime();
+            s.landingGrazeKey=contact.key();s.landingGrazeGravity=Direction.DOWN;s.landingGrazeUntilTick=now;
+            h.assertFalse(AirChanges.grounded(p),"first onGround tick for the predicted graze must not become semantic support");
+            h.assertTrue(GravityInput.available(p),"graze-suppressed ground flag must not steal the Reorientation rescue input");
+            s.landingGrazeUntilTick=now-1L;
+            h.assertTrue(AirChanges.grounded(p),"feet contact that persists beyond graze memory must become real support");
+        }finally{reg.close();}
+        h.succeed();
+    }
+
     @GameTest(padding=40)
     public void acquiresLongRangeBeforePresentationAndKeepsSurfaceIdentity(GameTestHelper h){
         var p=managed(h,Direction.DOWN,Direction.EAST);p.snapTo(h.absoluteVec(new Vec3(5.5,30,5.5)));p.setDeltaMovement(new Vec3(0,-.25,0));
@@ -74,10 +164,15 @@ public final class LandingStateGameTests {
             h.assertFalse(s.landingCommitted,"early acquisition must not commit camera/body presentation");
             var key=s.landingCandidate.contact().key();
             p.snapTo(h.absoluteVec(new Vec3(5.5,16,5.5)));p.setDeltaMovement(new Vec3(0,-.25,0));LandingState.tick(p);
-            h.assertTrue(s.landingCandidate!=null&&s.landingCandidate.contact().key().equals(key),"entering presentation window must preserve acquired surface identity");
-            h.assertTrue(s.landingCandidateStableTicks>=2,"same acquired surface should accumulate stability");
-            h.assertTrue(s.landingCandidateConfirmed,"presentation may commit only from the current prediction");
-            h.assertTrue(s.landingCommitted,"same surface should commit after its ETA enters the 10-tick visual window");
+            h.assertTrue(s.landingCandidate!=null&&s.landingCandidate.contact().key().equals(key),"entering body-approach window must preserve acquired surface identity");
+            h.assertTrue(s.landingCandidateStableTicks==1,"same-tick movement must preserve identity without adding another confirmation tick");
+            h.assertTrue(s.landingCandidateConfirmed,"presentation may use only the current physical prediction");
+            h.assertTrue(s.landingCandidate.approach()==LandingPolicy.Approach.CLEAR,"straight feet-first approach should classify as clear");
+            h.assertTrue(s.landingCandidate.etaTicks()>LandingPolicy.CLEAR_COMMIT_TICKS&&s.landingCandidate.etaTicks()<=LandingTiming.PRESENTATION_TICKS,
+                "clear support should be visible to body anticipation before input lock; eta="+s.landingCandidate.etaTicks());
+            h.assertFalse(s.landingCommitted,"clear support must not lock input while still outside the final five ticks");
+            p.snapTo(new Vec3(p.getX(),targetY+1.0D,p.getZ()));p.setDeltaMovement(new Vec3(0,-.25,0));LandingState.tick(p);
+            h.assertTrue(s.landingCommitted,"clear support should commit once ETA enters the final five ticks");
         }finally{reg.close();}
         h.succeed();
     }
@@ -91,6 +186,7 @@ public final class LandingStateGameTests {
             LandingState.tick(p);var s=ClingingReoriented.data(p);h.assertTrue(s.landingCandidate!=null,"fixture should acquire far support");
             visible.set(false);LandingState.tick(p);
             h.assertTrue(s.landingCandidate!=null&&s.landingCandidateMisses==1,"one far miss should retain candidate only as hysteresis");
+            h.assertTrue(s.landingCandidateStableTicks==0,"a lost prediction must reset confirmation even while retaining acquisition");
             h.assertFalse(s.landingCandidateConfirmed,"hysteresis-retained candidate must not masquerade as a current forecast");
             h.assertFalse(s.landingCommitted,"hysteresis alone must never start landing presentation");
             LandingState.tick(p);

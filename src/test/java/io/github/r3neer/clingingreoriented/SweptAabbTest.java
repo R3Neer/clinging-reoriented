@@ -21,7 +21,10 @@ final class SweptAabbTest {
     @Test void cornerTieCanAcknowledgeFeetContact(){
         var corner=new AABB(2,-1,-1,3,0,2);
         var end=BODY.move(2,-2,0);
-        assertTrue(SweptAabb.hitForNormal(BODY,end,corner,Direction.UP).isPresent());
+        var feet=SweptAabb.hitForNormal(BODY,end,corner,Direction.UP).orElseThrow();
+        assertTrue(feet.tied());
+        assertTrue(feet.includes(Direction.UP));
+        assertTrue(feet.includes(Direction.WEST));
         assertTrue(SweptAabb.hitForNormal(BODY,end,corner,Direction.WEST).isPresent());
     }
     @Test void parallelSeparatedAxisCannotCollide(){

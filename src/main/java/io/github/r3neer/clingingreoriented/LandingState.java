@@ -5,6 +5,7 @@ import io.github.r3neer.clingingreoriented.api.LandingSurfaces;
 import java.util.Optional;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 
 /** Server authority for early landing acquisition and the shorter final presentation commitment. */
 public final class LandingState {
@@ -53,7 +54,7 @@ public final class LandingState {
 
         GravityTransition.TurnKind kind=kindFor(state,gravity);
         if(kind==null||predicted.isEmpty())return;
-        if(predicted.get().etaTicks()<=LandingTiming.PRESENTATION_TICKS+PRESENTATION_EPS)commit(player,predicted.get(),kind);
+        if(LandingPolicy.shouldCommit(predicted.get(),state.landingCandidateStableTicks))commit(player,predicted.get(),kind);
     }
 
     static Optional<LandingPrediction.Candidate> currentPrediction(ServerPlayer player){
@@ -62,6 +63,18 @@ public final class LandingState {
         if(!state.landingCandidateConfirmed || state.landingCandidate==null
             || state.landingCandidateTick!=player.level().getGameTime())return Optional.empty();
         return Optional.of(state.landingCandidate);
+    }
+
+    /** Physical feet contact is not yet semantic support while a matching graze/ambiguous epoch is unresolved. */
+    static boolean acceptsSupport(Player player,Direction gravity,LandingSurfaces.Contact support){
+        if(player==null||gravity==null||support==null)return false;
+        var state=ClingingReoriented.data(player);long now=player.level().getGameTime();
+        if(state.landingGrazeKey!=null&&state.landingGrazeGravity==gravity&&now<=state.landingGrazeUntilTick
+            &&state.landingGrazeKey.equals(support.key()))return false;
+        var candidate=state.landingCandidate;
+        return candidate==null||candidate.gravity()!=gravity||!candidate.contact().key().equals(support.key())
+            ||candidate.approach()!=LandingPolicy.Approach.AMBIGUOUS
+            ||state.landingCandidateStableTicks>=LandingPolicy.AMBIGUOUS_STABLE_TICKS;
     }
 
     public static boolean committed(ServerPlayer player){
@@ -73,16 +86,13 @@ public final class LandingState {
         return true;
     }
 
-    /**
-     * Abort an already-issued LAND presentation while preserving the exact visible frame. A LAND
-     * packet owns client presentation even when it did not originate from a pre-existing HOLD, so
-     * cancellation is keyed by landingCommitted rather than freeFlightVisualHeld.
-     */
+    /** Abort LAND into a short recovery; lifecycle/transfer cancellation still releases immediately. */
     public static void cancel(ServerPlayer player,boolean visualBecameNonCanonical){
         var state=ClingingReoriented.data(player);
         if(state.landingCommitted)Payloads.cancelLanding(player,true);
         state.clearLandingCommit();state.clearLandingCandidate();
-        if(visualBecameNonCanonical)state.visualBaseKnown=false;
+        // A cancelled LAND now eases back to the pre-landing HOLD, so the previous visual base stays canonical.
+        if(visualBecameNonCanonical&&!state.freeFlightVisualHeld)state.visualBaseKnown=false;
     }
 
     public static void lifecycleClear(ServerPlayer player){clearTransient(ClingingReoriented.data(player));}
@@ -95,6 +105,8 @@ public final class LandingState {
 
     private static Optional<LandingPrediction.Candidate> updateCandidate(ServerPlayer player,PlayerData state,Direction gravity){
         long tick=player.level().getGameTime();
+        long previousTick=state.landingCandidateTick;
+        boolean previousConfirmed=state.landingCandidateConfirmed;
         state.landingCandidateConfirmed=false;
         state.landingCandidateTick=tick;
         Optional<LandingPrediction.Candidate> predicted=LandingPrediction.predict(player,LandingPrediction.ACQUISITION_TICKS);
@@ -104,11 +116,22 @@ public final class LandingState {
                 state.clearLandingCandidate();
                 return Optional.empty();
             }
+            if(current.approach()==LandingPolicy.Approach.GRAZE){
+                state.landingGrazeKey=current.contact().key();
+                state.landingGrazeGravity=gravity;
+                state.landingGrazeUntilTick=tick+1L;
+                state.clearLandingCandidate();
+                return Optional.empty();
+            }
             boolean sameEpoch=state.landingCandidate!=null && state.landingCandidateRevision==state.revision
                 && same(current.contact(),state.landingCandidate.contact());
             if(sameEpoch){
                 state.landingCandidate=current;
-                state.landingCandidateStableTicks=Math.min(1_000_000,state.landingCandidateStableTicks+1);
+                if(!previousConfirmed || previousTick<tick-1L || previousTick>tick){
+                    state.landingCandidateStableTicks=1;
+                }else if(previousTick==tick-1L){
+                    state.landingCandidateStableTicks=Math.min(1_000_000,state.landingCandidateStableTicks+1);
+                }
                 state.landingCandidateMisses=0;
             }else{
                 state.clearLandingCandidate();
@@ -122,6 +145,8 @@ public final class LandingState {
         }
 
         if(state.landingCandidate!=null){
+            // Retaining acquisition through a short miss does not retain contact confirmation.
+            state.landingCandidateStableTicks=0;
             boolean epochValid=state.landingCandidateRevision==state.revision
                 && state.landingCandidate.gravity()==gravity
                 && LandingSurfaces.revalidate(player,gravity,state.landingCandidate.contact());
@@ -137,18 +162,18 @@ public final class LandingState {
     }
 
     private static void clearTransient(PlayerData state){
-        state.airborneTicks=0;state.clearLandingCommit();state.clearLandingCandidate();state.visualBaseKnown=false;
+        state.airborneTicks=0;state.clearLandingCommit();state.clearLandingCandidate();state.clearLandingGraze();state.visualBaseKnown=false;
         state.freeFlightVisualHeld=false;state.freeFlightVisualHeldInFluid=false;
     }
 
-    private static void clearFluidTransientPreservingHold(PlayerData state){state.airborneTicks=0;state.clearLandingCommit();state.clearLandingCandidate();}
+    private static void clearFluidTransientPreservingHold(PlayerData state){state.airborneTicks=0;state.clearLandingCommit();state.clearLandingCandidate();state.clearLandingGraze();}
 
     /** Real support is authoritative: retire any remaining LAND/HOLD ownership exactly at touchdown. */
     private static void touchdown(ServerPlayer player,Direction gravity){
         var state=ClingingReoriented.data(player);boolean wasCommitted=state.landingCommitted;
         if(wasCommitted||state.freeFlightVisualHeld)Payloads.cancelLanding(player,false);
         state.freeFlightVisualHeld=false;state.freeFlightVisualHeldInFluid=false;state.airborneTicks=0;
-        state.clearLandingCommit();state.clearLandingCandidate();state.visualBaseDirection=gravity;state.visualBaseKnown=true;
+        state.clearLandingCommit();state.clearLandingCandidate();state.clearLandingGraze();state.visualBaseDirection=gravity;state.visualBaseKnown=true;
     }
 
     private static void commit(ServerPlayer player,LandingPrediction.Candidate candidate,GravityTransition.TurnKind kind){
